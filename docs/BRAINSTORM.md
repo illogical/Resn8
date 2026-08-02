@@ -144,7 +144,8 @@ This randomization needs to support being serialized so that it can be remembere
     - Track index of which playlist was selected
 - Playlist generation
     - Be able to create playlists based upon randomization algorthms
-        - 
+-Logging
+    -Keeping a play history
 - Configure playback speed
 - Tracking where the user left off
     - Which playlist?
