@@ -58,7 +58,7 @@ fun Resn8App(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Resn8 Audio Player") }
+                title = { Text("Resn8") }
             )
         },
         bottomBar = {

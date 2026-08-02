@@ -1,13 +1,17 @@
 package com.app.resn8.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,11 +65,21 @@ fun MiniPlayer(
                 )
             }
 
-            Text(
-                text = "Score: $likeScore",
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
+            if (likeScore > 0) {
+                Icon(
+                    imageVector = Icons.Filled.ThumbUp,
+                    contentDescription = "Liked",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 8.dp).size(20.dp)
+                )
+            } else if (likeScore < 0) {
+                Icon(
+                    imageVector = Icons.Filled.ThumbDown,
+                    contentDescription = "Disliked",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 8.dp).size(20.dp)
+                )
+            }
 
             IconButton(onClick = onPlayPauseClick) {
                 Text(
