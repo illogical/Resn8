@@ -91,4 +91,33 @@ class Converters {
     @TypeConverter
     fun toQueueFilterSnapshot(value: String?): QueueFilterSnapshot? =
         value?.let { runCatching { json.decodeFromString<QueueFilterSnapshot>(it) }.getOrNull() }
+
+    @TypeConverter
+    fun fromLibrarySurface(surface: com.app.resn8.domain.model.LibrarySurface?): String? = surface?.name
+
+    @TypeConverter
+    fun toLibrarySurface(value: String?): com.app.resn8.domain.model.LibrarySurface? =
+        value?.let { enumValueOf<com.app.resn8.domain.model.LibrarySurface>(it) }
+
+    @TypeConverter
+    fun fromMetadataGroupKey(key: com.app.resn8.domain.model.MetadataGroupKey?): String? = key?.serialize()
+
+    @TypeConverter
+    fun toMetadataGroupKey(value: String?): com.app.resn8.domain.model.MetadataGroupKey? =
+        com.app.resn8.domain.model.MetadataGroupKey.deserialize(value)
+
+    @TypeConverter
+    fun fromAvailabilityFilter(filter: com.app.resn8.domain.model.AvailabilityFilter?): String? = filter?.name
+
+    @TypeConverter
+    fun toAvailabilityFilter(value: String?): com.app.resn8.domain.model.AvailabilityFilter? =
+        value?.let { enumValueOf<com.app.resn8.domain.model.AvailabilityFilter>(it) }
+
+    @TypeConverter
+    fun fromLibraryFilterSnapshot(snapshot: com.app.resn8.domain.model.LibraryFilterSnapshot?): String? =
+        snapshot?.let { json.encodeToString(it) }
+
+    @TypeConverter
+    fun toLibraryFilterSnapshot(value: String?): com.app.resn8.domain.model.LibraryFilterSnapshot? =
+        value?.let { runCatching { json.decodeFromString<com.app.resn8.domain.model.LibraryFilterSnapshot>(it) }.getOrNull() }
 }

@@ -5,6 +5,7 @@ enum class SortOrder {
     ALBUM,
     TITLE,
     TRACK,
+    RECENTLY_ADDED,
     MOST_PLAYED,
     LEAST_PLAYED,
     UNPLAYED,

@@ -102,15 +102,15 @@ To exercise storage access, media playback, and removable-storage behavior, run 
 
 Implementation is organized into dependency-ordered milestones:
 
-1. application foundation and domain contracts;
-2. durable library persistence;
-3. folder selection and indexing;
-4. library browsing;
-5. reliable background playback;
-6. ratings and meaningful-play tracking;
-7. manual playlists;
-8. smart randomized queues;
-9. full queue and browsing-context restoration.
+1. [x] **Milestone 0**: application foundation and domain contracts
+2. [x] **Milestone 1**: durable library persistence
+3. [x] **Milestone 2**: folder selection and indexing
+4. [x] **Milestone 3**: library and folder browsing
+5. [ ] **Milestone 4**: reliable background playback
+6. [ ] **Milestone 5**: ratings and meaningful-play tracking
+7. [ ] **Milestone 6**: manual playlists
+8. [ ] **Milestone 7**: smart randomized queues
+9. [ ] **Milestone 8**: full queue and browsing-context restoration
 
 Post-MVP goals include multiple collections and source roots, contextual and flat-folder library profiles, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore.
 

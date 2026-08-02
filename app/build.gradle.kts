@@ -32,9 +32,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures {
-        compose = true
+    sourceSets {
+        getByName("test").assets.srcDir("$projectDir/schemas")
     }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -80,8 +81,17 @@ dependencies {
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.room.paging)
     ksp(libs.room.compiler)
     testImplementation(libs.room.testing)
+
+    // Paging
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
+    testImplementation(libs.paging.testing)
+
+    // Coil Image Loading
+    implementation(libs.coil.compose)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)

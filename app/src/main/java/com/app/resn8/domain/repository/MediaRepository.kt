@@ -1,15 +1,40 @@
 package com.app.resn8.domain.repository
 
+import androidx.paging.PagingData
+import com.app.resn8.domain.model.AlbumSummary
+import com.app.resn8.domain.model.ArtistSummary
+import com.app.resn8.domain.model.AvailabilityFilter
+import com.app.resn8.domain.model.FolderBreadcrumb
+import com.app.resn8.domain.model.FolderListItem
 import com.app.resn8.domain.model.FolderNode
+import com.app.resn8.domain.model.LibraryQuery
 import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.domain.model.PlaybackHistoryResult
 import com.app.resn8.domain.model.ScanResult
+import com.app.resn8.domain.model.SelectionResolutionResult
 import com.app.resn8.domain.model.SortOrder
 import com.app.resn8.domain.model.StagedFolder
 import com.app.resn8.domain.model.StagedMedia
 import kotlinx.coroutines.flow.Flow
 
 interface MediaRepository {
+    fun getArtistSummariesPaged(query: LibraryQuery): Flow<PagingData<ArtistSummary>>
+    fun getAlbumSummariesPaged(query: LibraryQuery): Flow<PagingData<AlbumSummary>>
+    fun getTracksPaged(query: LibraryQuery): Flow<PagingData<MediaFile>>
+    
+    fun getRootFolderNode(sourceId: String): Flow<FolderNode?>
+    fun getDirectChildFolders(parentId: String): Flow<List<FolderListItem>>
+    fun getFolderBreadcrumbs(folderId: String): Flow<List<FolderBreadcrumb>>
+    fun getPagedFolderMedia(folderId: String, query: LibraryQuery): Flow<PagingData<MediaFile>>
+
+    suspend fun resolveSelectionMediaIds(
+        selectedFileIds: Set<String>,
+        selectedFolderIds: Set<String>,
+        availability: AvailabilityFilter = AvailabilityFilter.ALL
+    ): SelectionResolutionResult
+
+    suspend fun snapshotVisibleMediaIds(query: LibraryQuery): List<String>
+
     fun getMediaFilesFlow(
         collectionId: String?,
         folderId: String? = null,

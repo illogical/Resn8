@@ -34,11 +34,11 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 ## Milestone 3 — Browse the Indexed Library (P0)
 
-- [ ] **T016 — Implement indexed library queries.** Provide reactive/paged artist, album, all-track, and folder-tree queries with availability, filter, search-text, and deterministic sort parameters.
-- [ ] **T017 — Build Artist and Album views.** Drill from artists to their albums/tracks and from albums to tracks; order by disc/track with title/filename fallbacks and clear unknown-metadata grouping.
-- [ ] **T018 — Build the folder browser.** Mirror indexed relative folders, show indexed/unavailable files, support file/folder multi-selection, and resolve folder selections to unique descendant media IDs.
-- [ ] **T019 — Add sort/filter controls.** Support artist, album, title/filename, track, recently added/indexed, most/least played, unplayed, most/least recent, most liked, and filter-out-disliked where appropriate.
-- [ ] **T020 — Verify large-library behavior.** Benchmark seeded datasets up to 25,000 media rows; remove main-thread I/O and avoid loading artwork/full lists eagerly.
+- [x] **T016 — Implement indexed library queries.** Provide reactive/paged artist, album, all-track, and folder-tree queries with availability, filter, search-text, and deterministic sort parameters.
+- [x] **T017 — Build Artist and Album views.** Drill from artists to their albums/tracks and from albums to tracks; order by disc/track with title/filename fallbacks and clear unknown-metadata grouping.
+- [x] **T018 — Build the folder browser.** Mirror indexed relative folders, show indexed/unavailable files, support file/folder multi-selection, and resolve folder selections to unique descendant media IDs.
+- [x] **T019 — Add sort/filter controls.** Support artist, album, title/filename, track, recently added/indexed, most/least played, unplayed, most/least recent, most liked, and filter-out-disliked where appropriate.
+- [x] **T020 — Verify large-library behavior.** Benchmark seeded datasets up to 25,000 media rows; remove main-thread I/O and avoid loading artwork/full lists eagerly.
 
 **Exit:** Users can efficiently find and select music by metadata or original folder structure.
 

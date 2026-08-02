@@ -27,6 +27,9 @@ import com.app.resn8.data.database.entity.StagedFolderEntity
 import com.app.resn8.data.database.entity.StagedMediaEntity
 import com.app.resn8.data.database.entity.UiSessionStateEntity
 
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
 @Database(
     entities = [
         CollectionEntity::class,
@@ -43,7 +46,7 @@ import com.app.resn8.data.database.entity.UiSessionStateEntity
         SavedQueueItemEntity::class,
         UiSessionStateEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -60,12 +63,23 @@ abstract class Resn8Database : RoomDatabase() {
     companion object {
         private const val DB_NAME = "resn8_database.db"
 
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE ui_session_state ADD COLUMN selectedSourceId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE ui_session_state ADD COLUMN selectedArtistKey TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE ui_session_state ADD COLUMN selectedAlbumKey TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE ui_session_state ADD COLUMN activeSurface TEXT NOT NULL DEFAULT 'ARTISTS'")
+                db.execSQL("ALTER TABLE ui_session_state ADD COLUMN libraryFilterSnapshot TEXT DEFAULT NULL")
+            }
+        }
+
         fun buildDatabase(context: Context): Resn8Database {
             return Room.databaseBuilder(
                 context.applicationContext,
                 Resn8Database::class.java,
                 DB_NAME
-            ).build()
+            ).addMigrations(MIGRATION_1_2)
+                .build()
         }
 
         fun buildInMemoryDatabase(context: Context): Resn8Database {

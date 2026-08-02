@@ -3,6 +3,9 @@ package com.app.resn8.data.database.entity
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
+import com.app.resn8.domain.model.LibraryFilterSnapshot
+import com.app.resn8.domain.model.LibrarySurface
+import com.app.resn8.domain.model.MetadataGroupKey
 import com.app.resn8.domain.model.QueueFilterSnapshot
 import com.app.resn8.domain.model.SortOrder
 import com.app.resn8.domain.model.UiSessionState
@@ -46,26 +49,34 @@ data class UiSessionStateEntity(
     @PrimaryKey val id: Int = 1,
     val currentRoute: String,
     val selectedCollectionId: String?,
+    val selectedSourceId: String? = null,
     val selectedFolderId: String?,
     val selectedArtist: String?,
     val selectedAlbum: String?,
+    val selectedArtistKey: MetadataGroupKey? = null,
+    val selectedAlbumKey: MetadataGroupKey? = null,
     val selectedPlaylistId: String?,
     val activeQueueId: String?,
     val activeSearchQuery: String?,
     val activeSort: SortOrder,
+    val activeSurface: LibrarySurface = LibrarySurface.ARTISTS,
+    val libraryFilterSnapshot: LibraryFilterSnapshot? = LibraryFilterSnapshot(),
     val activeFilterSnapshot: QueueFilterSnapshot?
 )
 
 fun UiSessionStateEntity.toDomain() = UiSessionState(
     currentRoute = currentRoute,
     selectedCollectionId = selectedCollectionId,
+    selectedSourceId = selectedSourceId,
     selectedFolderId = selectedFolderId,
-    selectedArtist = selectedArtist,
-    selectedAlbum = selectedAlbum,
+    selectedArtistKey = selectedArtistKey ?: selectedArtist?.let { MetadataGroupKey.Known(it) },
+    selectedAlbumKey = selectedAlbumKey ?: selectedAlbum?.let { MetadataGroupKey.Known(it) },
     selectedPlaylistId = selectedPlaylistId,
     activeQueueId = activeQueueId,
     activeSearchQuery = activeSearchQuery,
     activeSort = activeSort,
+    activeSurface = activeSurface,
+    libraryFilterSnapshot = libraryFilterSnapshot ?: LibraryFilterSnapshot(),
     activeFilterSnapshot = activeFilterSnapshot
 )
 
@@ -73,12 +84,17 @@ fun UiSessionState.toEntity() = UiSessionStateEntity(
     id = 1,
     currentRoute = currentRoute,
     selectedCollectionId = selectedCollectionId,
+    selectedSourceId = selectedSourceId,
     selectedFolderId = selectedFolderId,
-    selectedArtist = selectedArtist,
-    selectedAlbum = selectedAlbum,
+    selectedArtist = (selectedArtistKey as? MetadataGroupKey.Known)?.value,
+    selectedAlbum = (selectedAlbumKey as? MetadataGroupKey.Known)?.value,
+    selectedArtistKey = selectedArtistKey,
+    selectedAlbumKey = selectedAlbumKey,
     selectedPlaylistId = selectedPlaylistId,
     activeQueueId = activeQueueId,
     activeSearchQuery = activeSearchQuery,
     activeSort = activeSort,
+    activeSurface = activeSurface,
+    libraryFilterSnapshot = libraryFilterSnapshot,
     activeFilterSnapshot = activeFilterSnapshot
 )

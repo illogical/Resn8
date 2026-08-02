@@ -1,9 +1,18 @@
 package com.app.resn8.data.repository
 
+import androidx.paging.PagingData
+import com.app.resn8.domain.model.AlbumSummary
+import com.app.resn8.domain.model.ArtistSummary
+import com.app.resn8.domain.model.AvailabilityFilter
+import com.app.resn8.domain.model.FolderBreadcrumb
+import com.app.resn8.domain.model.FolderListItem
 import com.app.resn8.domain.model.FolderNode
+import com.app.resn8.domain.model.LibraryQuery
 import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.domain.model.MetadataGroupKey
 import com.app.resn8.domain.model.PlaybackHistoryResult
 import com.app.resn8.domain.model.ScanResult
+import com.app.resn8.domain.model.SelectionResolutionResult
 import com.app.resn8.domain.model.SortOrder
 import com.app.resn8.domain.model.StagedFolder
 import com.app.resn8.domain.model.StagedMedia
@@ -21,6 +30,161 @@ class FakeMediaRepository(
     private val _mediaFiles = MutableStateFlow(initialMediaFiles)
     private val _folderNodes = MutableStateFlow(initialFolderNodes)
     private val _historyOccurrences = mutableSetOf<String>()
+
+    private fun filterMediaFiles(query: LibraryQuery): List<MediaFile> {
+        val normSearch = query.normalizedSearchText()
+        return _mediaFiles.value.filter { item ->
+            val matchesSource = query.sourceId == null || item.sourceId == query.sourceId
+            val matchesFolder = query.folderId == null || item.folderId == query.folderId
+            val matchesArtist = when (val k = query.artist) {
+                null -> true
+                is MetadataGroupKey.Unknown -> item.artist == null
+                is MetadataGroupKey.Known -> item.artist.equals(k.value, ignoreCase = true)
+            }
+            val matchesAlbum = when (val k = query.album) {
+                null -> true
+                is MetadataGroupKey.Unknown -> item.album == null
+                is MetadataGroupKey.Known -> item.album.equals(k.value, ignoreCase = true)
+            }
+            val matchesAvailability = when (query.filters.availability) {
+                AvailabilityFilter.ALL -> true
+                AvailabilityFilter.AVAILABLE_ONLY -> item.isAvailable
+                AvailabilityFilter.UNAVAILABLE_ONLY -> !item.isAvailable
+            }
+            val matchesDislike = !query.filters.excludeDisliked || item.likeScore >= 0
+            val matchesSearch = normSearch == null || (
+                item.displayTitle.contains(normSearch, ignoreCase = true) ||
+                (item.title?.contains(normSearch, ignoreCase = true) == true) ||
+                item.filename.contains(normSearch, ignoreCase = true) ||
+                (item.artist?.contains(normSearch, ignoreCase = true) == true) ||
+                (item.albumArtist?.contains(normSearch, ignoreCase = true) == true) ||
+                (item.album?.contains(normSearch, ignoreCase = true) == true)
+            )
+
+            matchesSource && matchesFolder && matchesArtist && matchesAlbum &&
+                matchesAvailability && matchesDislike && matchesSearch
+        }.sortedWith(getComparator(query.sort))
+    }
+
+    override fun getArtistSummariesPaged(query: LibraryQuery): Flow<PagingData<ArtistSummary>> {
+        return _mediaFiles.map {
+            val filtered = filterMediaFiles(query)
+            val groups = filtered.groupBy { it.artist }
+            val summaries = groups.map { (artist, files) ->
+                ArtistSummary(
+                    key = if (artist == null) MetadataGroupKey.Unknown else MetadataGroupKey.Known(artist),
+                    displayName = artist ?: "Unknown Artist",
+                    totalTrackCount = files.size,
+                    availableTrackCount = files.count { it.isAvailable },
+                    albumCount = files.map { it.album ?: "Unknown Album" }.distinct().size,
+                    representativeArtworkUri = files.firstOrNull { it.artworkUri != null }?.artworkUri
+                )
+            }.sortedWith(
+                compareBy<ArtistSummary> { it.key is MetadataGroupKey.Unknown }
+                    .thenBy { it.displayName.lowercase() }
+            )
+            PagingData.from(summaries)
+        }
+    }
+
+    override fun getAlbumSummariesPaged(query: LibraryQuery): Flow<PagingData<AlbumSummary>> {
+        return _mediaFiles.map {
+            val filtered = filterMediaFiles(query)
+            val groups = filtered.groupBy { Pair(it.album, it.albumArtist ?: it.artist) }
+            val summaries = groups.map { (pair, files) ->
+                val album = pair.first
+                val artist = pair.second
+                AlbumSummary(
+                    albumKey = if (album == null) MetadataGroupKey.Unknown else MetadataGroupKey.Known(album),
+                    albumDisplayName = album ?: "Unknown Album",
+                    effectiveAlbumArtistKey = if (artist == null) MetadataGroupKey.Unknown else MetadataGroupKey.Known(artist),
+                    effectiveAlbumArtistDisplayName = artist ?: "Unknown Artist",
+                    totalTrackCount = files.size,
+                    availableTrackCount = files.count { it.isAvailable },
+                    minYear = files.mapNotNull { it.year }.minOrNull(),
+                    representativeMediaId = files.firstOrNull()?.id,
+                    representativeArtworkUri = files.firstOrNull { it.artworkUri != null }?.artworkUri
+                )
+            }.sortedWith(
+                compareBy<AlbumSummary> { it.albumKey is MetadataGroupKey.Unknown }
+                    .thenBy { it.albumDisplayName.lowercase() }
+            )
+            PagingData.from(summaries)
+        }
+    }
+
+    override fun getTracksPaged(query: LibraryQuery): Flow<PagingData<MediaFile>> {
+        return _mediaFiles.map {
+            val filtered = filterMediaFiles(query)
+            PagingData.from(filtered)
+        }
+    }
+
+    override fun getRootFolderNode(sourceId: String): Flow<FolderNode?> {
+        return _folderNodes.map { nodes ->
+            nodes.find { it.sourceId == sourceId && (it.parentId == null || it.relativePath.isEmpty()) }
+        }
+    }
+
+    override fun getDirectChildFolders(parentId: String): Flow<List<FolderListItem>> {
+        return _folderNodes.map { nodes ->
+            nodes.filter { it.parentId == parentId }.map { folder ->
+                val childFolderCount = _folderNodes.value.count { it.parentId == folder.id }
+                val directMediaCount = _mediaFiles.value.count { it.folderId == folder.id }
+                FolderListItem(folder, childFolderCount, directMediaCount)
+            }.sortedWith(compareBy<FolderListItem> { it.folder.displayName.lowercase() }.thenBy { it.folder.id })
+        }
+    }
+
+    override fun getFolderBreadcrumbs(folderId: String): Flow<List<FolderBreadcrumb>> {
+        return _folderNodes.map { nodes ->
+            val breadcrumbs = mutableListOf<FolderBreadcrumb>()
+            var current = nodes.find { it.id == folderId }
+            while (current != null) {
+                breadcrumbs.add(0, FolderBreadcrumb(id = current.id, displayName = current.displayName))
+                current = nodes.find { it.id == current?.parentId }
+            }
+            breadcrumbs
+        }
+    }
+
+    override fun getPagedFolderMedia(folderId: String, query: LibraryQuery): Flow<PagingData<MediaFile>> {
+        return getTracksPaged(query.copy(folderId = folderId))
+    }
+
+    override suspend fun resolveSelectionMediaIds(
+        selectedFileIds: Set<String>,
+        selectedFolderIds: Set<String>,
+        availability: AvailabilityFilter
+    ): SelectionResolutionResult {
+        if (selectedFileIds.isEmpty() && selectedFolderIds.isEmpty()) {
+            return SelectionResolutionResult(emptyList(), 0, 0)
+        }
+        val allSubFolderIds = mutableSetOf<String>()
+        val queue = ArrayDeque<String>(selectedFolderIds)
+        while (queue.isNotEmpty()) {
+            val currentId = queue.removeFirst()
+            allSubFolderIds.add(currentId)
+            _folderNodes.value.filter { it.parentId == currentId }.forEach { queue.addLast(it.id) }
+        }
+
+        val matchingFiles = _mediaFiles.value.filter { file ->
+            (selectedFileIds.contains(file.id) || allSubFolderIds.contains(file.folderId)) &&
+                when (availability) {
+                    AvailabilityFilter.ALL -> true
+                    AvailabilityFilter.AVAILABLE_ONLY -> file.isAvailable
+                    AvailabilityFilter.UNAVAILABLE_ONLY -> !file.isAvailable
+                }
+        }
+        val uniqueIds = matchingFiles.map { it.id }.distinct().sorted()
+        val total = uniqueIds.size
+        val available = matchingFiles.count { it.isAvailable }
+        return SelectionResolutionResult(uniqueIds, total, available)
+    }
+
+    override suspend fun snapshotVisibleMediaIds(query: LibraryQuery): List<String> {
+        return filterMediaFiles(query).map { it.id }
+    }
 
     override fun getMediaFilesFlow(
         collectionId: String?,
@@ -41,18 +205,40 @@ class FakeMediaRepository(
     }
 
     private fun getComparator(sortOrder: SortOrder): Comparator<MediaFile> {
-        return when (sortOrder) {
-            SortOrder.ARTIST -> compareBy<MediaFile> { it.artist ?: "Unknown Artist" }.thenBy { it.album ?: "Unknown Album" }.thenBy { it.trackNumber ?: 0 }
-            SortOrder.ALBUM -> compareBy<MediaFile> { it.album ?: "Unknown Album" }.thenBy { it.discNumber ?: 0 }.thenBy { it.trackNumber ?: 0 }
-            SortOrder.TITLE -> compareBy { it.displayTitle }
-            SortOrder.TRACK -> compareBy<MediaFile> { it.discNumber ?: 0 }.thenBy { it.trackNumber ?: 0 }.thenBy { it.displayTitle }
+        val finalTieBreaker = compareBy<MediaFile> { (it.displayTitle.ifEmpty { it.filename }).lowercase() }.thenBy { it.id }
+        val primaryComparator: Comparator<MediaFile> = when (sortOrder) {
+            SortOrder.ARTIST -> compareBy<MediaFile> { it.artist == null }
+                .thenBy { it.artist?.lowercase() }
+                .thenBy { (it.albumArtist ?: it.artist)?.lowercase() }
+                .thenBy { it.album == null }
+                .thenBy { it.album?.lowercase() }
+                .thenBy { it.discNumber == null }
+                .thenBy { it.discNumber ?: 0 }
+                .thenBy { it.trackNumber == null }
+                .thenBy { it.trackNumber ?: 0 }
+            SortOrder.ALBUM -> compareBy<MediaFile> { it.album == null }
+                .thenBy { it.album?.lowercase() }
+                .thenBy { (it.albumArtist ?: it.artist)?.lowercase() }
+                .thenBy { it.discNumber == null }
+                .thenBy { it.discNumber ?: 0 }
+                .thenBy { it.trackNumber == null }
+                .thenBy { it.trackNumber ?: 0 }
+            SortOrder.TITLE -> finalTieBreaker
+            SortOrder.TRACK -> compareBy<MediaFile> { it.discNumber == null }
+                .thenBy { it.discNumber ?: 0 }
+                .thenBy { it.trackNumber == null }
+                .thenBy { it.trackNumber ?: 0 }
+            SortOrder.RECENTLY_ADDED -> compareByDescending { it.firstIndexedAt }
             SortOrder.MOST_PLAYED -> compareByDescending { it.playCount }
             SortOrder.LEAST_PLAYED -> compareBy { it.playCount }
-            SortOrder.UNPLAYED -> compareBy { it.playCount > 0 }
-            SortOrder.MOST_RECENT -> compareByDescending { it.lastPlayedAt ?: 0L }
-            SortOrder.LEAST_RECENT -> compareBy { it.lastPlayedAt ?: Long.MAX_VALUE }
+            SortOrder.UNPLAYED -> compareBy { it.playCount != 0 }
+            SortOrder.MOST_RECENT -> compareBy<MediaFile> { it.lastPlayedAt == null }
+                .thenByDescending { it.lastPlayedAt ?: 0L }
+            SortOrder.LEAST_RECENT -> compareBy<MediaFile> { it.lastPlayedAt != null }
+                .thenBy { it.lastPlayedAt ?: Long.MAX_VALUE }
             SortOrder.MOST_LIKED -> compareByDescending { it.likeScore }
         }
+        return primaryComparator.thenComparing(finalTieBreaker)
     }
 
     override suspend fun getMediaFileById(id: String): MediaFile? {

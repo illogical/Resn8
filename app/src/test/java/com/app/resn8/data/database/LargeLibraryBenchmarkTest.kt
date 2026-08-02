@@ -1,0 +1,79 @@
+package com.app.resn8.data.database
+
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import com.app.resn8.fixtures.LargeLibraryFixture
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class LargeLibraryBenchmarkTest {
+
+    private lateinit var db: Resn8Database
+
+    @Before
+    fun setup() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        db = Resn8Database.buildInMemoryDatabase(context)
+    }
+
+    @After
+    fun tearDown() {
+        db.close()
+    }
+
+    @Test
+    fun benchmark25kLibraryQueriesAndExplainPlan() = runBlocking {
+        println("Seeding 25,000 media rows into SQLite in-memory database...")
+        val seedStart = System.currentTimeMillis()
+        LargeLibraryFixture.seedLargeLibrary(db, itemCount = 25000)
+        val seedEnd = System.currentTimeMillis()
+        println("Seeding completed in ${seedEnd - seedStart} ms.")
+
+        val queryStart = System.currentTimeMillis()
+        val visibleIds = db.mediaFileDao().snapshotVisibleMediaIds(
+            collectionId = "MUSIC",
+            sourceId = null,
+            folderId = null,
+            isArtistFilterNull = 1,
+            artistKeyIsUnknown = 0,
+            artistKeyValue = null,
+            isAlbumFilterNull = 1,
+            albumKeyIsUnknown = 0,
+            albumKeyValue = null,
+            availabilityFilter = "AVAILABLE_ONLY",
+            excludeDisliked = 1,
+            searchPattern = null,
+            sortOrder = "ARTIST"
+        )
+        val queryEnd = System.currentTimeMillis()
+        val elapsedMs = queryEnd - queryStart
+        println("Visible media snapshot query executed in $elapsedMs ms (returned ${visibleIds.size} rows).")
+
+        assertTrue("Expected matching rows from 25,000 library", visibleIds.isNotEmpty())
+
+        val sqliteDb = db.openHelper.writableDatabase
+        val cursor = sqliteDb.query(
+            "EXPLAIN QUERY PLAN SELECT mf.id FROM media_files mf INNER JOIN root_sources rs ON mf.sourceId = rs.id WHERE rs.collectionId = 'MUSIC' AND mf.isAvailable = 1"
+        )
+        val planLines = mutableListOf<String>()
+        while (cursor.moveToNext()) {
+            val detailIndex = cursor.getColumnIndex("detail")
+            if (detailIndex >= 0) {
+                planLines.add(cursor.getString(detailIndex))
+            }
+        }
+        cursor.close()
+
+        println("EXPLAIN QUERY PLAN Output:")
+        planLines.forEach { println(" - $it") }
+        assertTrue("Expected non-empty query plan", planLines.isNotEmpty())
+    }
+}
