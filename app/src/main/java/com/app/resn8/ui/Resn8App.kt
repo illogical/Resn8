@@ -91,8 +91,9 @@ fun Resn8App(
         }
     ) { innerPadding ->
         Resn8NavHost(
+            container = container,
             navController = navController,
-            startDestination = LibraryRoute(),
+            startDestination = OnboardingRoute,
             modifier = Modifier.padding(innerPadding)
         )
     }

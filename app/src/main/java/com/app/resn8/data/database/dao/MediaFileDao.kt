@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MediaFileDao {
+    @Query("SELECT * FROM media_files WHERE sourceId = :sourceId")
+    fun getMediaFilesBySourceId(sourceId: String): List<MediaFileEntity>
+
     @Query("SELECT * FROM media_files WHERE id = :id LIMIT 1")
     fun getMediaFileById(id: String): MediaFileEntity?
 

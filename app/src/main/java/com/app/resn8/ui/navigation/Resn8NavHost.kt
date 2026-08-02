@@ -2,10 +2,13 @@ package com.app.resn8.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.app.resn8.di.AppContainer
 import com.app.resn8.ui.screens.FoldersScreen
 import com.app.resn8.ui.screens.LibraryScreen
 import com.app.resn8.ui.screens.NowPlayingScreen
@@ -13,12 +16,13 @@ import com.app.resn8.ui.screens.OnboardingScreen
 import com.app.resn8.ui.screens.PlaylistDetailScreen
 import com.app.resn8.ui.screens.PlaylistsScreen
 import com.app.resn8.ui.screens.QueueScreen
+import com.app.resn8.ui.screens.onboarding.OnboardingViewModel
 
 @Composable
 fun Resn8NavHost(
+    container: AppContainer,
     navController: NavHostController,
-    startDestination: Any = LibraryRoute(),
-    onSelectFolderClicked: () -> Unit = {},
+    startDestination: Any = OnboardingRoute,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -27,8 +31,17 @@ fun Resn8NavHost(
         modifier = modifier
     ) {
         composable<OnboardingRoute> {
+            val context = LocalContext.current
+            val onboardingViewModel: OnboardingViewModel = viewModel(
+                factory = OnboardingViewModel.Factory(context.applicationContext, container)
+            )
             OnboardingScreen(
-                onSelectFolderClicked = onSelectFolderClicked
+                viewModel = onboardingViewModel,
+                onNavigateToLibrary = {
+                    navController.navigate(LibraryRoute()) {
+                        popUpTo(OnboardingRoute) { inclusive = true }
+                    }
+                }
             )
         }
 

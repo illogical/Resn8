@@ -22,13 +22,13 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 ## Milestone 2 — Select and Index a Music Folder (P0)
 
-- [ ] **T009 — Implement folder onboarding.** Launch `ACTION_OPEN_DOCUMENT_TREE`, take persistent read permission, create the default `MUSIC` collection/root, and handle cancellation or failed grants.
-- [ ] **T010 — Build recursive enumeration.** Traverse document-provider children off the main thread, admit supported audio only, stream bounded batches, expose progress/cancellation, and tolerate inaccessible/corrupt individual documents.
-- [ ] **T011 — Extract and normalize metadata.** Read duration, MIME type, embedded MP3/music tags, artwork reference, and source facts; apply tag → music path/filename → cleaned filename precedence without inventing stored unknown values.
-- [ ] **T012 — Implement filename/path fallback parsing.** Support `Artist/Album` inference and common disc/track prefixes; record which source supplied each result and summarize unrecognized naming patterns for sample-library analysis.
-- [ ] **T013 — Implement idempotent re-indexing.** Stage bounded scan batches, match provider ID/URI then relative path, apply unique conservative signature recovery, preserve first-indexed time and all user data, mark missing files unavailable, restore returned files, and publish the resolved scan as one atomic canonical snapshot.
-- [ ] **T014 — Build indexing UI states.** Show first-run explanation, collection naming, progress, cancel/retry, final counts, empty folders, permission loss, removable-storage absence, and corrupt/unsupported-file summaries.
-- [ ] **T015 — Test real provider behavior.** Cover internal shared storage and a removable/document-provider equivalent; verify persisted access and re-index behavior across process/device restart.
+- [x] **T009 — Implement folder onboarding.** Launch `ACTION_OPEN_DOCUMENT_TREE`, take persistent read permission, create the default `MUSIC` collection/root, and handle cancellation or failed grants.
+- [x] **T010 — Build recursive enumeration.** Traverse document-provider children off the main thread, admit supported audio only, stream bounded batches, expose progress/cancellation, and tolerate inaccessible/corrupt individual documents.
+- [x] **T011 — Extract and normalize metadata.** Read duration, MIME type, embedded MP3/music tags, artwork reference, and source facts; apply tag → music path/filename → cleaned filename precedence without inventing stored unknown values.
+- [x] **T012 — Implement filename/path fallback parsing.** Support `Artist/Album` inference and common disc/track prefixes; record which source supplied each result and summarize unrecognized naming patterns for sample-library analysis.
+- [x] **T013 — Implement idempotent re-indexing.** Stage bounded scan batches, match provider ID/URI then relative path, apply unique conservative signature recovery, preserve first-indexed time and all user data, mark missing files unavailable, restore returned files, and publish the resolved scan as one atomic canonical snapshot.
+- [x] **T014 — Build indexing UI states.** Show first-run explanation, collection naming, progress, cancel/retry, final counts, empty folders, permission loss, removable-storage absence, and corrupt/unsupported-file summaries.
+- [x] **T015 — Test real provider behavior.** Cover internal shared storage and a removable/document-provider equivalent; verify persisted access and re-index behavior across process/device restart.
 
 **Exit:** A user can select one nested music root, restart the app, inspect a durable indexed library, and manually re-index it safely.
 

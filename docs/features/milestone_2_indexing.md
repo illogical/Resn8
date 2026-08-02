@@ -2,36 +2,78 @@
 
 ## Objective
 
-Implement folder selection onboarding, recursive DocumentProvider enumeration, metadata extraction and normalization, filename/path fallback parsing, idempotent staging and snapshot re-indexing, indexing UI states, and SAF provider tests as specified in [SPECIFICATION.md](../SPECIFICATION.md) and [TASKS.md](../TASKS.md). 
+Implement T009-T015 from [TASKS.md](../TASKS.md): onboard one user-selected `MUSIC` root through the Storage Access Framework (SAF), recursively enumerate decoder-supported audio, extract and normalize metadata, apply deterministic path/filename fallbacks, stage and atomically publish an idempotent library snapshot, expose durable indexing UI states and manual re-indexing, and verify real `DocumentsProvider` behavior.
 
-Building upon the Room persistence foundation established in [Milestone 1](milestone_1_persistence.md), Milestone 2 enables Resn8 to onboard a user-selected local root folder via Storage Access Framework (`ACTION_OPEN_DOCUMENT_TREE`), persist tree permissions, recursively discover supported audio files off the main thread, extract embedded tags with fallback heuristics, and publish resolved library snapshots without disturbing user statistics, ratings, or existing playlists.
+The result must satisfy [SPECIFICATION.md](../SPECIFICATION.md) while preserving the broader collection, folder, identity, playlist, queue, and restoration model described in [BRAINSTORM.md](../BRAINSTORM.md). A completed scan must never reset `firstIndexedAt`, ratings, listening history, playlist membership, or saved queue references, and a failed, cancelled, or interrupted scan must never expose a partial canonical snapshot.
+
+Milestone 2 indexes playable audio only. It never requests broad storage permission, modifies source audio, schedules background indexing, or adds multiple-root management UI.
 
 ---
 
 ## Inputs from Milestone 0 and Milestone 1
 
-Milestone 0 established domain model contracts, repository interfaces, fake repositories, and placeholder navigation. Milestone 1 created the complete version-1 Room persistence schema, entity relations, DAOs, and atomic transaction primitives.
+Milestone 0 established pure domain contracts, repository seams, fake repositories, typed navigation, and the application container. Milestone 1 established the version-1 Room model and the retention rules that Milestone 2 must honor.
 
-Milestone 2 directly utilizes the following Milestone 1 persistence entities and APIs:
-- **`RootSourceEntity` (`root_sources`)**: Stores persistent tree URI, display name, availability (`isAvailable`), and scan execution facts (`lastScanStatus`, `lastScanStartedAt`, `lastScanCompletedAt`, `lastScanSummaryJson`).
-- **`FolderNodeEntity` (`folder_nodes`)**: Persists indexed relative directory hierarchy (`relativePath`, `parentId`) scoped to a `sourceId`.
-- **`MediaFileEntity` (`media_files`)**: Canonical media table storing document URIs/IDs, relative paths, metadata, provenance (`MetadataValueSource`), availability (`isAvailable`), user statistics (`playCount`, `likeScore`, `lastPlayedAt`), and initial timestamp (`firstIndexedAt`).
-- **`ScanRunEntity` (`scan_runs`)**, **`StagedFolderEntity` (`staged_folders`)**, and **`StagedMediaEntity` (`staged_media`)**: Isolated persistent staging schema that allows scans to write bounded batches off the main thread, perform identity matching, survive process recreation, and fail or cancel without exposing partial scan results to library readers.
-- **`ScanDao` & Repository Snapshot Publication (`publishResolvedScan`)**: Atomic transaction primitive that publishes resolved staging records, inserts new media (`firstIndexedAt = now`), refreshes existing source metadata/availability while preserving ratings and history, marks absent media as unavailable (`isAvailable = false`), and cleans up staging rows.
+Milestone 2 builds on these existing types and APIs:
+
+- **`RootSourceEntity` (`root_sources`)** stores the persisted tree URI, display name, availability, scan timestamps/status, and the versioned `lastScanSummary` value.
+- **`FolderNodeEntity` (`folder_nodes`)** stores stable source-relative directory nodes. The selected root is represented by `relativePath = ""` and `parentId = null`.
+- **`MediaFileEntity` (`media_files`)** stores stable media identity, content URI/document facts, relative path, nullable semantic metadata, non-null `displayTitle`, per-field provenance, availability, `firstIndexedAt`, and user-owned statistics.
+- **`ScanRunEntity`, `StagedFolderEntity`, and `StagedMediaEntity`** isolate bounded scan writes from canonical library readers.
+- **`MediaRepository` and `CollectionRepository`** expose scan lifecycle, staging/publication, root state, and availability operations. Production implementations use Room; unit tests retain framework-independent fakes.
+
+### Required preflight: reconcile the implemented contracts
+
+Before storage or UI work, compare the current Milestone 1 implementation with the contracts this milestone consumes. Update domain interfaces, Room implementations, converters, and fakes together where the existing implementation is narrower than the completed Milestone 1 design.
+
+At minimum:
+
+- Expand `ScanProgress` to represent `scanId`, phase/status, scanned folder count, inspected document count, discovered/admitted audio count, unsupported count, unreadable/error count, current relative path, and cancellation state. Totals that are unknowable during provider traversal must be nullable rather than fabricated.
+- Expand `ScanResult` into an explicitly versioned, additive serialization payload containing scanned/admitted, added, updated, unavailable, tag-derived, path-derived, filename-derived, unrecognized, unreadable, unsupported, and elapsed-duration counts. Existing serialized summaries must decode safely when new fields are absent.
+- Make scan status values typed at domain boundaries. Convert to persisted strings only in the Room layer if the schema still stores strings.
+- Ensure `publishResolvedScan` uses its scan result and updates canonical folders/media, missing-media availability, `ScanRunEntity`, and `RootSourceEntity.lastScanStatus`/timestamps/summary in the same Room transaction.
+- Add a source-scoped availability operation that atomically updates the root and every affected media row.
+- Update `FakeMediaRepository`, `FakeCollectionRepository`, `AppContainer`, and test fixtures whenever these contracts change.
+- Preserve Milestone 1 foreign keys and retention semantics. If correcting an implementation/schema mismatch is unavoidable, update the Room version, exported schema, and migration test rather than using destructive fallback.
+
+Do not start the UI against speculative interfaces. Complete and test this contract reconciliation first.
 
 ---
 
-## Responsibility Boundaries
+## Responsibility and Downstream Boundaries
 
 | Milestone | Responsibility |
 | --- | --- |
-| **Milestone 1 (Completed)** | Room schema, entity mappings, identity constraints, converters, atomic DAOs, repository transaction primitives, and database persistence tests. |
-| **Milestone 2 (This Plan)** | Folder selection (`ACTION_OPEN_DOCUMENT_TREE`), persistent Uri grants, recursive tree traversal, audio filtering, metadata extraction & normalization, path/filename fallback parsing, scan summary generation, identity candidate matching, scan orchestration, indexing UI states, and provider tests. |
-| **Milestone 3 (Next)** | Reactive library browsing (Artist, Album, All Tracks, Folder tree), search, sort/filter controls, and 25k-track performance optimization. |
-| **Milestone 4–5** | Playback service (Media3 / ExoPlayer), Now Playing UI, audio focus, listening duration tracking, and meaningful-play commits. |
-| **Milestones 6–8** | Manual playlists, smart randomized queue generation, context/queue restoration, and final MVP acceptance. |
+| **Milestone 1 (completed baseline)** | Room entities, foreign keys, converters, repository seams, isolated staging, and atomic persistence primitives. |
+| **Milestone 2 (this plan)** | Contract reconciliation, SAF onboarding, provider traversal, admission, metadata/fallback parsing, scan orchestration and recovery, deterministic identity resolution, atomic publication, indexing UI/manual re-indexing, and provider tests. |
+| **Milestone 3** | Reactive/paged Artist, Album, All Tracks, and Folder browsing; search/sort/filter controls; 25,000-track query benchmarks. |
+| **Milestones 4-8** | Playback, ratings/meaningful plays, playlists, generated queues, and context restoration. |
+| **Post-MVP** | Multiple roots/collections, contextual/flat creation UI, scheduled re-indexing, source-file maintenance, and backup/restore. |
 
-Milestone 2 relies on Milestone 1 repositories and DAOs for staging and atomic snapshot publication. It must not duplicate database schema definitions, alter foreign key constraints, or bypass the established persistence layer.
+Milestone 2 must leave stable inputs for later tasks:
+
+- Folder IDs remain stable by `(sourceId, relativePath)` so folder selection and restored UI context do not break after a scan.
+- Media IDs remain stable across metadata refresh, temporary unavailability, and uniquely recovered renames so playlists, history, and saved queues remain valid.
+- `artist`, `albumArtist`, `album`, disc, and track remain independently queryable; presentation fallbacks are not written into nullable semantic columns.
+- `firstIndexedAt` changes only for genuinely new media and supports the future recently-indexed sort.
+- Folder ancestry is complete and deterministic so selecting a folder can later resolve all currently indexed descendants.
+- Publication must not require loading artwork or eagerly exposing large canonical lists. Keep the staging and resolver design suitable for at least 25,000 rows even though Milestone 3 owns query benchmarking.
+
+---
+
+## Implementation Order
+
+Implement in this dependency order:
+
+1. Reconcile scan/result/repository contracts and fakes.
+2. Build pure admission, normalization, and fallback parsers with table-driven unit tests.
+3. Build the SAF provider adapter and metadata extractor.
+4. Build the scan coordinator, interruption recovery, and deterministic identity resolver.
+5. Complete atomic snapshot publication and source-scoped availability operations.
+6. Build onboarding, durable start routing, progress/recovery UI, and manual re-indexing.
+7. Add provider-backed instrumentation, restart, and device verification.
+
+Each slice must compile and have focused tests before the next slice depends on it.
 
 ---
 
@@ -39,246 +81,392 @@ Milestone 2 relies on Milestone 1 repositories and DAOs for staging and atomic s
 
 ### T009 — Implement Folder Onboarding
 
-#### 1. Launch SAF Folder Picker and Persist Read Permission
-- Integrate Jetpack Compose launcher for `ActivityResultContracts.OpenDocumentTree()` in the onboarding workflow.
-- Upon receiving a valid root tree `Uri`:
+#### 1. Launch the picker and validate durable access
+
+- Integrate `ActivityResultContracts.OpenDocumentTree()` from a lifecycle-aware Compose host. Route the returned URI to an onboarding ViewModel/use case; do not perform persistence or scanning directly in a composable callback.
+- Request only persistent read access:
+
   ```kotlin
-  val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-  context.contentResolver.takePersistableUriPermission(treeUri, takeFlags)
+  contentResolver.takePersistableUriPermission(
+      treeUri,
+      Intent.FLAG_GRANT_READ_URI_PERMISSION,
+  )
   ```
-- Retrieve folder display name using `DocumentFile.fromTreeUri(context, treeUri)?.name` or ContentResolver document query fallback.
 
-#### 2. Initialize Collection and RootSource
-- Wire repository calls to create the default `MUSIC` collection (`CollectionProfile.MUSIC`) if one does not already exist:
-  - `Collection`: stable ID (e.g. `"col_music_default"`), display name (user-configured or defaulted to root folder name), `profile = CollectionProfile.MUSIC`.
-- Register the root source in Room via `CollectionRepository` / `RootSourceEntity`:
-  - `RootSource`: `id = UUID`, `collectionId`, `treeUri = treeUri.toString()`, `displayName`, `isAvailable = true`, `lastScanStatus = ScanStatus.IDLE`.
+- Catch `SecurityException` and validate the URI with a lightweight root-document query before creating database records. A returned URI is not considered usable until the grant exists in `ContentResolver.persistedUriPermissions` and the root can be queried.
+- Resolve the default display name from the root document query. `DocumentFile.fromTreeUri(...).name` may be used only as a fallback convenience, not for recursive enumeration.
+- If the picker is cancelled, remain in `FirstRun` without an error or partial database records.
 
-#### 3. Handle Permission Losses and User Cancellation
-- If the user cancels the picker, remain cleanly in the onboarding explanation state without showing an error or persisting partial entities.
-- Provide a utility to verify active persisted permissions via `context.contentResolver.persistedUriPermissions`. If permission is missing or revoked on app launch, update `RootSource.isAvailable = false` and prompt the user to reselect or re-grant access.
+#### 2. Name and register the single MVP collection/root
+
+- After grant validation, show a collection-name prompt defaulted to the selected folder name. Trim input and reject a blank final name.
+- On confirmation, create the single `MUSIC` collection if absent and register its one root source through repositories. Use repository-generated stable IDs; do not hard-code IDs in UI code.
+- Prevent a second collection or second root from being registered through the MVP UI. Keep repository identifiers and APIs compatible with the post-MVP multiple-root task.
+- Define cancellation of the naming prompt: create no collection/root, release the newly taken persistable permission when it is not already owned by a registered source, and return to `FirstRun`.
+- Once a root is registered, retain it after an empty or failed initial scan so the user can retry or manually re-index without selecting it again.
+- “Select Different Folder” is a narrowly scoped onboarding replacement permitted only before the first successful non-empty publication. Update the existing root's URI/display name in one repository transaction so its stable ID and the one-root invariant are preserved; clear prior operational scan rows, then release the old grant only after the new grant and database update succeed. If canonical media or user context already exists, use Re-grant/Retry instead and leave general root replacement for post-MVP management.
+
+#### 3. Reconcile permission and storage availability
+
+- On application start and before every scan, compare registered roots with current persisted grants and perform a lightweight provider query.
+- Distinguish:
+  - **Permission revoked:** no matching persisted read grant or a provider `SecurityException`.
+  - **Storage/provider unavailable:** the grant exists but the provider/root cannot currently be opened.
+- Atomically set `RootSource.isAvailable = false` and `MediaFile.isAvailable = false` for the source when either condition is confirmed. Preserve folders, media rows, statistics, history, playlists, and queues.
+- Never publish an empty scan after a root-level access failure. An inaccessible root is an availability transition, not evidence that every file was removed.
+- After access returns, set the source available only after validation and offer re-index. Matching media becomes available during successful publication.
 
 ---
 
 ### T010 — Build Recursive Enumeration
 
-#### 1. Non-Blocking Tree Traversal
-- Create `DocumentTreeScanner` under `com.app.resn8.storage.indexer` running strictly on `Dispatchers.IO`.
-- Avoid slow recursive `DocumentFile.listFiles()` calls which make individual synchronous IPC queries per document.
-- Use low-level `ContentResolver.query` on `DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)`:
-  - Query columns: `Document.COLUMN_DOCUMENT_ID`, `Document.COLUMN_DISPLAY_NAME`, `Document.COLUMN_MIME_TYPE`, `Document.COLUMN_SIZE`, `Document.COLUMN_LAST_MODIFIED`, `Document.COLUMN_FLAGS`.
-  - Maintain a queue/stack of folder document IDs to traverse nested subdirectories recursively.
-  - Build relative paths (e.g., `""` for root, `"Artist/Album"` for nested subfolders).
+#### 1. Define a provider adapter
 
-#### 2. Audio File Filtering and Format Admission
-- Filter candidate documents against supported audio formats:
-  - **MIME types**: `audio/mpeg`, `audio/mp4`, `audio/aac`, `audio/flac`, `audio/ogg`, `audio/x-wav`, `audio/opus`, `audio/x-matroska`.
-  - **Extension fallbacks**: `.mp3`, `.m4a`, `.aac`, `.flac`, `.ogg`, `.wav`, `.opus`, `.oga`, `.mka`.
-- Exclude hidden files (starting with `.`), non-audio documents, and zero-byte files.
+- Create a small injectable `DocumentTreeProvider` abstraction under `com.app.resn8.storage.indexer` around `ContentResolver`/`DocumentsContract`. Keep traversal tests independent of Android by testing against a fake implementation.
+- Obtain the root ID with `DocumentsContract.getTreeDocumentId(treeUri)`.
+- Query children with `DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)` and construct each document URI with `DocumentsContract.buildDocumentUriUsingTree(treeUri, childDocumentId)`.
+- Query at least document ID, display name, MIME type, size, last modified, and flags. Treat provider values as untrusted: cursors may be null, columns or values may be absent, and size/modified time may be unknown.
+- Close every cursor and file descriptor. Detect repeated directory document IDs within one traversal and skip/report them so a faulty provider cannot create a cycle.
 
-#### 3. Streaming Bounded Staging Batches
-- Stream admitted audio items and discovered folders in bounded batches (e.g., 100 items per batch).
-- Write batches to `ScanDao` persistent staging tables: `staged_folders` and `staged_media` tied to a unique `scanId`.
-- Emit live `ScanProgress` updates (`scannedFolderCount`, `discoveredAudioCount`, `currentRelativePath`, `status = SCANNING`).
+#### 2. Traverse off the main thread
 
-#### 4. Fault Tolerance and Cancellation
-- Wrap individual document inspection in try-catch blocks to catch `SecurityException`, `FileNotFoundException`, or corrupt directory nodes. Skip unreadable items, record error details into the scan run summary, and continue scanning remaining documents.
-- Respect coroutine cancellation (`coroutineContext.ensureActive()`). On cancellation, mark `ScanRunEntity.status = CANCELLED`, clean up staging rows, and leave the prior canonical library snapshot intact.
+- Create `DocumentTreeScanner` using an iterative queue/stack on `Dispatchers.IO`; do not recursively call `DocumentFile.listFiles()`.
+- Track folder paths relative to the selected root. Use `""` for the root and `/` as the canonical persisted separator regardless of provider/platform formatting.
+- Store a media `relativePath` that includes its filename (for example, `Artist/Album/01 - Song.mp3`); store its parent directory separately through `resolvedFolderId`.
+- Check `ensureActive()` before each provider query, while iterating large cursors, before metadata extraction, and before each staging write.
+- Do not follow provider-specific links outside the granted tree.
+
+#### 3. Centralize audio admission
+
+- Implement one pure `AudioAdmissionPolicy`, shared by scanning and tests, based on the formats intended for Media3 playback.
+- Initial MIME types: `audio/mpeg`, `audio/mp4`, `audio/aac`, `audio/flac`, `audio/ogg`, `audio/x-wav`, `audio/wav`, `audio/opus`, and `audio/x-matroska`.
+- Initial case-insensitive extensions: `.mp3`, `.m4a`, `.aac`, `.flac`, `.ogg`, `.oga`, `.wav`, `.opus`, and `.mka`.
+- Admit when a supported MIME type is present. When MIME is blank, generic (for example `application/octet-stream`), or provider-specific, allow the supported extension fallback. A specific unsupported MIME type is unsupported unless a tested provider exception is documented.
+- Do not exclude dot-prefixed audio solely because it is hidden; the specification requires supported audio under the selected root.
+- Exclude directories, known non-audio documents, and confirmed zero-byte files. Unknown/null size is not the same as zero and must not be rejected for that reason.
+- Count unsupported documents without retaining raw filenames or paths in logs or persisted diagnostics.
+
+#### 4. Stream bounded work with backpressure
+
+- Use a bounded producer/consumer pipeline: enumerate document facts, extract/resolve metadata, then stage folders and media in batches. Default batch size may be 100 but must be configurable in tests.
+- Do not accumulate the whole provider tree in UI state. Emit immutable aggregate `ScanProgress` snapshots.
+- Stage a folder once per canonical relative path and make repeated writes idempotent for a scan ID.
+- Report scanned folders, inspected documents, admitted audio, unsupported documents, unreadable/errors, and current relative path. Do not invent a percentage when the provider cannot supply a reliable total.
+
+#### 5. Classify faults and cancellation
+
+- A failed child query or unreadable document is recorded as a bounded diagnostic category and does not fail unrelated branches.
+- A root query failure is fatal to that scan and follows the availability policy in T009.
+- Cancellation marks the scan `CANCELLED`, purges its staging rows in a `NonCancellable` cleanup section, and preserves the prior canonical snapshot.
+- Do not persist exception stack traces, content URIs, absolute paths, or user filenames in scan summaries or production logs.
 
 ---
 
 ### T011 — Extract and Normalize Metadata
 
-#### 1. Off-Main-Thread Metadata Extraction
-- Create `AudioMetadataExtractor` under `com.app.resn8.storage.indexer` using `MediaMetadataRetriever` (or Media3 format utilities) on `Dispatchers.IO`.
-- Extract embedded tags for each admitted audio document:
-  - `METADATA_KEY_TITLE`
-  - `METADATA_KEY_ARTIST`
-  - `METADATA_KEY_ALBUMARTIST`
-  - `METADATA_KEY_ALBUM`
-  - `METADATA_KEY_DISC_NUMBER`
-  - `METADATA_KEY_CD_TRACK_NUMBER`
-  - `METADATA_KEY_YEAR`
-  - `METADATA_KEY_GENRE`
-  - `METADATA_KEY_DURATION`
-  - Embedded artwork existence / byte reference.
+#### 1. Extract off the main thread
 
-#### 2. Metadata Precedence Rules
-For each track in a `MUSIC` collection, resolve display fields using this strict precedence:
-1. **Valid embedded ID3/audio tags**: If present and non-blank, use the tag value and record provenance as `MetadataValueSource.TAG`.
-2. **Path and Filename Inference**: If embedded tags are missing, infer artist/album from relative folder structure (`Artist/Album/...`) and track number from leading filename numbers (see T012). Record provenance as `MetadataValueSource.PATH` or `MetadataValueSource.FILENAME`.
-3. **Cleaned Filename Fallback**: If title is missing, clean the filename (remove extension, replace underscores with spaces, trim). Record provenance as `MetadataValueSource.FILENAME`.
+- Create injectable `AudioMetadataExtractor` and Android `MediaMetadataRetriever` implementation under `com.app.resn8.storage.indexer`.
+- Call `setDataSource(context, documentUri)` on `Dispatchers.IO`; release the retriever in `finally` for success, failure, and cancellation.
+- Extract title, artist, album artist, album, disc, track, year, genre, duration, and embedded-artwork availability when supported.
+- A readable admitted audio document whose metadata extraction fails remains indexable: set `MetadataScanStatus.FAILED`, keep duration nullable, apply filename/path fallbacks, and increment the metadata/unreadable diagnostic count as defined by `ScanResult`. A document that cannot be opened at all is skipped.
 
-#### 3. Database Sanitization and Nullability Rules
-- **DO NOT** store string fallbacks like `"Unknown Artist"`, `"Unknown Album"`, or `"Unknown Title"` in database columns. Store `null` when a value cannot be extracted or inferred. Fallback strings are applied only at presentation UI boundaries.
-- Parse and sanitize numeric track/disc values (e.g., parse `"1/12"` to `trackNumber = 1`, `"2"` to `discNumber = 2`).
-- Store unknown duration as `null` (not `0` or `-1`).
+#### 2. Normalize without destroying display data
+
+- Trim surrounding whitespace, convert blank strings to null, remove embedded NUL/control characters, and parse numeric values defensively.
+- Parse values such as `1/12` as track `1`. Accept only positive, representable disc/track/year values; invalid values become null.
+- Store unknown duration as null, never `0` or `-1`.
+- Keep `artist` and `albumArtist` independent. Do not copy one into the other in storage. Milestone 3 may group albums with `albumArtist ?: artist` at the query/presentation boundary.
+- Do not split or rewrite multi-artist tag text during this milestone.
+
+#### 3. Apply per-field precedence
+
+For each nullable semantic field, apply precedence independently so one valid tag does not block fallback for another missing field:
+
+1. Valid embedded tag -> `MetadataValueSource.TAG`.
+2. MUSIC path inference for artist/album -> `MetadataValueSource.PATH`.
+3. Filename inference for disc/track/title -> `MetadataValueSource.FILENAME`.
+
+`title` remains nullable semantic metadata. `displayTitle` is always populated with resolved title or, finally, the cleaned extensionless filename. Never store `Unknown Artist`, `Unknown Album`, or `Unknown Title`; those labels belong only to presentation.
+
+#### 4. Define artwork behavior for later playback
+
+- Do not store raw artwork bytes or transient `MediaMetadataRetriever` byte references in Room.
+- For Milestone 2, set `artworkUri` only if artwork is copied to a deterministic app-private cache file keyed by stable media ID and written atomically. Otherwise leave `artworkUri = null` and record that embedded artwork extraction is deferred/on-demand.
+- Delete or replace only app-owned cached artwork after successful publication. Never modify the source document.
+- Tests must cover missing/corrupt artwork without requiring artwork for a successful media record.
 
 ---
 
 ### T012 — Implement Filename and Path Fallback Parsing
 
-#### 1. Relative Path Parsing for Music Collections
-- Inspect relative path components relative to the selected root:
-  - Path `Artist/Album/01 - Track.mp3`:
-    - Component 2 levels up (`Artist`) -> inferred `artist` if embedded artist tag is absent.
-    - Component 1 level up (`Album`) -> inferred `album` if embedded album tag is absent.
-  - Path `Album/01 - Track.mp3` (single directory level):
-    - Component 1 level up (`Album`) -> inferred `album` if tag absent. `artist` remains `null`.
+#### 1. Define root-relative MUSIC path semantics
 
-#### 2. Filename Prefix Matching Heuristics
-Parse leading track and disc patterns from filenames:
-- **Disc and Track prefix**: `^(\d{1,2})[-._\s]+(\d{1,2})[-._\s]+(.+)$` (e.g., `1-01 Song Title.mp3` -> Disc 1, Track 1, Title `"Song Title"`).
-- **Track number prefix**: `^(\d{1,2})[-._\s]+(.+)$` or `^(\d{1,2})\.\s*(.+)$` (e.g., `01 - Song Title.mp3`, `01. Song Title.mp3` -> Track 1, Title `"Song Title"`).
-- **Combined Disc-Track prefix**: `^(\d{3,4})[-._\s]+(.+)$` (e.g., `101 Song Title.mp3` -> Disc 1, Track 01).
+Parse normalized directory components from the selected root, not from arbitrary absolute/provider paths:
 
-#### 3. Metadata Provenance & Pattern Summary
-- Track exact provenance (`MetadataValueSource`) per derived field:
-  - `TAG`: Derived from embedded metadata tags.
-  - `PATH`: Inferred from folder hierarchy.
-  - `FILENAME`: Inferred from filename track/title parsing.
-- Compute scan metrics and build versioned `ScanSummary` JSON for `lastScanSummaryJson`:
-  - `totalDiscoveredFiles`
-  - `tagDerivedCount`
-  - `pathDerivedCount`
-  - `filenameDerivedCount`
-  - `unrecognizedPatternCount`
-  - `unreadableFileCount`
-  - `unsupportedFileCount`
-  - List of unrecognized path/filename patterns for diagnostic analysis.
+| Relative media path | Inferred artist | Inferred album | Notes |
+| --- | --- | --- | --- |
+| `Artist/Album/01 - Song.mp3` | `Artist` | `Album` | Standard MUSIC layout. |
+| `Artist/Album/Disc 1/01 - Song.mp3` | `Artist` | `Album` | First two root-relative components remain authoritative; deeper components are structural only. |
+| `Album/01 - Song.mp3` | null | `Album` | Single directory is treated as album. |
+| `01 - Song.mp3` | null | null | Root-level file uses filename fallback only. |
+
+- Apply inferred values only when the corresponding embedded tag is absent/invalid.
+- Empty, `.`/`..`, or otherwise invalid components produce no inferred metadata.
+- Preserve the complete normalized folder hierarchy even when only the first two components supply MUSIC metadata.
+
+#### 2. Parse filenames in deterministic order
+
+Strip the final extension, trim the stem, then evaluate patterns in this order so a compact disc-track value is not consumed by a simpler track pattern:
+
+1. **Separated disc and track:** `^(\d{1,2})[-._\s]+(\d{1,2})[-._\s]+(.+)$`, for example `1-01 Song` -> disc 1, track 1, title `Song`.
+2. **Compact disc and track:** `^(\d{3,4})[-._\s]+(.+)$`, interpreting the last two digits as track and preceding digits as disc, for example `101 Song` -> disc 1, track 1 and `1201 Song` -> disc 12, track 1.
+3. **Track only:** `^(\d{1,2})(?:[-._\s]+)(.+)$`, covering `01 Song`, `01 - Song`, and `01. Song`.
+4. **No recognized prefix:** use the cleaned whole stem as `displayTitle`; semantic `title` may use the cleaned stem with `FILENAME` provenance when no tag title exists.
+
+- Require positive disc/track values and non-blank remaining title text. If validation fails, continue to the next safe fallback rather than storing partial garbage.
+- Replace separator underscores with spaces and collapse repeated whitespace for the cleaned display fallback, but otherwise preserve user-visible casing and punctuation.
+- Keep parsing functions pure and table-driven.
+
+#### 3. Record provenance and privacy-safe summaries
+
+- Record provenance independently for title, artist, album artist, album, disc number, and track number.
+- Use an explicitly versioned `ScanResult`/summary payload with aggregate counts.
+- Do not persist a list of raw unrecognized paths or filenames. If diagnostics beyond counts are needed, store only bounded parser category identifiers such as `NO_PREFIX`, `INVALID_TRACK_ZERO`, or `AMBIGUOUS_COMPACT_PREFIX`.
+- Do not include tree URIs, document IDs, filenames, relative paths, tags, or artwork in production logs or backup-oriented diagnostic payloads.
 
 ---
 
 ### T013 — Implement Idempotent Re-indexing
 
-#### 1. Scan Staging and Identity Candidate Matching
-During enumeration, staging rows (`staged_media`) are populated with document URIs, document IDs, relative paths, file size, modified time, duration, and extracted metadata.
+#### 1. Orchestrate one scan per source
 
-Before atomic snapshot publication, perform three-tier candidate matching to map each `staged_media` item to a canonical `media_files.id`:
-1. **Tier 1 — Document ID / URI Match**: Match `staged_media.documentUri` or `documentId` against existing `media_files.documentUri` / `documentId` within the same `sourceId`.
-2. **Tier 2 — Relative Path Match**: For unmatched staged items, match `staged_media.relativePath` against existing `media_files.relativePath` within the same `sourceId`.
-3. **Tier 3 — Signature Recovery Match**: For remaining unmatched staged items, attempt conservative rename recovery by matching `(size, modifiedTimeMs, durationMs)` uniquely against unmatched canonical `media_files` in the same `sourceId`. If exactly one canonical record matches, map the staged item to that existing `media_id` (recovering renamed files).
+- Create `IndexingCoordinator` (or equivalently named use case) that owns:
 
-#### 2. Atomic Snapshot Publication (`publishResolvedScan`)
-Execute snapshot publication inside one database transaction via `ScanDao` / repository:
-- **New Files**: Insert new `MediaFileEntity` rows with `firstIndexedAt = System.currentTimeMillis()`, `playCount = 0`, `likeScore = 0`, `lastPlayedAt = null`, and `isAvailable = true`.
-- **Existing Files**: Refresh document URI, relative path, file size, modified time, extracted metadata, provenance, folder ID, and `isAvailable = true`. **STRICTLY PRESERVE** `firstIndexedAt`, `playCount`, `likeScore`, `lastPlayedAt`, and playlist memberships.
-- **Missing Files**: For any canonical `media_files` in the source not present in the published scan staging, set `isAvailable = false`. **DO NOT** delete media rows or cascade-delete playlists/history.
-- **Folder Hierarchy**: Update `folder_nodes` to match the newly published directory tree.
-- **Root Source State**: Update `RootSourceEntity` (`lastScanStatus = SUCCESS`, `lastScanCompletedAt = System.currentTimeMillis()`, `lastScanSummaryJson = serializedSummary`).
-- **Staging Cleanup**: Purge `staged_media` and `staged_folders` rows for the completed `scanId`.
+  `validate access -> start/recover scan -> enumerate/extract/stage -> resolve identities -> publish -> emit terminal result`
 
-#### 3. Error and Cancellation Handling
-- If a scan fails or is cancelled, update `ScanRunEntity.status` (`FAILED` or `CANCELLED`), delete its staging rows, and leave the prior canonical library snapshot unchanged.
-- Re-indexing must be completely idempotent: running a scan twice on an unchanged folder produces identical database state without duplicate rows or altered timestamps.
+- Enforce at most one active scan per source with a process-local mutex plus a repository/database guard. A second request observes or returns the active scan rather than creating a competing run.
+- Set root scan status/start time when the run starts. UI observes durable scan state plus in-process progress; composables do not own scan jobs.
+
+#### 2. Recover interrupted scans safely
+
+- On startup, inspect any `IN_PROGRESS` scan for the registered source.
+- Reuse its scan ID as established by Milestone 1, but restart enumeration from the root because provider cursor/traversal position is not durably checkpointed.
+- Before restarting, atomically clear that scan ID's staged rows and reset transient progress counts. Reusing the scan ID plus unique scan-scoped keys makes restart idempotent and prevents stale partial rows from being published when the tree changed during interruption.
+- If access is no longer valid, retain the prior canonical snapshot, transition source/media availability per T009, and expose `PermissionRevoked` or `StorageUnavailable` with Retry/Reselect.
+- User cancellation is terminal and creates a new scan ID on a later retry. Fatal scan failure records bounded error categories, removes staging, and creates a new scan ID on retry.
+
+#### 3. Resolve stable folder IDs
+
+- Match staged folders to canonical folders by `(sourceId, relativePath)`, including the root `""` node.
+- Reuse matched folder IDs. Allocate IDs only for new paths, then resolve parent IDs from the same staged/canonical map.
+- Retain any canonical folder referenced by retained unavailable media. Do not delete it merely because it was absent from the latest tree.
+- Optional cleanup may delete only unreferenced stale folders, bottom-up, inside publication. Deferring such cleanup is acceptable for MVP; regenerating folder IDs is not.
+
+#### 4. Resolve media identities deterministically
+
+Resolve against one source-scoped pool containing both available and unavailable canonical media. A canonical ID may be claimed by at most one staged row.
+
+1. **Provider identity:** match document URI and non-null document ID. If both independently match different canonical rows, record `IDENTITY_CONFLICT` and do not merge either record by guesswork; create a new identity only if uniqueness constraints permit, otherwise fail publication controllably.
+2. **Relative path:** for still-unmatched rows, match the full canonical relative media path within the same source.
+3. **Conservative signature recovery:** for still-unmatched rows, compare `(size, modifiedTimeMs, durationMs)` only when size and modified time are positive/known and duration is known and positive. Claim an unmatched canonical row only when exactly one candidate has the complete signature.
+4. **New identity:** allocate a new media ID when no safe match exists.
+
+- Remove each claimed canonical row from later candidate tiers so two staged rows cannot claim one identity.
+- Never use title, artist, album, filename alone, or partial/unknown signatures for rename recovery.
+- Duplicate content at different source URIs remains distinct unless the rules above recover one unique prior identity.
+- A matching unavailable row is restored with the same ID and user data.
+
+#### 5. Publish one canonical snapshot atomically
+
+Perform all of the following in one Room transaction:
+
+- Insert new folders/media in parent-before-child order. New media receives the injected clock value for `firstIndexedAt`, neutral statistics, and `isAvailable = true`.
+- Refresh provider facts, path/folder, extracted metadata, provenance, metadata scan status, and availability for existing/returning media while preserving `firstIndexedAt`, `playCount`, `likeScore`, `lastPlayedAt`, history, playlist membership, and saved queue references.
+- Mark unmatched canonical media for this source unavailable; never delete it.
+- Retain folders required by unavailable media and stable UI references.
+- Update scan-run terminal status/counts and `RootSource` availability/status/completion timestamps/versioned summary.
+- Remove only the completed scan's staging rows.
+
+Canonical library observers must see either the previous snapshot or the complete new snapshot. The repository may page/read staging internally; do not require UI or the coordinator to materialize multiple unbounded 25,000-row object graphs.
+
+#### 6. Define idempotence precisely
+
+Two successful scans of an unchanged tree must produce:
+
+- No duplicate media or folders.
+- The same stable media/folder IDs, `firstIndexedAt`, user statistics, memberships, history, and queue references.
+- Equivalent canonical source/metadata/availability values.
+
+Scan-run records, root scan timestamps, elapsed duration, and progress/summary execution facts are expected to change and are excluded from byte-for-byte idempotence.
 
 ---
 
 ### T014 — Build Indexing UI States
 
-#### 1. UI Navigation and Screen Architecture
-Create onboarding and indexing Compose UI components under `com.app.resn8.ui.onboarding` and `com.app.resn8.ui.indexing`, integrated into the app navigation graph (`NavGraph.kt`).
+#### 1. Use unidirectional durable state
 
-#### 2. State Representation
-Support all indexing UI states via a unified `IndexingUiState`:
-- **`FirstRun`**: Explains local-only privacy, SAF folder selection, and features a prominent "Select Music Folder" button.
-- **`FolderNamingModal`**: Allows the user to review and customize the collection display name before indexing begins.
-- **`Scanning`**: Displays real-time scan progress:
-  - Progress indicator / spinner.
-  - Live counters: Discovered audio tracks, scanned folders.
-  - Current relative folder path being processed.
-  - "Cancel Scan" action button.
-- **`CompleteSummary`**: Shows a summary card upon scan completion:
-  - Total tracks added, updated, and missing/unavailable.
-  - Counts of tag-derived vs. path/filename-derived metadata.
-  - Unrecognized patterns or unreadable file summary (if any).
-  - "Continue to Library" action button.
-- **`EmptyFolder`**: Rendered when no supported audio files are found in the selected root. Offers a clear explanation and "Select Different Folder" button.
-- **`PermissionRevoked` / `StorageUnavailable`**: Rendered when root folder permission is lost or removable storage is unmounted. Displays "Grant Access" and "Retry" actions.
-- **`ScanError`**: Rendered on fatal scan failure with error details and a "Retry Indexing" action.
+- Add onboarding/indexing ViewModels and use cases wired through `AppContainer`; inject provider, extractor, clock, and coordinator dependencies for tests.
+- Keep typed routes and small IDs only. Never place a tree URI, permission state, scan object graph, or exception in a route.
+- Derive application start routing from registered collection/root state, persisted grant validation, root availability, and scan state. Do not hard-code Library as the effective first-run destination.
+- Keep scan work in the ViewModel/coordinator so configuration changes recreate UI without starting a second scan.
 
-#### 3. Accessibility and Adaptive Layout
-- Include semantic content descriptions for progress bars, counters, and status icons.
-- Ensure layouts adjust gracefully across phone portrait, landscape, and tablet screen dimensions.
+#### 2. Represent all required states
+
+Use a sealed `IndexingUiState` (or equivalent state plus effects) covering:
+
+- **`Loading`** while durable onboarding/source state is resolved.
+- **`FirstRun`** with local-only privacy, one-root explanation, and “Select Music Folder”.
+- **`FolderNaming`** with default name, validation, confirm, and cancel behavior.
+- **`Scanning`** with indeterminate progress, phase, scanned folders, inspected documents, admitted audio, unsupported count, unreadable/error count, current relative path, and Cancel.
+- **`CompleteSummary`** with added, updated, restored, unavailable, tag/path/filename-derived, unsupported, and unreadable counts plus “Continue to Library”.
+- **`EmptyFolder`** retaining the registered root and offering Retry/Re-index and Select Different Folder.
+- **`PermissionRevoked`** with Reselect/Grant Access.
+- **`StorageUnavailable`** with Retry while retaining all context.
+- **`Interrupted`** while an existing scan is safely restarted, or with an explicit Retry if automatic restart cannot begin.
+- **`ScanError`** with a user-safe category/message and Retry; do not display raw provider paths or stack traces.
+
+One-shot picker launch/navigation events must not be replayed after configuration changes.
+
+#### 3. Add manual re-indexing
+
+- Add a visible manual “Re-index” action from the library/source surface after onboarding, as required by the Milestone 2 exit criteria.
+- Disable or convert it to “View progress” while that source already has an active scan.
+- Show the prior canonical library during re-indexing and publish changes only at completion.
+- Scheduled/background indexing remains post-MVP.
+
+#### 4. Accessibility and adaptive behavior
+
+- Give progress/status controls useful semantics and announce terminal state changes without repeatedly announcing every path update.
+- Meet minimum touch targets, logical focus order, font scaling, and non-color-only error/status communication.
+- Support phone portrait and landscape. Avoid claiming tablet-specific optimization beyond graceful adaptive sizing, which the specification leaves for later.
 
 ---
 
 ### T015 — Test Real Provider Behavior
 
-#### 1. Unit & Integration Test Suite
-Add test coverage under `app/src/test/java/com/app/resn8/storage/` and `app/src/androidTest/java/com/app/resn8/storage/`:
-- **Folder Onboarding Tests**: Verify persistent Uri permission requests, collection creation, and cancellation handling.
-- **Recursive Enumeration Tests**: Verify directory traversal with nested subfolders, audio format filtering, non-audio exclusion, and bounded batching.
-- **Metadata Extraction & Fallback Tests**:
-  - Test embedded ID3 tag extraction.
-  - Test `Artist/Album/Track - Title.mp3` path & filename fallback parsing.
-  - Test common track prefix regexes (`01 - Title`, `1-01 Title`, `101 Title`).
-  - Test provenance recording (`TAG`, `PATH`, `FILENAME`).
-  - Test nullability rules (verify `"Unknown Artist"` is NOT stored in DB).
-- **Idempotent Re-indexing Tests**:
-  - Initial scan -> verify tracks inserted with `firstIndexedAt = now` and `isAvailable = true`.
-  - Second scan with updated tags -> verify metadata updated, `firstIndexedAt` and user ratings preserved.
-  - Second scan with deleted file -> verify track marked `isAvailable = false`, playlist membership preserved.
-  - Second scan with renamed file -> verify signature recovery re-links canonical `media_id`, preserving ratings & play count.
-  - Cancelled scan -> verify staging purged and canonical DB untouched.
-- **Removable Storage & Provider Tests**: Simulate missing/unmounted tree Uris and verify `isAvailable = false` updates across app restarts.
+#### 1. Pure unit tests
+
+Add table-driven tests for:
+
+- MIME/extension admission, generic MIME fallback, uppercase extensions, hidden audio, known zero-byte files, and unknown size.
+- Tag normalization, blank/control-character handling, numeric parsing, nullable duration, independent per-field precedence, and metadata extraction failure fallback.
+- Root-relative path cases including standard, deep disc folder, one-folder album, and root-level file.
+- Filename patterns `01 Song`, `01 - Song`, `01. Song`, `1-01 Song`, `101 Song`, `1201 Song`, zero/invalid values, ambiguity, and no-prefix fallback.
+- Per-field provenance and privacy-safe summary categories.
+- Identity conflicts, unavailable return, one-to-one candidate claiming, ambiguous/partial signatures, and duplicate-content separation.
+- Coordinator single-scan enforcement, cancellation, fatal root failure, interrupted restart, and immutable progress/state transitions.
+
+#### 2. Room/repository integration tests
+
+Verify:
+
+- Bounded staging remains invisible until publication.
+- Initial scan inserts stable folder/media IDs and neutral user values.
+- An unchanged second scan preserves canonical identity and user-owned fields.
+- Changed tags refresh only source/extracted fields.
+- Missing media becomes unavailable while its folder, memberships, history, and queues remain intact.
+- Returning and uniquely renamed media restores the canonical ID and user state.
+- Stale folders referenced by unavailable media are retained; unreferenced cleanup, if implemented, is bottom-up.
+- Root/media unavailability is atomic and a provider failure cannot publish an empty snapshot.
+- Successful publication atomically updates folders, media, scan run, root status/summary, and staging cleanup.
+- Cancellation/failure cleanup leaves the prior snapshot unchanged, including when cleanup begins from a cancelled coroutine.
+- Interrupted restart reuses the scan ID, clears stale staging, and safely republishes.
+- Versioned summaries round-trip with missing/additive fields.
+
+#### 3. Provider-backed instrumentation tests
+
+- Implement or configure a controllable test `DocumentsProvider`; do not claim real provider coverage from mocks alone.
+- Cover nested queries, null/missing metadata columns, generic MIME types, inaccessible documents/subtrees, repeated document IDs, metadata-open failure, grant validation, and provider disappearance/reappearance.
+- Verify activity recreation does not duplicate scans and app process recreation restarts an interrupted scan without exposing staging.
+- Verify persisted access and a successful manual re-index after app restart.
+
+#### 4. Device/provider acceptance matrix
+
+Record results on API 34+ for:
+
+| Environment | Required evidence |
+| --- | --- |
+| Emulator/test provider | Nested indexing, persisted grant after app restart, cancellation, provider failure, and re-index. |
+| Internal shared storage provider | Real folder selection, nested tagged/untagged audio, app restart, and manual re-index. |
+| Physical removable storage or equivalent provider | Device restart, unavailable media retention when removed/unmounted, and recovery after remount/reselection. |
+
+If CI lacks a connected device or removable-storage equivalent, compilation is still required and the unexecuted device checks must be recorded explicitly; they cannot be reported as passing.
+
+---
+
+## File-Level Handoff
+
+The coding assistant should expect to create or modify files in these areas. Exact class splitting may follow project conventions, but responsibilities must remain separated and injectable.
+
+- `domain/model/ScanStatus.kt`: typed progress/result/status contracts and versioned summary semantics.
+- `domain/repository/MediaRepository.kt` and `CollectionRepository.kt`: scan recovery/publication and source-scoped availability operations.
+- `data/database/dao/ScanDao.kt`, `MediaFileDao.kt`, `FolderDao.kt`, and `CollectionDao.kt`: staging reads, matching support, availability updates, and atomic publication inputs.
+- `data/repository/RoomMediaRepository.kt` and `RoomCollectionRepository.kt`: transaction and mapping implementation.
+- `data/repository/FakeMediaRepository.kt` and `FakeCollectionRepository.kt`: behaviorally useful fakes, not empty scan no-ops.
+- `storage/indexer/`: provider adapter, admission policy, scanner, extractor, normalizer/parser, identity resolver, and coordinator.
+- `di/AppContainer.kt`: injectable production and test wiring.
+- `ui/onboarding/`, `ui/indexing/`, and existing typed navigation/screen files: durable state, picker effects, progress/recovery, and manual re-index.
+- `src/test` and `src/androidTest`: pure, Room, Compose, provider, lifecycle, and restart coverage.
+
+Before editing a named file, inspect its current contents and preserve unrelated worktree changes.
 
 ---
 
 ## Verification Commands
 
-Execute the following commands from the repository root to verify Milestone 2 implementation:
+Run from the repository root:
 
 ```powershell
-# Run unit tests for enumeration, metadata parsing, fallback regexes, and scan orchestration
+# Pure unit, parser, coordinator, and Room/Robolectric tests
 .\gradlew.bat testDebugUnitTest
 
-# Confirm debug build compilation and KSP/Room schema generation
-.\gradlew.bat assembleDebug
+# Static checks and debug compilation, including Room/KSP output
+.\gradlew.bat lintDebug assembleDebug
 
-# Run instrumentation tests for SAF provider behavior and in-memory/on-device re-indexing
+# Ensure instrumentation sources compile even when no device is attached
+.\gradlew.bat compileDebugAndroidTestKotlin
+
+# Provider, Compose/lifecycle, and on-device tests; requires a connected API 34+ target
 .\gradlew.bat connectedDebugAndroidTest
 ```
+
+Also inspect the exported Room schema diff whenever entities, indexes, or converters change. Do not accept destructive migration fallback, skipped failing tests, or a connected-test command that passed only because no relevant tests existed.
 
 ---
 
 ## Exit Criteria
 
-Milestone 2 is complete only when:
+Milestone 2 is complete only when all of the following are demonstrated:
 
-1. **Folder Onboarding**: A user can select a root folder via SAF `ACTION_OPEN_DOCUMENT_TREE`, persistent read permission is taken, and a default `MUSIC` collection/root is registered.
-2. **Recursive Enumeration**: Nested subfolders are traversed off the main thread, non-audio files are filtered out, and admitted tracks are streamed in bounded staging batches.
-3. **Metadata Extraction & Normalization**: Embedded ID3/audio tags are extracted off the main thread; display title precedence (Tag -> Path/Filename -> Cleaned Filename) and metadata provenance (`TAG`, `PATH`, `FILENAME`) are recorded accurately.
-4. **Data Hygiene**: Missing metadata is stored as `null` in Room (never string fallbacks like `"Unknown Artist"`), and unknown duration is stored as `null`.
-5. **Fallback Parsing**: Path patterns (`Artist/Album`) and track/disc prefixes (`01 - Title`, `1-01 Title`) infer missing metadata fields and generate diagnostic scan summaries.
-6. **Idempotent Re-indexing**: Scans utilize isolated persistent staging, candidate identity matching (Document ID/URI -> Relative Path -> Conservative Signature), and atomic snapshot publication (`publishResolvedScan`).
-7. **Preservation of User State**: Re-indexing preserves `firstIndexedAt`, `playCount`, `likeScore`, `lastPlayedAt`, and playlist memberships for existing or returning files.
-8. **Fault Tolerance & Availability**: Missing files are marked `isAvailable = false` without row deletion. Unreadable/corrupt files do not fail the overall scan. Cancelled scans purge staging without corrupting canonical data.
-9. **UI States**: The UI handles first-run explanation, folder naming, live scan progress, completion summaries, empty folders, permission loss, and error retry states.
-10. **Verification**: All unit, build, and provider instrumentation tests pass.
+1. A first-run user can select one root, persist read access, name the default `MUSIC` collection, and restart the app without repeating onboarding.
+2. Nested supported audio is enumerated and metadata-extracted off the main thread through bounded work; provider anomalies do not crash unrelated traversal.
+3. Tag values win per field, MUSIC path/filename fallbacks are deterministic, missing semantic values remain null, and `displayTitle` is always usable.
+4. Scan summaries are versioned, privacy-safe, and contain the counts required by the specification and UI.
+5. Folder and media identities remain stable; ambiguous identity evidence never causes a guessed merge.
+6. Successful publication is one atomic canonical snapshot and preserves all user-owned data and references.
+7. Missing media and unavailable roots are retained with `isAvailable = false`; restored access/files recover without losing identity or context.
+8. Cancellation, fatal failure, configuration change, and process interruption leave the prior snapshot intact and follow the documented cleanup/restart policy.
+9. The UI covers first run, naming, progress with required counts, cancellation, completion, empty root, interruption, permission loss, unavailable storage, safe errors, and manual re-indexing.
+10. Unit, Room, build/lint, instrumentation compilation, provider-backed tests, and the applicable device/provider acceptance matrix pass or have explicit recorded device-only limitations.
 
 ---
 
 ## Reference Files
 
-- [SPECIFICATION.md](../SPECIFICATION.md): Sections 2.1, 2.3, 2.4, 3.1, 4.1, 4.2, 4.4, and 5.
-- [TASKS.md](../TASKS.md): Tasks T009–T015.
-- [BRAINSTORM.md](../BRAINSTORM.md): Library shapes, folder selection, re-indexing, fallback parsing.
-- [milestone_1_persistence.md](milestone_1_persistence.md): Room schema baseline, isolated scan staging (`ScanRunEntity`, `StagedMediaEntity`, `StagedFolderEntity`), atomic snapshot publication (`publishResolvedScan`).
-- [milestone_0_foundation.md](milestone_0_foundation.md): Application layer package structure and dependency container.
-- **Domain Models**:
-  - [MediaFile.kt](../../app/src/main/java/com/app/resn8/domain/model/MediaFile.kt)
-  - [Collection.kt](../../app/src/main/java/com/app/resn8/domain/model/Collection.kt)
-  - [ScanProgress.kt](../../app/src/main/java/com/app/resn8/domain/model/ScanProgress.kt)
-  - [ScanResult.kt](../../app/src/main/java/com/app/resn8/domain/model/ScanResult.kt)
-  - [MetadataValueSource.kt](../../app/src/main/java/com/app/resn8/domain/model/MetadataValueSource.kt)
-- **Database & DAOs**:
-  - [Resn8Database.kt](../../app/src/main/java/com/app/resn8/data/database/Resn8Database.kt)
-  - [ScanDao.kt](../../app/src/main/java/com/app/resn8/data/database/dao/ScanDao.kt)
-  - [MediaFileDao.kt](../../app/src/main/java/com/app/resn8/data/database/dao/MediaFileDao.kt)
-  - [FolderDao.kt](../../app/src/main/java/com/app/resn8/data/database/dao/FolderDao.kt)
-  - [CollectionDao.kt](../../app/src/main/java/com/app/resn8/data/database/dao/CollectionDao.kt)
-- **Repositories & Wiring**:
-  - [RoomCollectionRepository.kt](../../app/src/main/java/com/app/resn8/data/repository/RoomCollectionRepository.kt)
-  - [RoomMediaRepository.kt](../../app/src/main/java/com/app/resn8/data/repository/RoomMediaRepository.kt)
-  - [AppContainer.kt](../../app/src/main/java/com/app/resn8/di/AppContainer.kt)
+- [SPECIFICATION.md](../SPECIFICATION.md): Sections 1, 2.1-2.4, 3.1, 4.1-4.4, and 5.
+- [TASKS.md](../TASKS.md): T009-T020, T023, T040, T046, T048-T050, and T053 for current and downstream constraints.
+- [BRAINSTORM.md](../BRAINSTORM.md): Library shapes, folder inspection, manual re-indexing, metadata questions, and downstream folder selection.
+- [milestone_1_persistence.md](milestone_1_persistence.md): Version-1 schema, retention rules, scan staging/publication, stable IDs, and interrupted-scan policy.
+- [milestone_0_foundation.md](milestone_0_foundation.md): Domain/repository seams, typed navigation, fakes, and dependency container.
+- [ScanStatus.kt](../../app/src/main/java/com/app/resn8/domain/model/ScanStatus.kt)
+- [StagedModels.kt](../../app/src/main/java/com/app/resn8/domain/model/StagedModels.kt)
+- [MetadataEnums.kt](../../app/src/main/java/com/app/resn8/domain/model/MetadataEnums.kt)
+- [MediaFile.kt](../../app/src/main/java/com/app/resn8/domain/model/MediaFile.kt)
+- [Collection.kt](../../app/src/main/java/com/app/resn8/domain/model/Collection.kt)
+- [MediaRepository.kt](../../app/src/main/java/com/app/resn8/domain/repository/MediaRepository.kt)
+- [CollectionRepository.kt](../../app/src/main/java/com/app/resn8/domain/repository/CollectionRepository.kt)
+- [RoomMediaRepository.kt](../../app/src/main/java/com/app/resn8/data/repository/RoomMediaRepository.kt)
+- [RoomCollectionRepository.kt](../../app/src/main/java/com/app/resn8/data/repository/RoomCollectionRepository.kt)
+- [ScanDao.kt](../../app/src/main/java/com/app/resn8/data/database/dao/ScanDao.kt)
+- [AppContainer.kt](../../app/src/main/java/com/app/resn8/di/AppContainer.kt)
