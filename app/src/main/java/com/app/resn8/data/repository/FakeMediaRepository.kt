@@ -256,15 +256,21 @@ class FakeMediaRepository(
         return _folderNodes.map { nodes -> nodes.filter { it.sourceId == sourceId } }
     }
 
-    override suspend fun updateLikeScore(mediaId: String, delta: Int) {
-        require(delta == 1 || delta == -1) { "Like score delta must be +1 or -1" }
+    override suspend fun updateLikeScore(mediaId: String, delta: Int): Result<Int> {
+        if (delta != 1 && delta != -1) {
+            return Result.failure(IllegalArgumentException("Like score delta must be +1 or -1"))
+        }
+        val file = _mediaFiles.value.find { it.id == mediaId }
+            ?: return Result.failure(IllegalArgumentException("Media file not found: $mediaId"))
+        val newScore = file.likeScore + delta
         _mediaFiles.value = _mediaFiles.value.map { item ->
             if (item.id == mediaId) {
-                item.copy(likeScore = item.likeScore + delta)
+                item.copy(likeScore = newScore)
             } else {
                 item
             }
         }
+        return Result.success(newScore)
     }
 
     override suspend fun recordPlay(mediaId: String, listenedDurationMs: Long, isMeaningful: Boolean) {

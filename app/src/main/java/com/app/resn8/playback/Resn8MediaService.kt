@@ -7,6 +7,8 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -17,8 +19,11 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 const val RESN8_QUEUE_ID = "resn8_queue_id"
@@ -29,6 +34,8 @@ class Resn8MediaService : MediaSessionService() {
 
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
+    private var tracker: MeaningfulPlayTracker? = null
+    private var tickerJob: Job? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onCreate() {
@@ -46,6 +53,49 @@ class Resn8MediaService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
         player = exoPlayer
+
+        val playTracker = MeaningfulPlayTracker(
+            monotonicClock = { android.os.SystemClock.elapsedRealtime() }
+        ) { occurrenceId, mediaId, startedAt, endedAt, accumulatedMs, result ->
+            if (container != null) {
+                serviceScope.launch {
+                    container.mediaRepository.commitMeaningfulPlay(
+                        sessionOccurrenceId = occurrenceId,
+                        mediaId = mediaId,
+                        startedAt = startedAt,
+                        endedAt = endedAt,
+                        accumulatedListenedDurationMs = accumulatedMs,
+                        result = result
+                    )
+                }
+            }
+        }
+        tracker = playTracker
+
+        val playerListener = object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                val mediaId = mediaItem?.requestMetadata?.extras?.getString(RESN8_MEDIA_FILE_ID) ?: mediaItem?.mediaId
+                playTracker.onMediaItemTransition(mediaId, exoPlayer.duration)
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                playTracker.onPlaybackStateChanged(playbackState, exoPlayer.duration)
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playTracker.onIsPlayingChanged(isPlaying, exoPlayer.duration)
+                if (isPlaying) {
+                    startTicker(playTracker, exoPlayer)
+                } else {
+                    stopTicker()
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                playTracker.onTick(exoPlayer.duration)
+            }
+        }
+        exoPlayer.addListener(playerListener)
 
         val sessionActivityIntent = Intent(this, MainActivity::class.java)
         val sessionActivityPendingIntent = PendingIntent.getActivity(
@@ -78,6 +128,21 @@ class Resn8MediaService : MediaSessionService() {
             .setSessionActivity(sessionActivityPendingIntent)
             .setCallback(callback)
             .build()
+    }
+
+    private fun startTicker(tracker: MeaningfulPlayTracker, exoPlayer: ExoPlayer) {
+        stopTicker()
+        tickerJob = serviceScope.launch {
+            while (isActive) {
+                tracker.onTick(exoPlayer.duration)
+                delay(500L)
+            }
+        }
+    }
+
+    private fun stopTicker() {
+        tickerJob?.cancel()
+        tickerJob = null
     }
 
     private suspend fun resolveMediaItems(
@@ -122,6 +187,8 @@ class Resn8MediaService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        stopTicker()
+        tracker?.resetState()
         serviceScope.cancel()
         mediaSession?.run {
             player.release()
@@ -129,6 +196,7 @@ class Resn8MediaService : MediaSessionService() {
         }
         mediaSession = null
         player = null
+        tracker = null
         super.onDestroy()
     }
 }

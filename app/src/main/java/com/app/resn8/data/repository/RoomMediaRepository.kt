@@ -240,10 +240,21 @@ class RoomMediaRepository(
         }
     }
 
-    override suspend fun updateLikeScore(mediaId: String, delta: Int) {
-        require(delta == 1 || delta == -1) { "Like score delta must be +1 or -1" }
-        db.withTransaction {
-            mediaFileDao.updateLikeScore(mediaId, delta)
+    override suspend fun updateLikeScore(mediaId: String, delta: Int): Result<Int> {
+        if (delta != 1 && delta != -1) {
+            return Result.failure(IllegalArgumentException("Like score delta must be +1 or -1"))
+        }
+        return try {
+            val newScore = db.withTransaction {
+                val existing = mediaFileDao.getMediaFileById(mediaId)
+                    ?: throw IllegalArgumentException("Media file not found: $mediaId")
+                val updatedScore = existing.likeScore + delta
+                mediaFileDao.updateLikeScore(mediaId, delta)
+                updatedScore
+            }
+            Result.success(newScore)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

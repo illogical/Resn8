@@ -53,15 +53,21 @@ class MediaPersistenceTest {
     @Test
     fun signedScore_updatesAtomically_crossingZero() = runBlocking {
         // 0 -> 1
-        mediaRepo.updateLikeScore(testMediaId, 1)
+        val res1 = mediaRepo.updateLikeScore(testMediaId, 1)
+        assertTrue(res1.isSuccess)
+        assertEquals(1, res1.getOrNull())
         assertEquals(1, mediaRepo.getMediaFileById(testMediaId)?.likeScore)
 
         // 1 -> 2
-        mediaRepo.updateLikeScore(testMediaId, 1)
+        val res2 = mediaRepo.updateLikeScore(testMediaId, 1)
+        assertTrue(res2.isSuccess)
+        assertEquals(2, res2.getOrNull())
         assertEquals(2, mediaRepo.getMediaFileById(testMediaId)?.likeScore)
 
         // 2 -> 1
-        mediaRepo.updateLikeScore(testMediaId, -1)
+        val res3 = mediaRepo.updateLikeScore(testMediaId, -1)
+        assertTrue(res3.isSuccess)
+        assertEquals(1, res3.getOrNull())
         assertEquals(1, mediaRepo.getMediaFileById(testMediaId)?.likeScore)
 
         // 1 -> 0
@@ -75,6 +81,15 @@ class MediaPersistenceTest {
         // -1 -> -2
         mediaRepo.updateLikeScore(testMediaId, -1)
         assertEquals(-2, mediaRepo.getMediaFileById(testMediaId)?.likeScore)
+    }
+
+    @Test
+    fun signedScore_rejectsInvalidDelta_andMissingMedia() = runBlocking {
+        val invalidDelta = mediaRepo.updateLikeScore(testMediaId, 2)
+        assertTrue(invalidDelta.isFailure)
+
+        val missingMedia = mediaRepo.updateLikeScore("non_existent_id", 1)
+        assertTrue(missingMedia.isFailure)
     }
 
     @Test

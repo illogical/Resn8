@@ -254,6 +254,8 @@ fun Resn8NavHost(
                 onSeek = { pos -> playbackConnection?.seekTo(pos) },
                 onSkipPrevious = { playbackConnection?.skipToPrevious() },
                 onSkipNext = { playbackConnection?.skipToNext() },
+                onLikeClicked = { playbackConnection?.likeTrack() },
+                onDislikeClicked = { playbackConnection?.dislikeTrack() },
                 onQueueClicked = { navController.navigate(QueueRoute) },
                 onDismissNotice = { playbackConnection?.clearNotice() }
             )

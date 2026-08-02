@@ -211,26 +211,32 @@ class PlaybackConnection(
             it.copy(isCurrent = it.queueItemId == currentQueueItemId)
         }
 
-        _uiState.update {
-            it.copy(
-                currentQueueItemId = currentQueueItemId,
-                currentMediaId = currentMediaFileId,
-                currentIndex = currentIndex,
-                title = title,
-                artist = artist,
-                album = album,
-                artworkUri = artworkUri,
-                positionMs = pos,
-                durationMs = if (isUnknownDuration) 0L else dur,
-                isDurationUnknown = isUnknownDuration,
-                isPlaying = isPlaying,
-                isBuffering = isBuffering,
-                canPlayPause = ctrl.isCommandAvailable(Player.COMMAND_PLAY_PAUSE),
-                canSeek = ctrl.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM),
-                canSkipPrevious = ctrl.hasPreviousMediaItem(),
-                canSkipNext = ctrl.hasNextMediaItem(),
-                queueItems = updatedQueueItems
-            )
+        scope.launch {
+            val mediaFile = if (currentMediaFileId != null) container.mediaRepository.getMediaFileById(currentMediaFileId) else null
+            val likeScore = mediaFile?.likeScore ?: 0
+
+            _uiState.update {
+                it.copy(
+                    currentQueueItemId = currentQueueItemId,
+                    currentMediaId = currentMediaFileId,
+                    currentIndex = currentIndex,
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    artworkUri = artworkUri,
+                    likeScore = likeScore,
+                    positionMs = pos,
+                    durationMs = if (isUnknownDuration) 0L else dur,
+                    isDurationUnknown = isUnknownDuration,
+                    isPlaying = isPlaying,
+                    isBuffering = isBuffering,
+                    canPlayPause = ctrl.isCommandAvailable(Player.COMMAND_PLAY_PAUSE),
+                    canSeek = ctrl.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM),
+                    canSkipPrevious = ctrl.hasPreviousMediaItem(),
+                    canSkipNext = ctrl.hasNextMediaItem(),
+                    queueItems = updatedQueueItems
+                )
+            }
         }
     }
 
@@ -332,6 +338,30 @@ class PlaybackConnection(
             ctrl.seekTo(index, 0L)
             ctrl.prepare()
             ctrl.play()
+        }
+    }
+
+    fun likeTrack(mediaId: String? = _uiState.value.currentMediaId) {
+        if (mediaId == null) return
+        scope.launch {
+            val result = container.mediaRepository.updateLikeScore(mediaId, +1)
+            result.onSuccess { newScore ->
+                if (_uiState.value.currentMediaId == mediaId) {
+                    _uiState.update { it.copy(likeScore = newScore) }
+                }
+            }
+        }
+    }
+
+    fun dislikeTrack(mediaId: String? = _uiState.value.currentMediaId) {
+        if (mediaId == null) return
+        scope.launch {
+            val result = container.mediaRepository.updateLikeScore(mediaId, -1)
+            result.onSuccess { newScore ->
+                if (_uiState.value.currentMediaId == mediaId) {
+                    _uiState.update { it.copy(likeScore = newScore) }
+                }
+            }
         }
     }
 

@@ -47,7 +47,7 @@ interface MediaRepository {
     suspend fun getMediaFileById(id: String): MediaFile?
     suspend fun getMediaFilesByIdsPreservingOrder(mediaIds: List<String>): List<MediaFile>
     fun getFolderNodesFlow(sourceId: String): Flow<List<FolderNode>>
-    suspend fun updateLikeScore(mediaId: String, delta: Int)
+    suspend fun updateLikeScore(mediaId: String, delta: Int): Result<Int>
     suspend fun recordPlay(mediaId: String, listenedDurationMs: Long, isMeaningful: Boolean)
     suspend fun commitMeaningfulPlay(
         sessionOccurrenceId: String,
