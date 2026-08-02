@@ -44,7 +44,7 @@ All audio types use one `MediaFile` entity. Common fields are required; music-sp
 | `Collection` | Stable ID, name, profile, created/updated timestamps |
 | `RootSource` | Stable ID, collection ID, persisted tree URI, display name, availability, last scan status/timestamps |
 | `FolderNode` | Stable ID, source ID, parent ID, relative path, display name; represents the indexed hierarchy |
-| `MediaFile` | Stable ID, source ID, folder ID, document URI/ID, relative path, filename, display title, MIME type, size, duration, modified time, availability, metadata scan status |
+| `MediaFile` | Stable ID, source ID, folder ID, document URI/ID, relative path, filename, display title, MIME type, size, duration, modified time, first-indexed time, availability, metadata scan status |
 | Music metadata | Nullable title, artist, album artist, album, disc number, track number, year, genre, artwork reference |
 | Listening statistics | `playCount >= 0`, nullable `lastPlayedAt`, signed `likeScore` defaulting to `0` |
 | `Playlist` | Stable ID, collection ID, unique name within collection, created/updated timestamps |
@@ -53,7 +53,7 @@ All audio types use one `MediaFile` entity. Common fields are required; music-sp
 | `SavedQueue` | Queue ID, collection ID, kind, optional generation rule/filter/seed, explicit ordered media IDs, current index, position, playback state, timestamps |
 | `UiSessionState` | Last route plus selected collection, folder, artist, album, playlist, and active filter/sort identifiers |
 
-Room is the source of truth for indexed metadata, relationships, statistics, playlists, saved queues, and session state. Source audio remains addressed through content URIs. Foreign keys and indexes cover collection/source/folder membership, artist, album, track/disc number, play count, last played, like score, playlist position, and availability.
+Room is the source of truth for indexed metadata, relationships, statistics, playlists, saved queues, and session state. Source audio remains addressed through content URIs. Foreign keys and indexes cover collection/source/folder membership, artist, album, track/disc number, first-indexed time, play count, last played, like score, playlist position, and availability.
 
 ### 2.3 Metadata Resolution
 
@@ -72,7 +72,7 @@ For `CONTEXTUAL` collections, relative folders are the category hierarchy and mu
 
 - A scan recursively enumerates the selected tree, filters for decoder-supported audio MIME types/extensions, extracts metadata off the main thread, and upserts results in bounded batches.
 - Existing records are matched by provider document ID/URI first and relative path second. A conservative size/duration/modified-time signature may recover a renamed item only when the match is unique.
-- New files are inserted with neutral statistics. Changed files refresh source and extracted metadata without resetting ratings, history, or playlist membership.
+- New files are inserted with neutral statistics and a first-indexed timestamp. Changed or returning files preserve that timestamp while refreshing source and extracted metadata without resetting ratings, history, or playlist membership.
 - Missing files are marked unavailable rather than deleted. A later matching scan restores them. Permanently removing retained records is a separate confirmed maintenance action outside MVP.
 - A scan is cancellable, reports progress and a final summary, survives configuration changes, and never exposes a partially replaced library snapshot.
 - Duplicate content at different source URIs is treated as distinct media unless a later deduplication feature explicitly links it.
@@ -118,7 +118,7 @@ The user's target most-liked example is normative: scores `3, 3, 1, 0, 0, -1` pr
 
 Generation uses an injectable seeded random source. It saves the mode, normalized filter snapshot, seed, and explicit ordered media IDs. The explicit order is authoritative: ratings, statistics, filters, or new scans do not reshuffle an active queue. The user regenerates to incorporate changes. Unavailable items are skipped with a visible explanation, while the saved queue remains recoverable.
 
-Manual library sorts support artist, album, disc/track, filename/title, most/least played, unplayed, most/least recently played, and most liked. Unlike smart queues, normal sorts are deterministic, using normalized title and stable media ID as final tie-breakers.
+Manual library sorts support artist, album, disc/track, filename/title, recently added/indexed, most/least played, unplayed, most/least recently played, and most liked. Recently added/indexed orders by first-indexed time descending. Unlike smart queues, normal sorts are deterministic, using normalized title and stable media ID as final tie-breakers.
 
 ## 3. User Experience
 
@@ -211,4 +211,3 @@ The MVP is complete when all of the following are demonstrated on an API 34+ dev
 5. Raycast/Alfred-style global search across metadata, folders, playlists, and history.
 6. Rating/history maintenance, including confirmed move/delete workflows for disliked files.
 7. Export/import backup for playlists, ratings, history, and settings without bundling source audio.
-

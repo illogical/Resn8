@@ -23,10 +23,10 @@ Establish the following package structure under `com.app.resn8`:
 - `ui`: Navigation, theme, and screen-specific packages.
 
 ### T003 — Define domain contracts
-Create core entities matching `SPECIFICATION.md`:
+Completed core domain contracts matching `SPECIFICATION.md`, including collection profiles, media metadata, filter/sort definitions, rating and meaningful-play rules, queue-generation modes, saved queue state, scan progress/results, and repository interfaces:
 - `MediaFile`: The central audio record.
 - `RootSource`: Folder access metadata.
-- `Collection`: Logical grouping (Music/Podcasts).
+- `Collection`: Logical grouping using `MUSIC`, `CONTEXTUAL`, and `FLAT` profiles.
 - `Playlist` & `PlaylistItem`.
 - `SavedQueue`: Durable playback state.
 
