@@ -30,6 +30,8 @@ class FakeMediaRepository(
     private val _mediaFiles = MutableStateFlow(initialMediaFiles)
     private val _folderNodes = MutableStateFlow(initialFolderNodes)
     private val _historyOccurrences = mutableSetOf<String>()
+    private val stagedFoldersByScan = mutableMapOf<String, MutableList<StagedFolder>>()
+    private val stagedMediaByScan = mutableMapOf<String, MutableList<StagedMedia>>()
 
     private fun filterMediaFiles(query: LibraryQuery): List<MediaFile> {
         val normSearch = query.normalizedSearchText()
@@ -245,6 +247,11 @@ class FakeMediaRepository(
         return _mediaFiles.value.find { it.id == id }
     }
 
+    override suspend fun getMediaFilesByIdsPreservingOrder(mediaIds: List<String>): List<MediaFile> {
+        val map = _mediaFiles.value.associateBy { it.id }
+        return mediaIds.mapNotNull { map[it] }
+    }
+
     override fun getFolderNodesFlow(sourceId: String): Flow<List<FolderNode>> {
         return _folderNodes.map { nodes -> nodes.filter { it.sourceId == sourceId } }
     }
@@ -296,9 +303,13 @@ class FakeMediaRepository(
 
     override suspend fun startScanRun(sourceId: String): String = UUID.randomUUID().toString()
 
-    override suspend fun stageFolders(scanId: String, folders: List<StagedFolder>) {}
+    override suspend fun stageFolders(scanId: String, folders: List<StagedFolder>) {
+        stagedFoldersByScan.getOrPut(scanId) { mutableListOf() }.addAll(folders)
+    }
 
-    override suspend fun stageMedia(scanId: String, media: List<StagedMedia>) {}
+    override suspend fun stageMedia(scanId: String, media: List<StagedMedia>) {
+        stagedMediaByScan.getOrPut(scanId) { mutableListOf() }.addAll(media)
+    }
 
     override suspend fun publishResolvedScan(
         scanId: String,
@@ -325,9 +336,86 @@ class FakeMediaRepository(
         }
     }
 
-    override suspend fun cancelScanRun(scanId: String) {}
+    override suspend fun publishStagedScan(
+        scanId: String,
+        sourceId: String,
+        scanResult: ScanResult
+    ): ScanResult {
+        val stagedFolders = stagedFoldersByScan.remove(scanId).orEmpty()
+        val stagedMedia = stagedMediaByScan.remove(scanId).orEmpty()
+        val existingByUri = _mediaFiles.value.filter { it.sourceId == sourceId }.associateBy { it.documentUri }
+        val existingByPath = _mediaFiles.value.filter { it.sourceId == sourceId }.associateBy { it.relativePath }
+        val folderIds = mutableMapOf("" to UUID.nameUUIDFromBytes("$sourceId\u0000".toByteArray()).toString())
+        val folders = mutableListOf(
+            FolderNode(folderIds.getValue(""), sourceId, null, "", "Root")
+        )
+        stagedFolders.sortedBy { it.relativePath.count { char -> char == '/' } }.forEach { staged ->
+            val parentPath = staged.parentRelativePath.orEmpty()
+            val id = UUID.nameUUIDFromBytes("$sourceId\u0000${staged.relativePath}".toByteArray()).toString()
+            folderIds[staged.relativePath] = id
+            folders += FolderNode(id, sourceId, folderIds[parentPath], staged.relativePath, staged.displayName)
+        }
+        var added = 0
+        var updated = 0
+        val resolved = stagedMedia.map { staged ->
+            val existing = existingByUri[staged.documentUri] ?: existingByPath[staged.relativePath]
+            if (existing == null) added++ else updated++
+            MediaFile(
+                id = existing?.id ?: UUID.randomUUID().toString(),
+                sourceId = sourceId,
+                folderId = folderIds[staged.relativePath.substringBeforeLast('/', "")] ?: folderIds.getValue(""),
+                documentUri = staged.documentUri,
+                documentId = staged.documentId,
+                relativePath = staged.relativePath,
+                filename = staged.filename,
+                displayTitle = staged.displayTitle,
+                mimeType = staged.mimeType,
+                size = staged.size,
+                durationMs = staged.durationMs,
+                modifiedTimeMs = staged.modifiedTimeMs,
+                firstIndexedAt = existing?.firstIndexedAt ?: System.currentTimeMillis(),
+                metadataScanStatus = staged.metadataScanStatus,
+                title = staged.title,
+                artist = staged.artist,
+                albumArtist = staged.albumArtist,
+                album = staged.album,
+                discNumber = staged.discNumber,
+                trackNumber = staged.trackNumber,
+                year = staged.year,
+                genre = staged.genre,
+                artworkUri = existing?.artworkUri,
+                titleSource = staged.titleSource,
+                artistSource = staged.artistSource,
+                albumArtistSource = staged.albumArtistSource,
+                albumSource = staged.albumSource,
+                discNumberSource = staged.discNumberSource,
+                trackNumberSource = staged.trackNumberSource,
+                playCount = existing?.playCount ?: 0,
+                lastPlayedAt = existing?.lastPlayedAt,
+                likeScore = existing?.likeScore ?: 0
+            )
+        }
+        val resolvedIds = resolved.mapTo(mutableSetOf()) { it.id }
+        val missing = _mediaFiles.value.count { it.sourceId == sourceId && it.id !in resolvedIds }
+        _folderNodes.value = folders
+        _mediaFiles.value = _mediaFiles.value.filterNot { it.sourceId == sourceId } + resolved +
+            _mediaFiles.value.filter { it.sourceId == sourceId && it.id !in resolvedIds }.map { it.copy(isAvailable = false) }
+        return scanResult.copy(
+            scannedCount = stagedMedia.size,
+            addedCount = added,
+            updatedCount = updated,
+            unavailableCount = missing
+        )
+    }
 
-    override suspend fun failScanRun(scanId: String, errorSummary: String) {}
+    override suspend fun cancelScanRun(scanId: String) {
+        stagedFoldersByScan.remove(scanId)
+        stagedMediaByScan.remove(scanId)
+    }
+
+    override suspend fun failScanRun(scanId: String, errorSummary: String) {
+        cancelScanRun(scanId)
+    }
 
     fun addMediaFiles(files: List<MediaFile>) {
         _mediaFiles.value = _mediaFiles.value + files

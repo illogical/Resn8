@@ -17,6 +17,9 @@ interface SavedQueueDao {
     @Query("SELECT * FROM saved_queues WHERE id = :id LIMIT 1")
     fun getSavedQueueById(id: String): SavedQueueEntity?
 
+    @Query("SELECT * FROM saved_queues WHERE id = :id LIMIT 1")
+    fun getSavedQueueByIdFlow(id: String): Flow<SavedQueueEntity?>
+
     @Query("SELECT * FROM saved_queue_items WHERE queueId = :queueId ORDER BY itemIndex ASC")
     fun getSavedQueueItemsFlow(queueId: String): Flow<List<SavedQueueItemEntity>>
 

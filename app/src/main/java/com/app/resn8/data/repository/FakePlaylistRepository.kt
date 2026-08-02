@@ -68,6 +68,10 @@ class FakePlaylistRepository(
         return _items.map { list -> list.filter { it.playlistId == playlistId }.sortedBy { it.position } }
     }
 
+    override suspend fun getPlaylistItems(playlistId: String): List<PlaylistItem> {
+        return _items.value.filter { it.playlistId == playlistId }.sortedBy { it.position }
+    }
+
     override suspend fun addItemsToPlaylist(playlistId: String, mediaIds: List<String>) {
         val currentMaxPosition = _items.value.filter { it.playlistId == playlistId }.maxOfOrNull { it.position } ?: 0L
         val existingMediaIds = _items.value.filter { it.playlistId == playlistId }.map { it.mediaId }.toSet()

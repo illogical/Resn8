@@ -45,6 +45,7 @@ interface MediaRepository {
     ): Flow<List<MediaFile>>
 
     suspend fun getMediaFileById(id: String): MediaFile?
+    suspend fun getMediaFilesByIdsPreservingOrder(mediaIds: List<String>): List<MediaFile>
     fun getFolderNodesFlow(sourceId: String): Flow<List<FolderNode>>
     suspend fun updateLikeScore(mediaId: String, delta: Int)
     suspend fun recordPlay(mediaId: String, listenedDurationMs: Long, isMeaningful: Boolean)
@@ -70,6 +71,7 @@ interface MediaRepository {
         unavailableMediaIds: List<String>,
         scanResult: ScanResult
     )
+    suspend fun publishStagedScan(scanId: String, sourceId: String, scanResult: ScanResult): ScanResult
     suspend fun cancelScanRun(scanId: String)
     suspend fun failScanRun(scanId: String, errorSummary: String)
 }

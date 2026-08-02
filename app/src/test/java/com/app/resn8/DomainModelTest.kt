@@ -1,6 +1,8 @@
 package com.app.resn8
 
 import com.app.resn8.data.repository.FakeMediaRepository
+import com.app.resn8.data.database.Converters
+import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.fixtures.AudioFixtureGenerator
 import com.app.resn8.fixtures.FakeClock
 import com.app.resn8.fixtures.FakeRandom
@@ -69,5 +71,18 @@ class DomainModelTest {
         assertEquals('I'.code.toByte(), mp3Bytes[0])
         assertEquals('D'.code.toByte(), mp3Bytes[1])
         assertEquals('3'.code.toByte(), mp3Bytes[2])
+    }
+
+    @Test
+    fun scanResult_oldJson_decodesWithAdditiveDefaults() {
+        val oldJson = """{"scannedCount":12,"addedCount":12,"updatedCount":0,"unavailableCount":0,"tagDerivedCount":8,"pathDerivedCount":4,"unrecognizedCount":1,"unreadableCount":2,"durationMs":3456}"""
+
+        val decoded = Converters().toScanResult(oldJson)
+
+        assertNotNull(decoded)
+        assertEquals(12, decoded?.inspectedDocumentCount)
+        assertEquals(0, decoded?.unsupportedCount)
+        assertEquals(0, decoded?.metadataFailureCount)
+        assertEquals(2, decoded?.schemaVersion)
     }
 }

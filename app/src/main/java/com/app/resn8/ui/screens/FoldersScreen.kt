@@ -33,6 +33,7 @@ import com.app.resn8.ui.library.TrackListItemRow
 @Composable
 fun FoldersScreen(
     viewModel: FoldersViewModel,
+    onTrackClick: (com.app.resn8.domain.model.MediaFile) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val breadcrumbs by viewModel.breadcrumbs.collectAsState(initial = emptyList())
@@ -125,7 +126,7 @@ fun FoldersScreen(
                             mediaFile = mediaFile,
                             isSelected = selectedFileIds.contains(mediaFile.id),
                             onSelectToggle = { viewModel.toggleFileSelection(mediaFile.id) },
-                            onClick = { viewModel.toggleFileSelection(mediaFile.id) }
+                            onClick = { onTrackClick(mediaFile) }
                         )
                     }
                 }

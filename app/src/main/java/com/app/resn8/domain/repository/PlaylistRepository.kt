@@ -11,6 +11,7 @@ interface PlaylistRepository {
     suspend fun renamePlaylist(playlistId: String, newName: String): Result<Unit>
     suspend fun deletePlaylist(playlistId: String)
     fun getPlaylistItemsFlow(playlistId: String): Flow<List<PlaylistItem>>
+    suspend fun getPlaylistItems(playlistId: String): List<PlaylistItem>
     suspend fun addItemsToPlaylist(playlistId: String, mediaIds: List<String>)
     suspend fun removeItemFromPlaylist(playlistId: String, mediaId: String)
     suspend fun reorderPlaylistItem(playlistId: String, mediaId: String, newPosition: Long)

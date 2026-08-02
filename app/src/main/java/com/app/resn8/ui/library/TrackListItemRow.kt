@@ -17,11 +17,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.storage.artwork.ArtworkCache
 
 @Composable
 fun TrackListItemRow(
@@ -31,6 +36,15 @@ fun TrackListItemRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val artworkCache = remember { ArtworkCache(context) }
+    val resolvedArtworkUri by produceState(
+        initialValue = mediaFile.artworkUri,
+        key1 = mediaFile.id,
+        key2 = mediaFile.modifiedTimeMs
+    ) {
+        value = mediaFile.artworkUri ?: artworkCache.resolveEmbedded(mediaFile)
+    }
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -45,9 +59,9 @@ fun TrackListItemRow(
                 onCheckedChange = { onSelectToggle() }
             )
             Spacer(modifier = Modifier.width(8.dp))
-            if (mediaFile.artworkUri != null) {
+            if (resolvedArtworkUri != null) {
                 AsyncImage(
-                    model = mediaFile.artworkUri,
+                    model = resolvedArtworkUri,
                     contentDescription = "Track artwork",
                     modifier = Modifier.size(40.dp)
                 )

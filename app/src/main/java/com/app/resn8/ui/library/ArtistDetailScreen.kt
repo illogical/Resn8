@@ -25,7 +25,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 fun ArtistDetailScreen(
     viewModel: ArtistDetailViewModel,
     onAlbumClick: (String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onTrackClick: (com.app.resn8.domain.model.MediaFile) -> Unit = {}
 ) {
     val albums = viewModel.albumsPaged.collectAsLazyPagingItems()
     val tracks = viewModel.tracksPaged.collectAsLazyPagingItems()
@@ -77,7 +78,7 @@ fun ArtistDetailScreen(
                         mediaFile = mediaFile,
                         isSelected = false,
                         onSelectToggle = {},
-                        onClick = {}
+                        onClick = { onTrackClick(mediaFile) }
                     )
                 }
             }

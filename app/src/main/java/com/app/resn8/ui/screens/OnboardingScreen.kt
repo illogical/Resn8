@@ -1,6 +1,9 @@
 package com.app.resn8.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,8 +36,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.app.resn8.ui.screens.onboarding.IndexingUiState
 import com.app.resn8.ui.screens.onboarding.OnboardingViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun OnboardingScreen(
@@ -43,6 +49,21 @@ fun OnboardingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scanProgress by viewModel.scanProgress.collectAsState()
+    val context = LocalContext.current
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { /* WorkManager remains valid if the user declines; Android still exposes foreground work. */ }
+
+    LaunchedEffect(uiState) {
+        if (
+            uiState is IndexingUiState.Scanning &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -72,7 +93,10 @@ fun OnboardingScreen(
                 )
             }
             is IndexingUiState.Scanning -> {
-                ScanningContent(progress = scanProgress ?: state.progress)
+                ScanningContent(
+                    progress = scanProgress ?: state.progress,
+                    onCancel = viewModel::cancelIndexing
+                )
             }
             is IndexingUiState.Complete -> {
                 CompleteSummaryContent(
@@ -168,7 +192,18 @@ private fun FolderNamingDialog(
 }
 
 @Composable
-private fun ScanningContent(progress: com.app.resn8.domain.model.ScanProgress?) {
+private fun ScanningContent(
+    progress: com.app.resn8.domain.model.ScanProgress?,
+    onCancel: () -> Unit
+) {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(progress?.startedAt) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(1_000L)
+        }
+    }
+    val elapsedMs = progress?.startedAt?.takeIf { it > 0L }?.let { (now - it).coerceAtLeast(0L) } ?: 0L
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -181,9 +216,13 @@ private fun ScanningContent(progress: com.app.resn8.domain.model.ScanProgress?) 
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Processed: ${progress?.processedFiles ?: 0} tracks",
+            text = "Elapsed: ${formatDuration(elapsedMs)}",
             style = MaterialTheme.typography.bodyMedium
         )
+        Text(text = "Tracks: ${progress?.admittedAudio ?: 0} • Files checked: ${progress?.inspectedDocuments ?: 0}")
+        Text(text = "Folders: ${progress?.scannedFolders ?: 0} • Unsupported: ${progress?.unsupportedCount ?: 0}")
+        val issueCount = (progress?.unreadableCount ?: 0) + (progress?.metadataFailureCount ?: 0)
+        if (issueCount > 0) Text(text = "Read/metadata issues: $issueCount")
         if (progress?.currentStep?.isNotBlank() == true) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -192,6 +231,10 @@ private fun ScanningContent(progress: com.app.resn8.domain.model.ScanProgress?) 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        OutlinedButton(onClick = onCancel) {
+            Text("Cancel Indexing")
         }
     }
 }
@@ -216,6 +259,7 @@ private fun CompleteSummaryContent(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(text = "Total Tracks Discovered: ${summary.scannedCount}")
+            Text(text = "Elapsed: ${formatDuration(summary.durationMs)}")
             Text(text = "Added: ${summary.addedCount} | Updated: ${summary.updatedCount} | Missing: ${summary.unavailableCount}")
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = "Tag-Derived Metadata: ${summary.tagDerivedCount}")
@@ -224,6 +268,11 @@ private fun CompleteSummaryContent(
             if (summary.unreadableCount > 0) {
                 Text(text = "Unreadable Files: ${summary.unreadableCount}")
             }
+            if (summary.metadataFailureCount > 0) {
+                Text(text = "Metadata Fallbacks: ${summary.metadataFailureCount}")
+            }
+            Text(text = "Unsupported Files: ${summary.unsupportedCount}")
+            Text(text = "Artwork Candidates: ${summary.artworkCandidateCount}")
             Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = onGoToLibraryClicked,
@@ -233,6 +282,15 @@ private fun CompleteSummaryContent(
             }
         }
     }
+}
+
+private fun formatDuration(durationMs: Long): String {
+    val totalSeconds = (durationMs.coerceAtLeast(0L) / 1_000L)
+    val hours = totalSeconds / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0L) "%dh %02dm %02ds".format(hours, minutes, seconds)
+    else "%dm %02ds".format(minutes, seconds)
 }
 
 @Composable

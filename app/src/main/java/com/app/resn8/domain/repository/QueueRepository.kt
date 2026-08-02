@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface QueueRepository {
     fun getActiveQueueFlow(): Flow<SavedQueue?>
+    fun getQueueByIdFlow(queueId: String): Flow<SavedQueue?>
     suspend fun saveQueue(queue: SavedQueue)
     suspend fun replaceQueueSnapshot(queue: SavedQueue, orderedMediaIds: List<String>): SavedQueue
     suspend fun updatePlaybackPosition(queueId: String, currentIndex: Int, positionMs: Long, isPlaying: Boolean)

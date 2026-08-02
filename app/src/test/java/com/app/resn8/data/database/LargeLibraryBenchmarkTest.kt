@@ -3,6 +3,11 @@ package com.app.resn8.data.database
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.app.resn8.fixtures.LargeLibraryFixture
+import com.app.resn8.data.repository.RoomCollectionRepository
+import com.app.resn8.data.repository.RoomMediaRepository
+import com.app.resn8.domain.model.ScanResult
+import com.app.resn8.domain.model.StagedMedia
+import org.junit.Assert.assertEquals
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -75,5 +80,47 @@ class LargeLibraryBenchmarkTest {
         println("EXPLAIN QUERY PLAN Output:")
         planLines.forEach { println(" - $it") }
         assertTrue("Expected non-empty query plan", planLines.isNotEmpty())
+    }
+
+    @Test
+    fun benchmark25kStagedPublicationUsesBoundedInputBatches() = runBlocking {
+        val collections = RoomCollectionRepository(db)
+        val media = RoomMediaRepository(db)
+        val collection = collections.createCollection("Publication benchmark")
+        val source = collections.addRootSource(collection.id, "content://benchmark/music", "Music")
+        val scanId = media.startScanRun(source.id)
+
+        (0 until 25_000).chunked(250).forEach { indexes ->
+            media.stageMedia(
+                scanId,
+                indexes.map { index ->
+                    StagedMedia(
+                        id = "staged-$index",
+                        scanId = scanId,
+                        documentUri = "content://benchmark/song-$index",
+                        documentId = "song-$index",
+                        relativePath = "song-$index.mp3",
+                        filename = "song-$index.mp3",
+                        displayTitle = "Song $index",
+                        mimeType = "audio/mpeg",
+                        size = 1_000L + index,
+                        durationMs = 180_000L,
+                        modifiedTimeMs = 10_000L + index
+                    )
+                }
+            )
+        }
+
+        val startedAt = System.currentTimeMillis()
+        val result = media.publishStagedScan(
+            scanId,
+            source.id,
+            ScanResult(25_000, 0, 0, 0, 0, 0, 0, 0, 0)
+        )
+        val elapsedMs = System.currentTimeMillis() - startedAt
+        println("Published 25,000 staged rows in $elapsedMs ms")
+
+        assertEquals(25_000, result.scannedCount)
+        assertEquals(25_000, result.addedCount)
     }
 }

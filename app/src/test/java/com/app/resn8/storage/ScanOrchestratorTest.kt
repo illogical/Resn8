@@ -184,4 +184,75 @@ class ScanOrchestratorTest {
         val mediaList = mediaRepo.getMediaFilesFlow(col.id).first()
         assertTrue(mediaList.isEmpty())
     }
+
+    @Test
+    fun stagedPublication_preservesIdsWithoutMaterializingCanonicalLibraryInCoordinator() = runBlocking {
+        val collection = collectionRepo.createCollection("Music")
+        val source = collectionRepo.addRootSource(collection.id, "content://tree/music", "Music")
+        val firstScan = mediaRepo.startScanRun(source.id)
+        mediaRepo.stageFolders(
+            firstScan,
+            listOf(StagedFolder("sf1", firstScan, "Artist", null, "Artist"))
+        )
+        mediaRepo.stageMedia(
+            firstScan,
+            listOf(
+                StagedMedia(
+                    id = "sm1",
+                    scanId = firstScan,
+                    documentUri = "content://doc/song",
+                    documentId = "song",
+                    relativePath = "Artist/Song.mp3",
+                    filename = "Song.mp3",
+                    displayTitle = "Song",
+                    mimeType = "audio/mpeg",
+                    size = 1_000,
+                    durationMs = 60_000,
+                    modifiedTimeMs = 2_000
+                )
+            )
+        )
+        val firstResult = mediaRepo.publishStagedScan(
+            firstScan,
+            source.id,
+            ScanResult(1, 0, 0, 0, 0, 0, 0, 0, 100)
+        )
+        val firstMedia = mediaRepo.getMediaFilesFlow(collection.id).first().single()
+
+        val secondScan = mediaRepo.startScanRun(source.id)
+        mediaRepo.stageFolders(
+            secondScan,
+            listOf(StagedFolder("sf2", secondScan, "Artist", null, "Artist"))
+        )
+        mediaRepo.stageMedia(
+            secondScan,
+            listOf(
+                StagedMedia(
+                    id = "sm2",
+                    scanId = secondScan,
+                    documentUri = "content://doc/song",
+                    documentId = "song",
+                    relativePath = "Artist/Song.mp3",
+                    filename = "Song.mp3",
+                    displayTitle = "Song refreshed",
+                    mimeType = "audio/mpeg",
+                    size = 1_000,
+                    durationMs = 60_000,
+                    modifiedTimeMs = 2_000
+                )
+            )
+        )
+        val secondResult = mediaRepo.publishStagedScan(
+            secondScan,
+            source.id,
+            ScanResult(1, 0, 0, 0, 0, 0, 0, 0, 120)
+        )
+        val secondMedia = mediaRepo.getMediaFilesFlow(collection.id).first().single()
+
+        assertEquals(1, firstResult.addedCount)
+        assertEquals(1, secondResult.updatedCount)
+        assertEquals(firstMedia.id, secondMedia.id)
+        assertEquals(firstMedia.firstIndexedAt, secondMedia.firstIndexedAt)
+        assertEquals("Song refreshed", secondMedia.displayTitle)
+    }
 }

@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.app.resn8.domain.model.LibrarySurface
+import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.ui.library.AlbumSummaryRowItem
 import com.app.resn8.ui.library.ArtistSummaryRowItem
 import com.app.resn8.ui.library.LibraryFilterSheet
@@ -47,6 +48,7 @@ fun LibraryScreen(
     onArtistClick: (String) -> Unit,
     onAlbumClick: (String) -> Unit,
     onFoldersClick: () -> Unit,
+    onTrackClick: (MediaFile) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentSurface by viewModel.surface.collectAsState()
@@ -187,7 +189,7 @@ fun LibraryScreen(
                                         mediaFile = mediaFile,
                                         isSelected = selectedFileIds.contains(mediaFile.id),
                                         onSelectToggle = { viewModel.toggleFileSelection(mediaFile.id) },
-                                        onClick = { viewModel.toggleFileSelection(mediaFile.id) }
+                                        onClick = { onTrackClick(mediaFile) }
                                     )
                                 }
                             }

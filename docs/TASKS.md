@@ -44,14 +44,14 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 ## Milestone 4 — Deliver Reliable Playback (P0)
 
-- [ ] **T021 — Create the playback service.** Host one ExoPlayer and MediaSession in a `MediaSessionService`; declare foreground playback permissions/service and supply system-visible metadata.
-- [ ] **T022 — Connect UI through MediaController.** Expose observable player/queue state and commands without constructing a player in the activity or ViewModels.
-- [ ] **T023 — Build queue creation from library contexts.** Starting a track from an artist, album, folder, all-tracks result, or playlist saves an explicit ordered queue snapshot and begins at the selected item.
-- [ ] **T024 — Build now-playing and mini-player UI.** Add artwork fallback, metadata, seek position, Previous, Play/Pause, Next, Like, Dislike, numeric score, queue, and visible Add to Playlist actions.
-- [ ] **T025 — Integrate Android playback behavior.** Support background/lock-screen notification controls, audio focus, Bluetooth/headset media keys, pause-on-headphone-disconnect, and clear error/skip behavior.
-- [ ] **T026 — Test playback lifecycle.** Verify activity recreation, backgrounding, screen lock, task removal, service recreation, audio focus changes, unplug events, unsupported/corrupt items, and single-player ownership.
+- [x] **T021 — Complete the existing playback service.** Finish the single ExoPlayer/MediaSession owner in `Resn8MediaService`; retain the required foreground playback declarations, use Media3's session-backed notification/foreground lifecycle, and supply system-visible metadata.
+- [x] **T022 — Connect UI through MediaController.** Add an application-scoped controller connection with observable player/queue state, available-command gating, bounded progress polling, retryable connection state, and deterministic listener/future cleanup; never construct a player in the Activity or ViewModels.
+- [x] **T023 — Build queue creation from library contexts.** Starting a track from an artist, album, folder, all-tracks result, or persisted playlist must snapshot the deterministic available-only order, assign stable queue-occurrence IDs, atomically persist the explicit queue before playback, and begin at the validated selected occurrence.
+- [x] **T024 — Build now-playing, queue, and mini-player UI.** Replace the existing placeholders with live artwork fallback, metadata, seek position, Previous, Play/Pause, Next, numeric score, and occurrence-aware queue controls. Keep visible, accessible Like/Dislike and Add to Playlist seams while M5 owns rating persistence and M6 owns playlist workflows.
+- [x] **T025 — Integrate Android playback behavior.** Support background/lock-screen session controls, audio focus, Bluetooth/headset media keys, pause-on-headphone-disconnect, and bounded error/skip behavior that reports failures, retains the saved queue, and cannot loop forever when every remaining item fails.
+- [x] **T026 — Test live playback lifecycle.** Verify Activity/controller recreation, backgrounding, screen lock, playing/paused task removal, service cleanup/recreation, audio focus, unplug events, hardware/system controls, unsupported/corrupt/unavailable items, and single-player ownership with API 34+ device coverage. Exact process-death queue/position restoration remains T043-T046.
 
-**Exit:** Local audio and its current queue play reliably through the app and Android system surfaces.
+**Exit:** Local audio plays reliably through the app and Android system surfaces from a persisted explicit queue, with live lifecycle/controller resilience and bounded failure handling. Periodic checkpoints, exact relaunch restoration, and Android playback resumption remain Milestone 8.
 
 ## Milestone 5 — Track Ratings and Meaningful Plays (P0)
 

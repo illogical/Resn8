@@ -2,18 +2,20 @@ package com.app.resn8.storage.indexer
 
 import android.content.Context
 import android.net.Uri
-import com.app.resn8.data.database.Resn8Database
-import com.app.resn8.data.database.entity.toDomain
-import com.app.resn8.domain.model.FolderNode
-import com.app.resn8.domain.model.MediaFile
+import android.os.SystemClock
+import android.util.Log
 import com.app.resn8.domain.model.MetadataScanStatus
+import com.app.resn8.domain.model.MetadataValueSource
 import com.app.resn8.domain.model.ScanProgress
 import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.domain.model.StagedFolder
 import com.app.resn8.domain.model.StagedMedia
 import com.app.resn8.domain.repository.CollectionRepository
 import com.app.resn8.domain.repository.MediaRepository
+import com.app.resn8.storage.artwork.ArtworkCandidateIndex
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,66 +23,62 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 
 class ScanOrchestrator(
-    private val context: Context,
+    context: Context,
     private val mediaRepository: MediaRepository,
     private val collectionRepository: CollectionRepository,
-    private val database: Resn8Database? = null
+    batchSize: Int = 100
 ) {
-    private val scanner = DocumentTreeScanner(context)
-    private val metadataExtractor = AudioMetadataExtractor(context)
-
+    private val scanner = DocumentTreeScanner(context.applicationContext, batchSize)
+    private val metadataExtractor = AudioMetadataExtractor(context.applicationContext)
+    private val artworkCandidateIndex = ArtworkCandidateIndex(context.applicationContext)
     private val _scanProgress = MutableStateFlow<ScanProgress?>(null)
     val scanProgress: Flow<ScanProgress?> = _scanProgress.asStateFlow()
 
-    suspend fun executeScan(
-        sourceId: String,
-        treeUri: Uri
-    ): ScanResult = withContext(Dispatchers.IO) {
-        val startTime = System.currentTimeMillis()
+    suspend fun executeScan(sourceId: String, treeUri: Uri): ScanResult = withContext(Dispatchers.IO) {
+        val startedAt = System.currentTimeMillis()
+        val monotonicStart = SystemClock.elapsedRealtime()
         val scanId = mediaRepository.startScanRun(sourceId)
-        collectionRepository.updateRootScanState(sourceId, "IN_PROGRESS", startTime, null, null)
-
-        val stagedFoldersList = mutableListOf<StagedFolder>()
-        val stagedMediaList = mutableListOf<StagedMedia>()
+        collectionRepository.updateRootScanState(sourceId, "IN_PROGRESS", startedAt, null, null)
+        Log.i(LOG_TAG, "scan_started scanId=$scanId sourceId=$sourceId")
 
         var tagDerivedCount = 0
         var pathDerivedCount = 0
         var unrecognizedCount = 0
-        var unreadableCount = 0
+        var metadataFailureCount = 0
+        var traversal = ScanTraversalProgress(0, 0, 0, 0, 0, 0, "")
+        var lastLoggedDocuments = 0
+        var lastLoggedAt = monotonicStart
 
         try {
             scanner.scanTree(
                 treeUri = treeUri,
                 onFolderBatch = { folderBatch ->
-                    val stagedFolders = folderBatch.map { folder ->
-                        StagedFolder(
-                            id = UUID.randomUUID().toString(),
-                            scanId = scanId,
-                            relativePath = folder.relativePath,
-                            parentRelativePath = folder.parentRelativePath,
-                            displayName = folder.displayName
-                        )
-                    }
-                    stagedFoldersList.addAll(stagedFolders)
-                    mediaRepository.stageFolders(scanId, stagedFolders)
+                    mediaRepository.stageFolders(
+                        scanId,
+                        folderBatch.map { folder ->
+                            StagedFolder(
+                                id = UUID.randomUUID().toString(),
+                                scanId = scanId,
+                                relativePath = folder.relativePath,
+                                parentRelativePath = folder.parentRelativePath,
+                                displayName = folder.displayName
+                            )
+                        }
+                    )
                 },
                 onMediaBatch = { mediaBatch ->
-                    val stagedMediaBatch = mutableListOf<StagedMedia>()
-                    for (file in mediaBatch) {
-                        var normalized: NormalizedMetadata
-                        try {
-                            val tags = metadataExtractor.extractTags(file.documentUri)
-                            normalized = FallbackParser.normalize(file.relativePath, file.filename, tags)
-                        } catch (e: Exception) {
-                            unreadableCount++
-                            normalized = FallbackParser.normalize(file.relativePath, file.filename, ExtractedTags())
-                        }
-
-                        if (normalized.titleSource == com.app.resn8.domain.model.MetadataValueSource.TAG) tagDerivedCount++
-                        if (normalized.titleSource == com.app.resn8.domain.model.MetadataValueSource.PATH) pathDerivedCount++
+                    val stagedMedia = mediaBatch.map { file ->
+                        val extraction = metadataExtractor.extract(file.documentUri)
+                        if (!extraction.succeeded) metadataFailureCount++
+                        val normalized = FallbackParser.normalize(file.relativePath, file.filename, extraction.tags)
+                        if (normalized.titleSource == MetadataValueSource.TAG) tagDerivedCount++
+                        if (
+                            normalized.artistSource == MetadataValueSource.PATH ||
+                            normalized.albumSource == MetadataValueSource.PATH ||
+                            normalized.titleSource == MetadataValueSource.FILENAME
+                        ) pathDerivedCount++
                         if (!normalized.isPatternRecognized) unrecognizedCount++
-
-                        val staged = StagedMedia(
+                        StagedMedia(
                             id = UUID.randomUUID().toString(),
                             scanId = scanId,
                             documentUri = file.documentUri.toString(),
@@ -92,7 +90,7 @@ class ScanOrchestrator(
                             size = file.size,
                             durationMs = normalized.durationMs,
                             modifiedTimeMs = file.modifiedTimeMs,
-                            metadataScanStatus = MetadataScanStatus.SUCCESS,
+                            metadataScanStatus = if (extraction.succeeded) MetadataScanStatus.SUCCESS else MetadataScanStatus.FAILED,
                             title = normalized.title,
                             artist = normalized.artist,
                             albumArtist = normalized.albumArtist,
@@ -101,7 +99,7 @@ class ScanOrchestrator(
                             trackNumber = normalized.trackNumber,
                             year = normalized.year,
                             genre = normalized.genre,
-                            artworkUri = normalized.artworkUri,
+                            artworkUri = null,
                             titleSource = normalized.titleSource,
                             artistSource = normalized.artistSource,
                             albumArtistSource = normalized.albumArtistSource,
@@ -109,188 +107,99 @@ class ScanOrchestrator(
                             discNumberSource = normalized.discNumberSource,
                             trackNumberSource = normalized.trackNumberSource
                         )
-                        stagedMediaBatch.add(staged)
                     }
-                    stagedMediaList.addAll(stagedMediaBatch)
-                    mediaRepository.stageMedia(scanId, stagedMediaBatch)
+                    mediaRepository.stageMedia(scanId, stagedMedia)
                 },
-                onProgressUpdate = { scannedFolders, discoveredMedia, currentPath ->
-                    _scanProgress.value = ScanProgress(
-                        processedFiles = discoveredMedia,
-                        totalFiles = discoveredMedia,
-                        currentStep = "Scanning: $currentPath"
-                    )
+                onArtworkCandidate = { artworkCandidateIndex.record(it) },
+                onProgressUpdate = { current ->
+                    traversal = current
+                    _scanProgress.value = current.toDomain(scanId, startedAt, metadataFailureCount)
+                    val now = SystemClock.elapsedRealtime()
+                    if (current.inspectedDocuments - lastLoggedDocuments >= LOG_DOCUMENT_INTERVAL || now - lastLoggedAt >= LOG_TIME_INTERVAL_MS) {
+                        Log.i(
+                            LOG_TAG,
+                            "scan_progress scanId=$scanId sourceId=$sourceId folders=${current.scannedFolders} " +
+                                "documents=${current.inspectedDocuments} audio=${current.admittedAudio} " +
+                                "unsupported=${current.unsupportedDocuments} errors=${current.unreadableBranches + metadataFailureCount} " +
+                                "elapsedMs=${now - monotonicStart}"
+                        )
+                        lastLoggedDocuments = current.inspectedDocuments
+                        lastLoggedAt = now
+                    }
                 }
             )
 
-            // Resolve folder hierarchy
-            val folderMap = mutableMapOf<String, FolderNode>()
-            val rootNode = FolderNode(
-                id = UUID.randomUUID().toString(),
-                sourceId = sourceId,
-                parentId = null,
-                relativePath = "",
-                displayName = "Root"
-            )
-            folderMap[""] = rootNode
-
-            stagedFoldersList.forEach { sf ->
-                val parentId = sf.parentRelativePath?.let { folderMap[it]?.id } ?: rootNode.id
-                val node = FolderNode(
-                    id = UUID.randomUUID().toString(),
-                    sourceId = sourceId,
-                    parentId = parentId,
-                    relativePath = sf.relativePath,
-                    displayName = sf.displayName
-                )
-                folderMap[sf.relativePath] = node
-            }
-
-            // Retrieve existing canonical media for source to perform 3-tier matching
-            val existingMedia: List<MediaFile> = database?.mediaFileDao()?.getMediaFilesBySourceId(sourceId)
-                ?.map { entity -> entity.toDomain() } ?: emptyList()
-
-            val uriMap = existingMedia.associateBy { m -> m.documentUri }
-            val pathMap = existingMedia.associateBy { m -> m.relativePath }
-            val signatureGroups = existingMedia.groupBy { m -> "${m.size}_${m.modifiedTimeMs}_${m.durationMs}" }
-            val uniqueSignatureMap = signatureGroups.filterValues { list -> list.size == 1 }.mapValues { entry -> entry.value.first() }
-
-            val matchedCanonicalIds = mutableSetOf<String>()
-            val resolvedMediaList = mutableListOf<MediaFile>()
-            var addedCount = 0
-            var updatedCount = 0
-
-            for (staged in stagedMediaList) {
-                val parentPath = staged.relativePath.substringBeforeLast('/', "").ifEmpty { "" }
-                val folderId = folderMap[parentPath]?.id ?: rootNode.id
-
-                val tier1Match = uriMap[staged.documentUri] ?: staged.documentId?.let { docId ->
-                    existingMedia.find { m -> m.documentId == docId }
-                }
-                val tier2Match = tier1Match ?: pathMap[staged.relativePath]
-                val sigKey = "${staged.size}_${staged.modifiedTimeMs}_${staged.durationMs}"
-                val tier3Match = tier2Match ?: uniqueSignatureMap[sigKey]
-
-                val existing = tier3Match
-                if (existing != null) {
-                    updatedCount++
-                    matchedCanonicalIds.add(existing.id)
-                    val updated = existing.copy(
-                        folderId = folderId,
-                        documentUri = staged.documentUri,
-                        documentId = staged.documentId,
-                        relativePath = staged.relativePath,
-                        filename = staged.filename,
-                        displayTitle = staged.displayTitle,
-                        mimeType = staged.mimeType,
-                        size = staged.size,
-                        durationMs = staged.durationMs,
-                        modifiedTimeMs = staged.modifiedTimeMs,
-                        isAvailable = true,
-                        metadataScanStatus = staged.metadataScanStatus,
-                        title = staged.title,
-                        artist = staged.artist,
-                        albumArtist = staged.albumArtist,
-                        album = staged.album,
-                        discNumber = staged.discNumber,
-                        trackNumber = staged.trackNumber,
-                        year = staged.year,
-                        genre = staged.genre,
-                        artworkUri = staged.artworkUri,
-                        titleSource = staged.titleSource,
-                        artistSource = staged.artistSource,
-                        albumArtistSource = staged.albumArtistSource,
-                        albumSource = staged.albumSource,
-                        discNumberSource = staged.discNumberSource,
-                        trackNumberSource = staged.trackNumberSource
-                    )
-                    resolvedMediaList.add(updated)
-                } else {
-                    addedCount++
-                    val newMedia = MediaFile(
-                        id = UUID.randomUUID().toString(),
-                        sourceId = sourceId,
-                        folderId = folderId,
-                        documentUri = staged.documentUri,
-                        documentId = staged.documentId,
-                        relativePath = staged.relativePath,
-                        filename = staged.filename,
-                        displayTitle = staged.displayTitle,
-                        mimeType = staged.mimeType,
-                        size = staged.size,
-                        durationMs = staged.durationMs,
-                        modifiedTimeMs = staged.modifiedTimeMs,
-                        firstIndexedAt = System.currentTimeMillis(),
-                        isAvailable = true,
-                        metadataScanStatus = staged.metadataScanStatus,
-                        title = staged.title,
-                        artist = staged.artist,
-                        albumArtist = staged.albumArtist,
-                        album = staged.album,
-                        discNumber = staged.discNumber,
-                        trackNumber = staged.trackNumber,
-                        year = staged.year,
-                        genre = staged.genre,
-                        artworkUri = staged.artworkUri,
-                        titleSource = staged.titleSource,
-                        artistSource = staged.artistSource,
-                        albumArtistSource = staged.albumArtistSource,
-                        albumSource = staged.albumSource,
-                        discNumberSource = staged.discNumberSource,
-                        trackNumberSource = staged.trackNumberSource,
-                        playCount = 0,
-                        lastPlayedAt = null,
-                        likeScore = 0
-                    )
-                    resolvedMediaList.add(newMedia)
-                }
-            }
-
-            val unavailableMediaIds = existingMedia.map { m -> m.id }.filter { id -> id !in matchedCanonicalIds }
-            val endTime = System.currentTimeMillis()
-            val scanResult = ScanResult(
-                scannedCount = stagedMediaList.size,
-                addedCount = addedCount,
-                updatedCount = updatedCount,
-                unavailableCount = unavailableMediaIds.size,
+            val durationMs = SystemClock.elapsedRealtime() - monotonicStart
+            val preliminary = ScanResult(
+                scannedCount = traversal.admittedAudio,
+                addedCount = 0,
+                updatedCount = 0,
+                unavailableCount = 0,
                 tagDerivedCount = tagDerivedCount,
                 pathDerivedCount = pathDerivedCount,
                 unrecognizedCount = unrecognizedCount,
-                unreadableCount = unreadableCount,
-                durationMs = endTime - startTime
+                unreadableCount = traversal.unreadableBranches,
+                durationMs = durationMs,
+                scannedFolderCount = traversal.scannedFolders,
+                inspectedDocumentCount = traversal.inspectedDocuments,
+                unsupportedCount = traversal.unsupportedDocuments,
+                metadataFailureCount = metadataFailureCount,
+                artworkCandidateCount = traversal.artworkCandidates
             )
-
-            mediaRepository.publishResolvedScan(
-                scanId = scanId,
-                resolvedFolders = folderMap.values.toList(),
-                resolvedMedia = resolvedMediaList,
-                unavailableMediaIds = unavailableMediaIds,
-                scanResult = scanResult
-            )
-
-            collectionRepository.updateRootScanState(
-                sourceId = sourceId,
-                status = "SUCCESS",
-                startedAt = startTime,
-                completedAt = endTime,
-                summary = scanResult
-            )
-
-            _scanProgress.value = ScanProgress(
-                processedFiles = stagedMediaList.size,
-                totalFiles = stagedMediaList.size,
+            val result = mediaRepository.publishStagedScan(scanId, sourceId, preliminary)
+            runCatching { artworkCandidateIndex.publish(sourceId) }
+                .onFailure { Log.w(LOG_TAG, "artwork_candidate_index_failed scanId=$scanId sourceId=$sourceId") }
+            _scanProgress.value = traversal.toDomain(scanId, startedAt, metadataFailureCount).copy(
+                phase = "COMPLETE",
                 currentStep = "Scan complete"
             )
-
-            scanResult
-        } catch (e: Exception) {
-            mediaRepository.failScanRun(scanId, e.message ?: "Unknown scan error")
-            collectionRepository.updateRootScanState(sourceId, "FAILED", startTime, System.currentTimeMillis(), null)
-            throw e
+            Log.i(
+                LOG_TAG,
+                "scan_completed scanId=$scanId sourceId=$sourceId audio=${result.scannedCount} " +
+                    "added=${result.addedCount} updated=${result.updatedCount} unavailable=${result.unavailableCount} " +
+                    "durationMs=${result.durationMs}"
+            )
+            result
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                mediaRepository.cancelScanRun(scanId)
+                collectionRepository.updateRootScanState(sourceId, "CANCELLED", startedAt, System.currentTimeMillis(), null)
+            }
+            Log.i(LOG_TAG, "scan_cancelled scanId=$scanId sourceId=$sourceId elapsedMs=${SystemClock.elapsedRealtime() - monotonicStart}")
+            throw cancelled
+        } catch (error: Exception) {
+            val category = error::class.simpleName ?: "ScanFailure"
+            mediaRepository.failScanRun(scanId, category)
+            if (error is SecurityException) collectionRepository.updateRootSourceAvailability(sourceId, false)
+            collectionRepository.updateRootScanState(sourceId, "FAILED", startedAt, System.currentTimeMillis(), null)
+            Log.e(LOG_TAG, "scan_failed scanId=$scanId sourceId=$sourceId category=$category elapsedMs=${SystemClock.elapsedRealtime() - monotonicStart}")
+            throw error
         }
     }
 
-    suspend fun cancelScan(scanId: String) {
-        mediaRepository.cancelScanRun(scanId)
+    private fun ScanTraversalProgress.toDomain(
+        scanId: String,
+        startedAt: Long,
+        metadataFailureCount: Int
+    ) = ScanProgress(
+        processedFiles = admittedAudio,
+        totalFiles = 0,
+        currentStep = if (currentRelativePath.isBlank()) "Scanning selected folder" else "Scanning: $currentRelativePath",
+        scanId = scanId,
+        phase = "SCANNING",
+        startedAt = startedAt,
+        scannedFolders = scannedFolders,
+        inspectedDocuments = inspectedDocuments,
+        admittedAudio = admittedAudio,
+        unsupportedCount = unsupportedDocuments,
+        unreadableCount = unreadableBranches,
+        metadataFailureCount = metadataFailureCount,
+        artworkCandidateCount = artworkCandidates
+    )
+
+    companion object {
+        private const val LOG_TAG = "Resn8Indexer"
+        private const val LOG_DOCUMENT_INTERVAL = 1_000
+        private const val LOG_TIME_INTERVAL_MS = 60_000L
     }
 }

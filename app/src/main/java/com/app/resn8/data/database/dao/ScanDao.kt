@@ -22,6 +22,25 @@ interface ScanDao {
     @Query("UPDATE scan_runs SET status = :status, completedAt = :completedAt, errorSummary = :errorSummary WHERE id = :scanId")
     fun updateScanRunStatus(scanId: String, status: String, completedAt: Long?, errorSummary: String? = null)
 
+    @Query(
+        """
+        UPDATE scan_runs SET
+            status = 'COMPLETED', completedAt = :completedAt,
+            scannedCount = :scannedCount, addedCount = :addedCount,
+            updatedCount = :updatedCount, unavailableCount = :unavailableCount,
+            errorSummary = NULL
+        WHERE id = :scanId
+        """
+    )
+    fun completeScanRun(
+        scanId: String,
+        completedAt: Long,
+        scannedCount: Int,
+        addedCount: Int,
+        updatedCount: Int,
+        unavailableCount: Int
+    )
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertStagedFolders(folders: List<StagedFolderEntity>)
 
@@ -33,6 +52,28 @@ interface ScanDao {
 
     @Query("SELECT * FROM staged_media WHERE scanId = :scanId")
     fun getStagedMedia(scanId: String): List<StagedMediaEntity>
+
+    @Query("SELECT COUNT(*) FROM staged_media WHERE scanId = :scanId")
+    fun countStagedMedia(scanId: String): Int
+
+    @Query("SELECT * FROM staged_media WHERE scanId = :scanId ORDER BY id LIMIT :limit OFFSET :offset")
+    fun getStagedMediaBatch(scanId: String, limit: Int, offset: Int): List<StagedMediaEntity>
+
+    @Query(
+        """
+        SELECT * FROM staged_folders
+        WHERE scanId = :scanId
+        ORDER BY (LENGTH(relativePath) - LENGTH(REPLACE(relativePath, '/', ''))) ASC, relativePath ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    fun getStagedFolderBatch(scanId: String, limit: Int, offset: Int): List<StagedFolderEntity>
+
+    @Query("UPDATE staged_media SET resolvedMediaId = :mediaId, resolvedFolderId = :folderId WHERE id = :stagedId")
+    fun setResolvedMedia(stagedId: String, mediaId: String, folderId: String)
+
+    @Query("UPDATE staged_folders SET resolvedFolderId = :folderId WHERE id = :stagedId")
+    fun setResolvedFolder(stagedId: String, folderId: String)
 
     @Query("DELETE FROM staged_folders WHERE scanId = :scanId")
     fun deleteStagedFolders(scanId: String)

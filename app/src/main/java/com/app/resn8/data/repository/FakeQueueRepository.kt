@@ -6,15 +6,19 @@ import com.app.resn8.domain.model.SavedQueueItem
 import com.app.resn8.domain.repository.QueueRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 class FakeQueueRepository(
     initialQueue: SavedQueue? = null
 ) : QueueRepository {
 
+    private val _queues = MutableStateFlow<Map<String, SavedQueue>>(initialQueue?.let { mapOf(it.id to it) } ?: emptyMap())
     private val _activeQueue = MutableStateFlow(initialQueue)
 
     override fun getActiveQueueFlow(): Flow<SavedQueue?> = _activeQueue
+
+    override fun getQueueByIdFlow(queueId: String): Flow<SavedQueue?> = _queues.map { it[queueId] }
 
     override suspend fun saveQueue(queue: SavedQueue) {
         replaceQueueSnapshot(queue, queue.orderedMediaIds)
@@ -28,6 +32,7 @@ class FakeQueueRepository(
             currentMediaId = queue.currentMediaId ?: orderedMediaIds.getOrNull(queue.currentIndex),
             updatedAt = System.currentTimeMillis()
         )
+        _queues.value = _queues.value + (updated.id to updated)
         _activeQueue.value = updated
         return updated
     }

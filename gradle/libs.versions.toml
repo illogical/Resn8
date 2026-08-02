@@ -15,6 +15,7 @@ navigationCompose = "2.8.7"
 kotlinxSerialization = "1.7.3"
 lifecycleViewModelCompose = "2.8.7"
 coroutines = "1.10.1"
+work = "2.10.1"
 
 paging = "3.3.6"
 coil = "2.7.0"
@@ -64,11 +65,11 @@ androidx-test-core = { group = "androidx.test", name = "core", version = "1.6.1"
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-
 

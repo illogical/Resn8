@@ -34,6 +34,19 @@ class RoomQueueRepository(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun getQueueByIdFlow(queueId: String): Flow<SavedQueue?> {
+        return savedQueueDao.getSavedQueueByIdFlow(queueId).flatMapLatest { queueEntity ->
+            if (queueEntity == null) {
+                flowOf(null)
+            } else {
+                savedQueueDao.getSavedQueueItemsFlow(queueEntity.id).map { itemEntities ->
+                    queueEntity.toDomain(itemEntities)
+                }
+            }
+        }
+    }
+
     override suspend fun saveQueue(queue: SavedQueue) {
         replaceQueueSnapshot(queue, queue.orderedMediaIds)
     }

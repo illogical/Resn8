@@ -24,9 +24,11 @@ interface AppContainer {
     val playlistRepository: PlaylistRepository
     val queueRepository: QueueRepository
     val uiSessionRepository: UiSessionRepository
+    val playbackConnection: com.app.resn8.playback.PlaybackConnection?
+    val startQueueUseCase: com.app.resn8.domain.usecase.StartQueueUseCase
 }
 
-class DefaultAppContainer(context: Context) : AppContainer {
+class DefaultAppContainer(private val context: Context) : AppContainer {
     override val database: Resn8Database by lazy {
         Resn8Database.buildDatabase(context)
     }
@@ -46,6 +48,17 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val uiSessionRepository: UiSessionRepository by lazy {
         RoomUiSessionRepository(database)
     }
+    override val playbackConnection: com.app.resn8.playback.PlaybackConnection by lazy {
+        com.app.resn8.playback.PlaybackConnection(context, this)
+    }
+    override val startQueueUseCase: com.app.resn8.domain.usecase.StartQueueUseCase by lazy {
+        com.app.resn8.domain.usecase.StartQueueUseCase(
+            mediaRepository,
+            playlistRepository,
+            queueRepository,
+            uiSessionRepository
+        )
+    }
 }
 
 class TestAppContainer(
@@ -53,7 +66,8 @@ class TestAppContainer(
     override val collectionRepository: CollectionRepository = FakeCollectionRepository(),
     override val playlistRepository: PlaylistRepository = FakePlaylistRepository(),
     override val queueRepository: QueueRepository = FakeQueueRepository(),
-    override val database: Resn8Database? = null
+    override val database: Resn8Database? = null,
+    override val playbackConnection: com.app.resn8.playback.PlaybackConnection? = null
 ) : AppContainer {
     override val uiSessionRepository: UiSessionRepository by lazy {
         if (database != null) RoomUiSessionRepository(database) else object : UiSessionRepository {
@@ -63,5 +77,13 @@ class TestAppContainer(
                 _state.value = state
             }
         }
+    }
+    override val startQueueUseCase: com.app.resn8.domain.usecase.StartQueueUseCase by lazy {
+        com.app.resn8.domain.usecase.StartQueueUseCase(
+            mediaRepository,
+            playlistRepository,
+            queueRepository,
+            uiSessionRepository
+        )
     }
 }

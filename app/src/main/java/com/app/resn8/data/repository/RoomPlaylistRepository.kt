@@ -106,6 +106,10 @@ class RoomPlaylistRepository(
         }
     }
 
+    override suspend fun getPlaylistItems(playlistId: String): List<PlaylistItem> {
+        return playlistDao.getPlaylistItems(playlistId).map { it.toDomain() }
+    }
+
     override suspend fun addItemsToPlaylist(playlistId: String, mediaIds: List<String>) {
         if (mediaIds.isEmpty()) return
 

@@ -32,5 +32,18 @@ class DocumentTreeScannerTest {
         assertFalse(scanner.isSupportedAudio("video.mp4", "video/mp4"))
         assertFalse(scanner.isSupportedAudio("document.pdf", "application/pdf"))
         assertFalse(scanner.isSupportedAudio("archive.zip", "application/zip"))
+        assertFalse(scanner.isSupportedAudio("mislabelled.mp3", "video/mp4"))
+        assertFalse(scanner.isSupportedAudio("empty.mp3", "audio/mpeg", size = 0L))
+        assertFalse(scanner.isSupportedAudio("legacy.wma", "application/octet-stream"))
+        assertFalse(scanner.isSupportedAudio("._Song.mp3", "audio/mpeg", size = 4_096L))
+    }
+
+    @Test
+    fun isSupportedAudio_usesExtensionOnlyForGenericProviderMime() {
+        val scanner = DocumentTreeScanner(ApplicationProvider.getApplicationContext())
+
+        assertTrue(scanner.isSupportedAudio("UPPERCASE.FLAC", "application/octet-stream", size = null))
+        assertTrue(scanner.isSupportedAudio(".hidden.opus", "", size = 10L))
+        assertFalse(scanner.isSupportedAudio("cover.jpg", "application/octet-stream", size = 10L))
     }
 }

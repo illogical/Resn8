@@ -35,6 +35,9 @@ interface MediaFileDao {
     @Query("SELECT * FROM media_files WHERE id = :id LIMIT 1")
     fun getMediaFileById(id: String): MediaFileEntity?
 
+    @Query("SELECT * FROM media_files WHERE id IN (:ids)")
+    fun getMediaFilesByIds(ids: List<String>): List<MediaFileEntity>
+
     @Query("SELECT * FROM media_files WHERE sourceId = :sourceId AND relativePath = :relativePath LIMIT 1")
     fun getMediaFileByPath(sourceId: String, relativePath: String): MediaFileEntity?
 
@@ -43,6 +46,20 @@ interface MediaFileDao {
 
     @Query("SELECT * FROM media_files WHERE sourceId = :sourceId AND documentId = :documentId LIMIT 1")
     fun getMediaFileByDocumentId(sourceId: String, documentId: String): MediaFileEntity?
+
+    @Query(
+        """
+        SELECT * FROM media_files
+        WHERE sourceId = :sourceId AND size = :size AND modifiedTimeMs = :modifiedTimeMs AND durationMs = :durationMs
+        LIMIT 2
+        """
+    )
+    fun getMediaByCompleteSignature(
+        sourceId: String,
+        size: Long,
+        modifiedTimeMs: Long,
+        durationMs: Long
+    ): List<MediaFileEntity>
 
     @Query(
         """
@@ -358,4 +375,28 @@ interface MediaFileDao {
 
     @Query("UPDATE media_files SET isAvailable = :isAvailable WHERE id IN (:mediaIds)")
     fun updateAvailabilityForIds(mediaIds: List<String>, isAvailable: Boolean)
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM media_files
+        WHERE sourceId = :sourceId
+          AND id NOT IN (
+            SELECT resolvedMediaId FROM staged_media
+            WHERE scanId = :scanId AND resolvedMediaId IS NOT NULL
+          )
+        """
+    )
+    fun countMissingFromStagedScan(sourceId: String, scanId: String): Int
+
+    @Query(
+        """
+        UPDATE media_files SET isAvailable = 0
+        WHERE sourceId = :sourceId
+          AND id NOT IN (
+            SELECT resolvedMediaId FROM staged_media
+            WHERE scanId = :scanId AND resolvedMediaId IS NOT NULL
+          )
+        """
+    )
+    fun markMissingFromStagedScanUnavailable(sourceId: String, scanId: String)
 }

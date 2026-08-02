@@ -6,6 +6,7 @@ import androidx.paging.PagingData
 import androidx.paging.map
 import androidx.room.withTransaction
 import com.app.resn8.data.database.Resn8Database
+import com.app.resn8.data.database.Converters
 import com.app.resn8.data.database.entity.PlaybackHistoryEntity
 import com.app.resn8.data.database.entity.ScanRunEntity
 import com.app.resn8.data.database.entity.toDomain
@@ -29,6 +30,7 @@ import com.app.resn8.domain.repository.MediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
+import java.nio.charset.StandardCharsets
 
 class RoomMediaRepository(
     private val db: Resn8Database
@@ -37,6 +39,7 @@ class RoomMediaRepository(
     private val folderDao = db.folderDao()
     private val scanDao = db.scanDao()
     private val playbackHistoryDao = db.playbackHistoryDao()
+    private val collectionDao = db.collectionDao()
 
     override fun getArtistSummariesPaged(query: LibraryQuery): Flow<PagingData<ArtistSummary>> {
         return Pager(
@@ -218,6 +221,19 @@ class RoomMediaRepository(
         return mediaFileDao.getMediaFileById(id)?.toDomain()
     }
 
+    override suspend fun getMediaFilesByIdsPreservingOrder(mediaIds: List<String>): List<MediaFile> {
+        if (mediaIds.isEmpty()) return emptyList()
+        val uniqueIds = mediaIds.distinct()
+        val entityMap = mutableMapOf<String, MediaFile>()
+        uniqueIds.chunked(500).forEach { chunk ->
+            val entities = mediaFileDao.getMediaFilesByIds(chunk)
+            entities.forEach { entity ->
+                entityMap[entity.id] = entity.toDomain()
+            }
+        }
+        return mediaIds.mapNotNull { id -> entityMap[id] }
+    }
+
     override fun getFolderNodesFlow(sourceId: String): Flow<List<FolderNode>> {
         return folderDao.getFolderNodesFlow(sourceId).map { entities ->
             entities.map { it.toDomain() }
@@ -296,6 +312,16 @@ class RoomMediaRepository(
             startedAt = System.currentTimeMillis()
         )
         db.withTransaction {
+            scanDao.getActiveScanRun(sourceId)?.let { interrupted ->
+                scanDao.updateScanRunStatus(
+                    scanId = interrupted.id,
+                    status = "INTERRUPTED",
+                    completedAt = System.currentTimeMillis(),
+                    errorSummary = "PROCESS_INTERRUPTED"
+                )
+                scanDao.deleteStagedFolders(interrupted.id)
+                scanDao.deleteStagedMedia(interrupted.id)
+            }
             scanDao.insertScanRun(scanRun)
         }
         return scanId
@@ -358,6 +384,154 @@ class RoomMediaRepository(
             scanDao.deleteStagedMedia(scanId)
         }
     }
+
+    override suspend fun publishStagedScan(
+        scanId: String,
+        sourceId: String,
+        scanResult: ScanResult
+    ): ScanResult = db.withTransaction {
+        val pageSize = 250
+        val rootPath = ""
+        val existingRoot = folderDao.getFolderNodeByPath(sourceId, rootPath)
+        val rootId = existingRoot?.id ?: stableFolderId(sourceId, rootPath)
+        val rootEntity = FolderNode(
+            id = rootId,
+            sourceId = sourceId,
+            parentId = null,
+            relativePath = rootPath,
+            displayName = "Root"
+        ).toEntity()
+        if (existingRoot == null) folderDao.insertFolderNode(rootEntity) else folderDao.updateFolderNode(rootEntity)
+
+        var folderOffset = 0
+        while (true) {
+            val batch = scanDao.getStagedFolderBatch(scanId, pageSize, folderOffset)
+            if (batch.isEmpty()) break
+            batch.forEach { staged ->
+                val existing = folderDao.getFolderNodeByPath(sourceId, staged.relativePath)
+                val folderId = existing?.id ?: stableFolderId(sourceId, staged.relativePath)
+                val parentPath = staged.parentRelativePath.orEmpty()
+                val parentId = folderDao.getFolderNodeByPath(sourceId, parentPath)?.id
+                    ?: stableFolderId(sourceId, parentPath)
+                val entity = FolderNode(
+                    id = folderId,
+                    sourceId = sourceId,
+                    parentId = parentId,
+                    relativePath = staged.relativePath,
+                    displayName = staged.displayName
+                ).toEntity()
+                if (existing == null) folderDao.insertFolderNode(entity) else folderDao.updateFolderNode(entity)
+                scanDao.setResolvedFolder(staged.id, folderId)
+            }
+            folderOffset += batch.size
+        }
+
+        var addedCount = 0
+        var updatedCount = 0
+        val claimedIds = HashSet<String>()
+        var mediaOffset = 0
+        while (true) {
+            val batch = scanDao.getStagedMediaBatch(scanId, pageSize, mediaOffset)
+            if (batch.isEmpty()) break
+            batch.forEach { staged ->
+                val parentPath = staged.relativePath.substringBeforeLast('/', "")
+                val folderId = folderDao.getFolderNodeByPath(sourceId, parentPath)?.id ?: rootId
+                val directMatch = staged.documentId?.let { mediaFileDao.getMediaFileByDocumentId(sourceId, it) }
+                    ?: mediaFileDao.getMediaFileByUri(sourceId, staged.documentUri)
+                    ?: mediaFileDao.getMediaFileByPath(sourceId, staged.relativePath)
+                val signatureMatch = if (
+                    directMatch == null && staged.size > 0L && staged.modifiedTimeMs > 0L && (staged.durationMs ?: 0L) > 0L
+                ) {
+                    mediaFileDao.getMediaByCompleteSignature(
+                        sourceId,
+                        staged.size,
+                        staged.modifiedTimeMs,
+                        staged.durationMs!!
+                    ).singleOrNull()
+                } else null
+                val existing = (directMatch ?: signatureMatch)?.takeUnless { it.id in claimedIds }
+                val mediaId = existing?.id ?: UUID.randomUUID().toString()
+                val firstIndexedAt = existing?.firstIndexedAt ?: System.currentTimeMillis()
+                val resolved = MediaFile(
+                    id = mediaId,
+                    sourceId = sourceId,
+                    folderId = folderId,
+                    documentUri = staged.documentUri,
+                    documentId = staged.documentId,
+                    relativePath = staged.relativePath,
+                    filename = staged.filename,
+                    displayTitle = staged.displayTitle,
+                    mimeType = staged.mimeType,
+                    size = staged.size,
+                    durationMs = staged.durationMs,
+                    modifiedTimeMs = staged.modifiedTimeMs,
+                    firstIndexedAt = firstIndexedAt,
+                    isAvailable = true,
+                    metadataScanStatus = staged.metadataScanStatus,
+                    title = staged.title,
+                    artist = staged.artist,
+                    albumArtist = staged.albumArtist,
+                    album = staged.album,
+                    discNumber = staged.discNumber,
+                    trackNumber = staged.trackNumber,
+                    year = staged.year,
+                    genre = staged.genre,
+                    artworkUri = existing?.artworkUri,
+                    titleSource = staged.titleSource,
+                    artistSource = staged.artistSource,
+                    albumArtistSource = staged.albumArtistSource,
+                    albumSource = staged.albumSource,
+                    discNumberSource = staged.discNumberSource,
+                    trackNumberSource = staged.trackNumberSource,
+                    playCount = existing?.playCount ?: 0,
+                    lastPlayedAt = existing?.lastPlayedAt,
+                    likeScore = existing?.likeScore ?: 0
+                ).toEntity()
+                if (existing == null) {
+                    mediaFileDao.insertMediaFile(resolved)
+                    addedCount++
+                } else {
+                    mediaFileDao.updateMediaFile(resolved)
+                    updatedCount++
+                }
+                claimedIds.add(mediaId)
+                scanDao.setResolvedMedia(staged.id, mediaId, folderId)
+            }
+            mediaOffset += batch.size
+        }
+
+        val unavailableCount = mediaFileDao.countMissingFromStagedScan(sourceId, scanId)
+        mediaFileDao.markMissingFromStagedScanUnavailable(sourceId, scanId)
+        val completedAt = System.currentTimeMillis()
+        val finalResult = scanResult.copy(
+            scannedCount = scanDao.countStagedMedia(scanId),
+            addedCount = addedCount,
+            updatedCount = updatedCount,
+            unavailableCount = unavailableCount
+        )
+        scanDao.completeScanRun(
+            scanId = scanId,
+            completedAt = completedAt,
+            scannedCount = finalResult.scannedCount,
+            addedCount = finalResult.addedCount,
+            updatedCount = finalResult.updatedCount,
+            unavailableCount = finalResult.unavailableCount
+        )
+        collectionDao.updateRootSourceAvailability(sourceId, true)
+        collectionDao.updateRootScanState(
+            sourceId = sourceId,
+            status = "SUCCESS",
+            startedAt = null,
+            completedAt = completedAt,
+            summaryJson = Converters().fromScanResult(finalResult)
+        )
+        scanDao.deleteStagedFolders(scanId)
+        scanDao.deleteStagedMedia(scanId)
+        finalResult
+    }
+
+    private fun stableFolderId(sourceId: String, relativePath: String): String =
+        UUID.nameUUIDFromBytes("$sourceId\u0000$relativePath".toByteArray(StandardCharsets.UTF_8)).toString()
 
     override suspend fun cancelScanRun(scanId: String) {
         db.withTransaction {

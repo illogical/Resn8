@@ -16,6 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -54,6 +55,9 @@ fun Resn8App(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    val playbackConnection = container.playbackConnection
+    val playbackUiState by (playbackConnection?.uiState ?: androidx.compose.runtime.remember { kotlinx.coroutines.flow.MutableStateFlow(com.app.resn8.playback.PlaybackUiState()) }).collectAsState()
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -64,8 +68,20 @@ fun Resn8App(
         bottomBar = {
             Column {
                 MiniPlayer(
+                    title = playbackUiState.title,
+                    artist = playbackUiState.artist,
+                    isPlaying = playbackUiState.isPlaying,
+                    likeScore = playbackUiState.likeScore,
+                    canPlayPause = playbackUiState.canPlayPause,
+                    canSkipNext = playbackUiState.canSkipNext,
                     onMiniPlayerClick = {
                         navController.navigate(NowPlayingRoute)
+                    },
+                    onPlayPauseClick = {
+                        playbackConnection?.togglePlayPause()
+                    },
+                    onNextClick = {
+                        playbackConnection?.skipToNext()
                     }
                 )
                 NavigationBar {

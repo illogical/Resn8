@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Icon
@@ -25,14 +28,19 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun MiniPlayer(
-    title: String = "Resn8 Player",
-    artist: String = "Select a track to play",
+    title: String = "",
+    artist: String = "",
     isPlaying: Boolean = false,
     likeScore: Int = 0,
+    canPlayPause: Boolean = true,
+    canSkipNext: Boolean = true,
     onMiniPlayerClick: () -> Unit = {},
     onPlayPauseClick: () -> Unit = {},
+    onNextClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    if (title.isBlank()) return
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -57,7 +65,7 @@ fun MiniPlayer(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = artist,
+                    text = artist.ifEmpty { "Unknown Artist" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -70,22 +78,31 @@ fun MiniPlayer(
                     imageVector = Icons.Filled.ThumbUp,
                     contentDescription = "Liked",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 8.dp).size(20.dp)
+                    modifier = Modifier.padding(horizontal = 4.dp).size(20.dp)
                 )
             } else if (likeScore < 0) {
                 Icon(
                     imageVector = Icons.Filled.ThumbDown,
                     contentDescription = "Disliked",
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 8.dp).size(20.dp)
+                    modifier = Modifier.padding(horizontal = 4.dp).size(20.dp)
                 )
             }
 
-            IconButton(onClick = onPlayPauseClick) {
-                Text(
-                    text = if (isPlaying) "⏸" else "▶",
-                    style = MaterialTheme.typography.titleMedium
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onPlayPauseClick, enabled = canPlayPause) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play"
+                    )
+                }
+
+                IconButton(onClick = onNextClick, enabled = canSkipNext) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Next"
+                    )
+                }
             }
         }
     }

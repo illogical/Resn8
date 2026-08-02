@@ -9,7 +9,12 @@ import kotlinx.coroutines.withContext
 class AudioMetadataExtractor(
     private val context: Context
 ) {
-    suspend fun extractTags(documentUri: Uri): ExtractedTags = withContext(Dispatchers.IO) {
+    data class Result(
+        val tags: ExtractedTags,
+        val succeeded: Boolean
+    )
+
+    suspend fun extract(documentUri: Uri): Result = withContext(Dispatchers.IO) {
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(context, documentUri)
@@ -28,7 +33,7 @@ class AudioMetadataExtractor(
             val year = yearRaw?.trim()?.take(4)?.toIntOrNull()
             val durationMs = durationRaw?.toLongOrNull()
 
-            ExtractedTags(
+            val tags = ExtractedTags(
                 title = title?.trim(),
                 artist = artist?.trim(),
                 albumArtist = albumArtist?.trim(),
@@ -39,14 +44,20 @@ class AudioMetadataExtractor(
                 genre = genre?.trim(),
                 durationMs = durationMs
             )
-        } catch (e: Exception) {
-            ExtractedTags()
+            Result(
+                tags = tags,
+                succeeded = true
+            )
+        } catch (_: Exception) {
+            Result(ExtractedTags(), succeeded = false)
         } finally {
             try {
                 retriever.release()
             } catch (_: Exception) {}
         }
     }
+
+    suspend fun extractTags(documentUri: Uri): ExtractedTags = extract(documentUri).tags
 
     private fun parseNumberPrefix(value: String?): Int? {
         if (value.isNullOrBlank()) return null
