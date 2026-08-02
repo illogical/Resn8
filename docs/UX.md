@@ -1,0 +1,212 @@
+# Resn8 User Experience (UX) User Stories & Verification Matrix
+
+This document defines user stories and manual UX verification workflows for Resn8. Use this matrix to test application behavior on-device or on an emulator across feature milestones.
+
+---
+
+## 1. Library Selection & Indexing (Milestones 0 – 2)
+
+### US1.1 — Select a Music Root Folder
+- **As a** user opening Resn8 for the first time,
+- **I want to** select my music folder using Android's system document picker (`ACTION_OPEN_DOCUMENT_TREE`),
+- **So that** Resn8 receives persistent access to my audio without requesting broad file system permissions.
+- **Verification**:
+  1. Launch app on a fresh install or tap "Select Music Folder" on Onboarding.
+  2. Choose a folder containing audio files via Android's System File Picker.
+  3. Confirm persistent read access is granted and indexing starts automatically.
+
+### US1.2 — Indexing Progress & Summary
+- **As a** user indexing my music,
+- **I want to** see live progress (folder count, track count, errors) and a clear completion summary,
+- **So that** I know my library has been indexed accurately.
+- **Verification**:
+  1. Observe the progress bar and item counters during scan.
+  2. Confirm final track count matches the folder contents.
+  3. Inspect scan summary for any corrupt or unsupported file reports.
+
+### US1.3 — Safe Re-Indexing
+- **As a** user who has added new music files to my selected folder,
+- **I want to** trigger a re-index,
+- **So that** new files appear in my library while my existing ratings, play counts, listening history, and playlist memberships remain intact.
+- **Verification**:
+  1. Add a new file to the indexed folder on storage.
+  2. Trigger "Re-index Library" from settings/onboarding.
+  3. Confirm new files are added, first-indexed timestamps are preserved for existing tracks, and ratings/history are unchanged.
+
+---
+
+## 2. Library & Folder Browsing (Milestone 3)
+
+### US2.1 — Surface Navigation & Metadata Drilldown
+- **As a** music listener,
+- **I want to** browse my collection by **Artist**, **Album**, **All Tracks**, and **Folders**,
+- **So that** I can find music by hierarchy or direct folder structure.
+- **Verification**:
+  1. Switch between tabs: Artists, Albums, All Tracks, Folders.
+  2. Tap an Artist -> drill down to their Albums and Tracks.
+  3. Tap an Album -> drill down to its Track list ordered by disc and track number.
+  4. Tap a Folder -> navigate child subfolders with breadcrumb path navigation.
+
+### US2.2 — Instant Search & Filter
+- **As a** user looking for a specific track,
+- **I want to** type in the search bar and apply availability/rating filters,
+- **So that** the visible list filters instantly without lagging.
+- **Verification**:
+  1. Enter text in the search box (matches title, artist, album, filename).
+  2. Open Filter Sheet: toggle Availability (All, Available Only, Unavailable Only) and Exclude Disliked (`likeScore >= 0`).
+  3. Verify list updates reactively.
+
+### US2.3 — Library Sorting
+- **As a** user,
+- **I want to** sort my tracks by Artist, Album, Title, Track Number, Recently Added, Most Played, Least Played, Unplayed, Most Recent, Least Recent, or Most Liked,
+- **So that** I can organize my view for discovery.
+- **Verification**:
+  1. Select different sort options in the filter sheet.
+  2. Confirm list order updates deterministically.
+
+---
+
+## 3. Playback & Transport Controls (Milestone 4)
+
+### US3.1 — Start Queue from Library Context
+- **As a** user browsing tracks,
+- **I want to** tap any track in All Tracks, Artist Detail, Album Detail, or Folders,
+- **So that** an explicit queue is created from the visible available order and playback begins immediately at that track.
+- **Verification**:
+  1. Tap a track in any view.
+  2. Confirm playback starts immediately at the selected track.
+  3. Confirm the active explicit queue contains only available tracks from that visible context.
+
+### US3.2 — Persistent Mini-Player
+- **As a** user navigating the app while music plays,
+- **I want to** see a mini-player bar at the bottom with title, artist, rating indicator, play/pause, and next controls,
+- **So that** I can control playback from any screen.
+- **Verification**:
+  1. Start playing a track.
+  2. Navigate between Onboarding, Library, Folders, and Playlists tabs.
+  3. Confirm mini-player stays anchored above navigation bar with current track info.
+  4. Tap Play/Pause or Next on mini-player -> confirm immediate response.
+  5. Tap mini-player body -> confirm navigation to Now Playing screen.
+  6. For a track with a positive or negative score, confirm the mini-player shows the corresponding liked or disliked indicator without relying on color alone.
+
+### US3.3 — Now Playing Screen & Seek Bar
+- **As a** listener on the Now Playing screen,
+- **I want to** view artwork, metadata, seek position slider, transport controls, and numeric rating score,
+- **So that** I have full control over playback.
+- **Verification**:
+  1. Open Now Playing screen.
+  2. Drag position slider -> confirm smooth seek to target `mm:ss` timestamp.
+  3. Tap Previous / Next -> confirm track skipping.
+  4. View Like, Dislike, and Add to Playlist buttons.
+
+Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 makes Like/Dislike durable and reactive; Milestone 6 implements Add to Playlist.
+
+### US3.4 — Queue Inspection & Item Jump
+- **As a** user,
+- **I want to** view the active queue list and jump to any queued track,
+- **So that** I can preview what plays next and change tracks directly.
+- **Verification**:
+  1. Open Queue screen from Now Playing.
+  2. Confirm current playing track is highlighted.
+  3. Tap another row in the queue -> confirm player skips directly to that item occurrence.
+
+### US3.5 — Background Playback & Notification Controls
+- **As a** user,
+- **I want to** switch apps or turn off my screen while music plays,
+- **So that** playback continues smoothly with Android system controls.
+- **Verification**:
+  1. Background app or lock screen.
+  2. Check Android media notification shade for artwork, title, artist, play/pause, and next/previous controls.
+  3. Confirm play/pause from notification works.
+
+### US3.6 — Audio Disconnect & Failure Resilience
+- **As a** user listening over headphones or Bluetooth,
+- **I want** playback to pause when audio is disconnected and nonfatal error notices to appear if a file is unreadable,
+- **So that** music doesn't blast from speakers unexpectedly or crash on bad files.
+- **Verification**:
+  1. Unplug headphones during playback -> confirm automatic pause (`AUDIO_BECOMING_NOISY`).
+  2. Play an unreadable file -> confirm nonfatal notification notice appears and player advances to next candidate once without infinite looping.
+
+---
+
+## 4. Ratings & Meaningful Play Accounting (Milestone 5 — Upcoming)
+
+### US4.1 — Atomic Signed Score Ratings
+- **As a** user rating music,
+- **I want to** Like (+1) or Dislike (-1) a track,
+- **So that** my preferences update immediately and persist across app restarts.
+- **Verification**:
+  1. Start at score `0`, then tap Like, Like, Dislike, Dislike, Dislike and confirm `0 -> 1 -> 2 -> 1 -> 0 -> -1` on Now Playing.
+  2. Confirm the mini-player indicator and relevant library filter/sort results refresh from the authoritative score.
+  3. Tap rapidly in both directions and confirm no action is lost or overwritten by stale UI state.
+  4. Confirm rating never pauses/skips playback, removes the item, or changes the active queue order.
+  5. Relaunch the app and confirm the score persists. Use Database Inspector only when validating the stored row directly.
+
+### US4.2 — Trustworthy Play Count Accounting
+- **As a** user,
+- **I want** a play count to increment only when I actually listen to a track (e.g. `min(50% duration, 4 minutes)` or completion),
+- **So that** seeking past a track doesn't manufacture false play counts.
+- **Verification**:
+  1. Seek past 50% duration -> confirm play count does NOT increment instantly.
+  2. Seek backward, pause/resume, and cross the same threshold more than once -> confirm only actual accumulated listening counts and the traversal increments at most once.
+  3. Pause, force buffering or an audio-focus interruption, then resume -> confirm excluded time does not advance qualification.
+  4. Background the app or lock the screen while audio plays -> confirm active listening continues to accumulate.
+  5. Recreate the Activity/controller during playback -> confirm the current traversal continues rather than resetting or double-counting.
+
+### US4.3 — Completion and Playback Occurrence Identity
+- **As a** user replaying or moving through a queue,
+- **I want** each real traversal to be counted independently while retries within one traversal remain idempotent,
+- **So that** duplicate tracks, repeats, and automatic transitions produce trustworthy history.
+- **Verification**:
+  1. Let a short track automatically advance to the next item and let the final queue item reach completion; confirm each qualifying completion is recorded once.
+  2. Seek directly to the end without positive active listening -> confirm natural completion does not count.
+  3. Exercise an unknown-duration fixture; confirm four active minutes or positive-listening natural completion qualifies.
+  4. Put the same media into two queue entries; confirm each entry has distinct queue-item identity and each traversal receives a distinct history occurrence.
+  5. Return to or repeat a queue item; confirm a genuine new traversal may count again while repeated threshold/completion signals for one traversal do not.
+  6. Verify history/play-count results with a deterministic most/least-played fixture or Database Inspector when no direct play-count field is visible.
+
+---
+
+## 5. Manual Playlists (Milestone 6 — Upcoming)
+
+### US5.1 — Create and Manage Playlists
+- **As a** user,
+- **I want to** create, rename, and delete playlists without altering my source files,
+- **So that** I can organize custom mixes.
+
+### US5.2 — Reusable Add-to-Playlist Workflow
+- **As a** user,
+- **I want to** add single tracks, multi-selected tracks, or entire folders to playlists using one consistent selector,
+- **So that** playlist creation is fast and intuitive.
+
+---
+
+## 6. Smart Queue Generation (Milestone 7 — Upcoming)
+
+### US6.1 — Generate Smart Queues
+- **As a** user,
+- **I want to** generate smart queues (Random Eligible, Unplayed, Least Played, Most Played, Most Liked, Recent) from the currently visible scope,
+- **So that** I can rediscover hidden music in my library.
+
+### US6.2 — Disliked File Exclusion
+- **As a** user,
+- **I want** disliked tracks (`likeScore < 0`) excluded from smart queues by default,
+- **So that** tracks I dislike aren't suggested automatically.
+
+---
+
+## 7. Relaunch Restoration & Context Recovery (Milestone 8 — Upcoming)
+
+### US7.1 — Seamless Relaunch Restoration
+- **As a** user returning to Resn8 after process death or app restart,
+- **I want** Resn8 to restore my exact queue, track, position (paused), and screen route,
+- **So that** I never lose my listening context.
+
+---
+
+## 8. Accessibility & Adaptive Design (Milestone 8 — Upcoming)
+
+### US8.1 — Screen Reader & Switch Access
+- **As a** user relying on accessibility services,
+- **I want** clear content descriptions, minimum 48dp touch targets, font scaling support, and high contrast,
+- **So that** the app is fully usable with TalkBack or hardware switches.

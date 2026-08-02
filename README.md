@@ -5,7 +5,7 @@
 Resn8 is an offline-first Android audio player for people who keep their own music and audio files. Point it at a folder on internal storage or an SD card, and Resn8 will turn that library into something easy to browse, play, rate, organize, and rediscover without uploading your media or listening history.
 
 > [!IMPORTANT]
-> Resn8 is in early development. The repository currently contains the Android application scaffold and implementation plans; the features below describe the intended MVP, not a finished release.
+> Resn8 is a working early-stage Android application through Milestone 4: local indexing, browsing, persisted explicit queues, and Media3 background playback are implemented. Ratings/meaningful-play accounting and later MVP milestones remain incomplete, so the feature lists below describe the intended finished MVP rather than the current release.
 
 ## Why Resn8?
 
@@ -92,8 +92,9 @@ On macOS or Linux:
 On Windows:
 
 ```powershell
-.\gradlew.bat assembleDebug
-.\gradlew.bat test
+$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+.\gradlew.bat testDebugUnitTest
+.\gradlew.bat lintDebug assembleDebug
 ```
 
 To exercise storage access, media playback, and removable-storage behavior, run the app from Android Studio on an API 34+ emulator or physical device. Some acceptance tests require a real device or suitable document provider.
@@ -106,7 +107,7 @@ Implementation is organized into dependency-ordered milestones:
 2. [x] **Milestone 1**: durable library persistence
 3. [x] **Milestone 2**: folder selection and indexing
 4. [x] **Milestone 3**: library and folder browsing
-5. [ ] **Milestone 4**: reliable background playback
+5. [x] **Milestone 4**: reliable background playback
 6. [ ] **Milestone 5**: ratings and meaningful-play tracking
 7. [ ] **Milestone 6**: manual playlists
 8. [ ] **Milestone 7**: smart randomized queues
@@ -118,10 +119,12 @@ For the complete product decisions and acceptance criteria, see:
 
 - [Product specification](docs/SPECIFICATION.md)
 - [Implementation tasks](docs/TASKS.md)
+- [UX stories and manual verification](docs/UX.md)
+- [Feature implementation plans](docs/features/)
 - [Original brainstorm](docs/BRAINSTORM.md)
 
 ## Contributing
 
-Resn8 is still establishing its foundation, so the specification and task dependency order are the best starting points for proposed changes. Before implementing a feature, check its milestone prerequisites and preserve the MVP boundaries documented in the specification.
+Resn8 is advancing through dependency-ordered milestones, so the specification, task backlog, UX verification matrix, and relevant feature plan are the best starting points for proposed changes. Before implementing a feature, check its completed baseline and milestone prerequisites and preserve the MVP boundaries documented in the specification.
 
 Bug reports, design feedback, test-library edge cases, and focused pull requests are welcome.

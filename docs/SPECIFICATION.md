@@ -49,8 +49,8 @@ All audio types use one `MediaFile` entity. Common fields are required; music-sp
 | Listening statistics | `playCount >= 0`, nullable `lastPlayedAt`, signed `likeScore` defaulting to `0` |
 | `Playlist` | Stable ID, collection ID, unique name within collection, created/updated timestamps |
 | `PlaylistItem` | Playlist ID, media ID, unique membership, stable manual position, added timestamp |
-| `PlaybackHistory` | Media ID, session/queue occurrence ID, start/end times, accumulated listened duration, completion/counting result |
-| `SavedQueue` | Queue ID, collection ID, kind, optional generation rule/filter/seed, explicit ordered media IDs, current index, position, playback state, timestamps |
+| `PlaybackHistory` | Media ID, playback traversal occurrence ID (`sessionOccurrenceId`), start/qualification or end times, accumulated listened duration, completion/counting result |
+| `SavedQueue` | Queue ID, collection ID, kind, optional generation rule/filter/seed, explicit ordered items with stable `queueItemId` values, current index/media and distinct `currentOccurrenceId`, position, playback state, timestamps |
 | `UiSessionState` | Last route plus selected collection, folder, artist, album, playlist, and active filter/sort identifiers |
 
 Room is the source of truth for indexed metadata, relationships, statistics, playlists, saved queues, and session state. Source audio remains addressed through content URIs. Foreign keys and indexes cover collection/source/folder membership, artist, album, track/disc number, first-indexed time, play count, last played, like score, playlist position, and availability.
@@ -87,16 +87,19 @@ For `CONTEXTUAL` collections, relative folders are the category hierarchy and mu
 
 ### 2.6 Meaningful Play Semantics
 
-`playCount` increments at most once for each queue occurrence after accumulated active listening reaches:
+`playCount` increments at most once for each playback traversal occurrence after accumulated active listening reaches:
 
 `min(50% of known duration, 4 minutes)`
 
-- Time advances only while audio is actually playing. Paused, buffering, and audio-focus-interrupted time does not count.
+- `queueItemId` identifies a stable entry in a saved queue. `currentOccurrenceId`/history `sessionOccurrenceId` identifies one traversal of that entry and is the exactly-once key; it is never substituted with `queueItemId`.
+- Duplicate media in one queue has distinct queue-item IDs. Initial entry, next/previous, a direct jump, repeat, or replay/re-entry creates a fresh traversal occurrence ID. Pause/resume, seeking, buffering, and UI/controller recreation preserve the current occurrence.
+- The authoritative playback service observes active listening. Time advances only while audio is actually playing and is measured with a monotonic elapsed-time source; persisted history and last-played timestamps use epoch milliseconds. Paused, buffering, stopped/error, and audio-focus-interrupted time does not count.
 - Seeking beyond the threshold does not count skipped time; only accumulated listened time qualifies.
 - Pause/resume and seeking within the same occurrence do not create another play.
-- Replaying through a new queue occurrence can create another play.
-- When duration is unknown, four minutes or natural completion qualifies. Natural completion qualifies even for a shorter or partially heard file.
-- On qualification, `playCount`, `lastPlayedAt`, and the history record are committed atomically. Position is checkpointed separately and more frequently.
+- Replaying through a new traversal occurrence can create another play.
+- When duration is unknown, four minutes or natural completion qualifies. Both an automatic transition after an item completes and final-queue `STATE_ENDED` are natural-completion signals. Natural completion qualifies a shorter or partially heard file only when accumulated active listening is greater than zero, so seeking directly to the end cannot count.
+- Finalize/qualify the prior occurrence before initializing the next one on a transition. Interrupted or failed playback cannot manufacture a count, and repeated commit attempts for one occurrence are idempotent.
+- On qualification, `playCount`, `lastPlayedAt`, and the history record are committed atomically. Position and process-death restoration state are checkpointed separately and more frequently in Milestone 8.
 
 ### 2.7 Filters, Sorts, and Smart Queue Generation
 
@@ -160,7 +163,7 @@ Position is saved periodically while playing, on pause, item transition, task/ba
 
 - Kotlin and Jetpack Compose with unidirectional UI state, ViewModels, coroutines, and Flow.
 - A layered package structure separating UI, playback, domain models/use cases, database repositories, and storage/indexing adapters.
-- AndroidX Media3 ExoPlayer hosted by a `MediaSessionService`; Compose connects through a `MediaController` rather than owning the player.
+- AndroidX Media3 ExoPlayer hosted by a `MediaSessionService`; the service also owns authoritative active-listening observation, while Compose connects through a `MediaController` rather than owning the player.
 - Room for relational local persistence and migrations. Data access occurs through repositories so queue algorithms and view models can be unit tested without Android storage.
 - Storage Access Framework content URIs with persisted read grants. Enumeration and metadata extraction run outside the main thread.
 - Navigation destinations are typed and restorable; large object graphs and URI permission state are never passed directly through route strings.
@@ -195,7 +198,7 @@ The MVP is complete when all of the following are demonstrated on an API 34+ dev
 - Artist, album, folder, and all-track browsing return correct filtered results for a representative library.
 - Audio plays through Media3 in foreground/background, responds to notification and hardware controls, handles audio focus/headphone removal, and has only one active player.
 - Like/Dislike updates are durable and atomic. Scores can cross zero in either direction.
-- A play increments exactly once per queue occurrence at the meaningful-listen threshold, cannot be earned by seeking alone, and persists across UI recreation.
+- A play increments exactly once per playback traversal occurrence at the meaningful-listen threshold, cannot be earned by seeking, pause/buffer/interruption time, or wall-clock changes, and remains correct during background playback and UI/controller recreation. Automatic and final-item natural completion use the same occurrence-correct atomic commit.
 - Manual playlists enforce unique membership, preserve user order, support single/bulk/folder addition, and survive restart.
 - Smart-mode unit tests verify eligibility, dislike exclusion, primary ordering, randomized ties, neutral placement, seeded reproducibility, empty/single-item inputs, and unavailable items.
 - The most-liked normative example produces grouped order `[3s randomized] -> [1s randomized] -> [0s randomized]`, excluding all negative scores.
