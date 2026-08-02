@@ -3,6 +3,7 @@ package com.app.resn8.data.repository
 import com.app.resn8.domain.model.Collection
 import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.domain.model.RootSource
+import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.domain.repository.CollectionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,5 +48,31 @@ class FakeCollectionRepository(
         )
         _rootSources.value = _rootSources.value + newSource
         return newSource
+    }
+
+    override suspend fun updateRootSourceAvailability(sourceId: String, isAvailable: Boolean) {
+        _rootSources.value = _rootSources.value.map {
+            if (it.id == sourceId) it.copy(isAvailable = isAvailable) else it
+        }
+    }
+
+    override suspend fun updateRootScanState(
+        sourceId: String,
+        status: String,
+        startedAt: Long?,
+        completedAt: Long?,
+        summary: ScanResult?
+    ) {
+        _rootSources.value = _rootSources.value.map {
+            if (it.id == sourceId) {
+                it.copy(
+                    lastScanStatus = status,
+                    lastScanStartedAt = startedAt ?: it.lastScanStartedAt,
+                    lastScanCompletedAt = completedAt ?: it.lastScanCompletedAt,
+                    lastScannedAt = completedAt ?: it.lastScannedAt,
+                    lastScanSummary = summary ?: it.lastScanSummary
+                )
+            } else it
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.app.resn8.domain.model
 
+import kotlinx.serialization.Serializable
+
 enum class SavedQueueKind {
     EXPLICIT,
     GENERATED
@@ -15,6 +17,7 @@ enum class SmartQueueMode {
     LEAST_RECENTLY_PLAYED
 }
 
+@Serializable
 data class QueueFilterSnapshot(
     val collectionId: String? = null,
     val folderId: String? = null,
@@ -22,6 +25,11 @@ data class QueueFilterSnapshot(
     val album: String? = null,
     val searchQuery: String? = null,
     val excludeDisliked: Boolean = true
+)
+
+data class SavedQueueItem(
+    val queueItemId: String,
+    val mediaId: String
 )
 
 data class SavedQueue(
@@ -32,8 +40,15 @@ data class SavedQueue(
     val filterSnapshot: QueueFilterSnapshot? = null,
     val seed: Long? = null,
     val orderedMediaIds: List<String> = emptyList(),
+    val items: List<SavedQueueItem> = emptyList(),
     val currentIndex: Int = 0,
+    val currentMediaId: String? = null,
+    val currentOccurrenceId: String? = null,
     val positionMs: Long = 0L,
     val isPlaying: Boolean = false,
+    val playWhenReadyIntent: Boolean = false,
+    val playbackSpeed: Float = 1.0f,
+    val repeatMode: RepeatMode = RepeatMode.OFF,
+    val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

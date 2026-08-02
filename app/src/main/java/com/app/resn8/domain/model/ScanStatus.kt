@@ -1,5 +1,7 @@
 package com.app.resn8.domain.model
 
+import kotlinx.serialization.Serializable
+
 data class ScanProgress(
     val processedFiles: Int,
     val totalFiles: Int,
@@ -7,6 +9,7 @@ data class ScanProgress(
     val isCancelled: Boolean = false
 )
 
+@Serializable
 data class ScanResult(
     val scannedCount: Int,
     val addedCount: Int,

@@ -11,6 +11,6 @@ data class Playlist(
 data class PlaylistItem(
     val playlistId: String,
     val mediaId: String,
-    val position: Double,
+    val position: Long,
     val addedAt: Long = System.currentTimeMillis()
 )

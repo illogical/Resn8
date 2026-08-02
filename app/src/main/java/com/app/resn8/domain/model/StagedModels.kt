@@ -1,9 +1,17 @@
 package com.app.resn8.domain.model
 
-data class MediaFile(
+data class StagedFolder(
     val id: String,
-    val sourceId: String,
-    val folderId: String,
+    val scanId: String,
+    val relativePath: String,
+    val parentRelativePath: String? = null,
+    val displayName: String,
+    val resolvedFolderId: String? = null
+)
+
+data class StagedMedia(
+    val id: String,
+    val scanId: String,
     val documentUri: String,
     val documentId: String? = null,
     val relativePath: String,
@@ -13,10 +21,7 @@ data class MediaFile(
     val size: Long,
     val durationMs: Long? = null,
     val modifiedTimeMs: Long,
-    val firstIndexedAt: Long = System.currentTimeMillis(),
-    val isAvailable: Boolean = true,
     val metadataScanStatus: MetadataScanStatus = MetadataScanStatus.PENDING,
-    // Music metadata (nullable)
     val title: String? = null,
     val artist: String? = null,
     val albumArtist: String? = null,
@@ -26,15 +31,12 @@ data class MediaFile(
     val year: Int? = null,
     val genre: String? = null,
     val artworkUri: String? = null,
-    // Metadata sources / provenance
     val titleSource: MetadataValueSource? = null,
     val artistSource: MetadataValueSource? = null,
     val albumArtistSource: MetadataValueSource? = null,
     val albumSource: MetadataValueSource? = null,
     val discNumberSource: MetadataValueSource? = null,
     val trackNumberSource: MetadataValueSource? = null,
-    // Listening statistics & rating
-    val playCount: Int = 0,
-    val lastPlayedAt: Long? = null,
-    val likeScore: Int = 0
+    val resolvedMediaId: String? = null,
+    val resolvedFolderId: String? = null
 )

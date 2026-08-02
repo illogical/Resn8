@@ -2,6 +2,7 @@ package com.app.resn8.domain.repository
 
 import com.app.resn8.domain.model.Collection
 import com.app.resn8.domain.model.RootSource
+import com.app.resn8.domain.model.ScanResult
 import kotlinx.coroutines.flow.Flow
 
 interface CollectionRepository {
@@ -10,4 +11,12 @@ interface CollectionRepository {
     suspend fun createCollection(name: String): Collection
     fun getRootSourcesFlow(collectionId: String): Flow<List<RootSource>>
     suspend fun addRootSource(collectionId: String, treeUri: String, displayName: String): RootSource
+    suspend fun updateRootSourceAvailability(sourceId: String, isAvailable: Boolean)
+    suspend fun updateRootScanState(
+        sourceId: String,
+        status: String,
+        startedAt: Long? = null,
+        completedAt: Long? = null,
+        summary: ScanResult? = null
+    )
 }

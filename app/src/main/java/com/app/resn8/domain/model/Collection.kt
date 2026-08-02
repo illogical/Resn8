@@ -21,7 +21,10 @@ data class RootSource(
     val displayName: String,
     val isAvailable: Boolean = true,
     val lastScanStatus: String? = null,
-    val lastScannedAt: Long? = null
+    val lastScannedAt: Long? = null,
+    val lastScanStartedAt: Long? = null,
+    val lastScanCompletedAt: Long? = null,
+    val lastScanSummary: ScanResult? = null
 )
 
 data class FolderNode(

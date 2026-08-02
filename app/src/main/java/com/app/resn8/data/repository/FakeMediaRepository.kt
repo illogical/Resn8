@@ -2,11 +2,16 @@ package com.app.resn8.data.repository
 
 import com.app.resn8.domain.model.FolderNode
 import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.domain.model.PlaybackHistoryResult
+import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.domain.model.SortOrder
+import com.app.resn8.domain.model.StagedFolder
+import com.app.resn8.domain.model.StagedMedia
 import com.app.resn8.domain.repository.MediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 
 class FakeMediaRepository(
     initialMediaFiles: List<MediaFile> = emptyList(),
@@ -15,6 +20,7 @@ class FakeMediaRepository(
 
     private val _mediaFiles = MutableStateFlow(initialMediaFiles)
     private val _folderNodes = MutableStateFlow(initialFolderNodes)
+    private val _historyOccurrences = mutableSetOf<String>()
 
     override fun getMediaFilesFlow(
         collectionId: String?,
@@ -33,8 +39,6 @@ class FakeMediaRepository(
             }.sortedWith(getComparator(sortOrder))
         }
     }
-
-    private fun String?.isNull_or_blank(): Boolean = this.isNullOrBlank()
 
     private fun getComparator(sortOrder: SortOrder): Comparator<MediaFile> {
         return when (sortOrder) {
@@ -55,11 +59,12 @@ class FakeMediaRepository(
         return _mediaFiles.value.find { it.id == id }
     }
 
-    override suspend fun getFolderNodesFlow(sourceId: String): Flow<List<FolderNode>> {
+    override fun getFolderNodesFlow(sourceId: String): Flow<List<FolderNode>> {
         return _folderNodes.map { nodes -> nodes.filter { it.sourceId == sourceId } }
     }
 
     override suspend fun updateLikeScore(mediaId: String, delta: Int) {
+        require(delta == 1 || delta == -1) { "Like score delta must be +1 or -1" }
         _mediaFiles.value = _mediaFiles.value.map { item ->
             if (item.id == mediaId) {
                 item.copy(likeScore = item.likeScore + delta)
@@ -70,17 +75,73 @@ class FakeMediaRepository(
     }
 
     override suspend fun recordPlay(mediaId: String, listenedDurationMs: Long, isMeaningful: Boolean) {
-        _mediaFiles.value = _mediaFiles.value.map { item ->
-            if (item.id == mediaId) {
-                item.copy(
-                    playCount = if (isMeaningful) item.playCount + 1 else item.playCount,
-                    lastPlayedAt = System.currentTimeMillis()
-                )
-            } else {
-                item
+        val sessionOccurrenceId = UUID.randomUUID().toString()
+        val result = if (isMeaningful) PlaybackHistoryResult.THRESHOLD_COUNTED else PlaybackHistoryResult.DISCARDED
+        commitMeaningfulPlay(sessionOccurrenceId, mediaId, System.currentTimeMillis() - listenedDurationMs, System.currentTimeMillis(), listenedDurationMs, result)
+    }
+
+    override suspend fun commitMeaningfulPlay(
+        sessionOccurrenceId: String,
+        mediaId: String,
+        startedAt: Long,
+        endedAt: Long?,
+        accumulatedListenedDurationMs: Long,
+        result: PlaybackHistoryResult
+    ): Boolean {
+        if (_historyOccurrences.contains(sessionOccurrenceId)) {
+            return false
+        }
+        _historyOccurrences.add(sessionOccurrenceId)
+        if (result == PlaybackHistoryResult.THRESHOLD_COUNTED || result == PlaybackHistoryResult.NATURAL_COMPLETION_COUNTED) {
+            _mediaFiles.value = _mediaFiles.value.map { item ->
+                if (item.id == mediaId) {
+                    item.copy(playCount = item.playCount + 1, lastPlayedAt = System.currentTimeMillis())
+                } else item
             }
         }
+        return true
     }
+
+    override suspend fun updateMediaAvailability(mediaId: String, isAvailable: Boolean) {
+        _mediaFiles.value = _mediaFiles.value.map {
+            if (it.id == mediaId) it.copy(isAvailable = isAvailable) else it
+        }
+    }
+
+    override suspend fun startScanRun(sourceId: String): String = UUID.randomUUID().toString()
+
+    override suspend fun stageFolders(scanId: String, folders: List<StagedFolder>) {}
+
+    override suspend fun stageMedia(scanId: String, media: List<StagedMedia>) {}
+
+    override suspend fun publishResolvedScan(
+        scanId: String,
+        resolvedFolders: List<FolderNode>,
+        resolvedMedia: List<MediaFile>,
+        unavailableMediaIds: List<String>,
+        scanResult: ScanResult
+    ) {
+        _folderNodes.value = resolvedFolders
+        val existingMap = _mediaFiles.value.associateBy { it.id }
+        val updatedMedia = resolvedMedia.map { newMedia ->
+            existingMap[newMedia.id]?.let { existing ->
+                newMedia.copy(
+                    firstIndexedAt = existing.firstIndexedAt,
+                    playCount = existing.playCount,
+                    lastPlayedAt = existing.lastPlayedAt,
+                    likeScore = existing.likeScore
+                )
+            } ?: newMedia
+        }
+        val unavailableSet = unavailableMediaIds.toSet()
+        _mediaFiles.value = updatedMedia.map {
+            if (unavailableSet.contains(it.id)) it.copy(isAvailable = false) else it
+        }
+    }
+
+    override suspend fun cancelScanRun(scanId: String) {}
+
+    override suspend fun failScanRun(scanId: String, errorSummary: String) {}
 
     fun addMediaFiles(files: List<MediaFile>) {
         _mediaFiles.value = _mediaFiles.value + files

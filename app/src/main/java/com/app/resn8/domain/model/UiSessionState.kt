@@ -7,6 +7,8 @@ data class UiSessionState(
     val selectedArtist: String? = null,
     val selectedAlbum: String? = null,
     val selectedPlaylistId: String? = null,
+    val activeQueueId: String? = null,
     val activeSearchQuery: String? = null,
-    val activeSort: SortOrder = SortOrder.ARTIST
+    val activeSort: SortOrder = SortOrder.ARTIST,
+    val activeFilterSnapshot: QueueFilterSnapshot? = null
 )
