@@ -4,11 +4,11 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 ## Milestone 0 — Establish the Foundation (P0)
 
-- [ ] **T001 — Pin architecture dependencies.** Add stable compatible versions for Media3, Room, KSP, Navigation Compose, lifecycle/ViewModel Compose, coroutines, and test utilities to the version catalog. Confirm `assembleDebug`, unit tests, and instrumentation test compilation.
-- [ ] **T002 — Create the application layers.** Establish UI/navigation, domain, data/database, storage/indexing, and playback packages; wire repository interfaces through a small dependency container so tests can substitute fakes.
-- [ ] **T003 — Define domain contracts.** Add collection profiles, media metadata, filter/sort definitions, rating and meaningful-play rules, queue-generation modes, saved queue state, scan progress/results, and repository interfaces matching the specification.
-- [ ] **T004 — Add navigation and app shell.** Replace the starter greeting with typed destinations for onboarding, library, folders, playlists, playlist detail, queue, and now playing; include persistent mini-player placement and restorable route state.
-- [ ] **T005 — Establish test fixtures.** Add tagged and untagged short audio fixtures, corrupt/unsupported samples, nested fake document trees, and deterministic fake clocks/random sources without committing copyrighted media.
+- [x] **T001 — Pin architecture dependencies.** Add stable compatible versions for Media3, Room, KSP, Navigation Compose, lifecycle/ViewModel Compose, coroutines, and test utilities to the version catalog. Confirm `assembleDebug`, unit tests, and instrumentation test compilation.
+- [x] **T002 — Create the application layers.** Establish UI/navigation, domain, data/database, storage/indexing, and playback packages; wire repository interfaces through a small dependency container so tests can substitute fakes.
+- [x] **T003 — Define domain contracts.** Add collection profiles, media metadata, filter/sort definitions, rating and meaningful-play rules, queue-generation modes, saved queue state, scan progress/results, and repository interfaces matching the specification.
+- [x] **T004 — Add navigation and app shell.** Replace the starter greeting with typed destinations for onboarding, library, folders, playlists, playlist detail, queue, and now playing; include persistent mini-player placement and restorable route state.
+- [x] **T005 — Establish test fixtures.** Add tagged and untagged short audio fixtures, corrupt/unsupported samples, nested fake document trees, and deterministic fake clocks/random sources without committing copyrighted media.
 
 **Exit:** The app builds, navigates between placeholder destinations, and domain behavior can be tested without Android framework dependencies.
 
