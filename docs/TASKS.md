@@ -14,9 +14,9 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 ## Milestone 1 — Persist the Library Model (P0)
 
-- [ ] **T006 — Implement the Room schema.** Create entities, relations, converters, indexes, DAOs, and the initial migration for collections, root sources, folders, media files/statistics, playback history, playlists/items, saved queues/items, and UI session state.
-- [ ] **T007 — Implement repository transactions.** Add atomic APIs for scan upserts, availability changes, signed-score updates, meaningful-play commits, playlist membership/order, queue snapshots, and restoration checkpoints.
-- [ ] **T008 — Test persistence invariants.** Verify unique playlist membership, non-negative play counts, signed scores crossing zero, cascading behavior, unavailable-file retention, stable playlist ordering, queue item ordering, and migration export/schema checks.
+- [ ] **T006 — Implement the Room schema.** Reconcile Milestone 0 domain contracts, then create the version-1 entities, relations, converters, indexes, focused DAOs, and exported schema for collections, roots, folders, isolated scan staging, media identity/metadata/statistics, playback occurrences, playlists/items, saved queues/items, and UI session state. Include first-indexed time, metadata provenance, stable queue-item/current-occurrence identities, complete restoration fields, and restrictive source/media deletion semantics.
+- [ ] **T007 — Implement repository transactions.** Preserve test fakes while adding Room-backed production repositories and atomic APIs for bounded scan staging/publication, availability changes, signed-score updates, idempotent meaningful-play commits, collision-free playlist membership/order, explicit queue snapshot replacement, playback checkpoints, and UI-session restoration state.
+- [ ] **T008 — Test persistence invariants.** Verify identity uniqueness, first-indexed retention, enum/JSON compatibility, atomic scan publication, unique playlist membership, non-negative statistics, concurrent signed-score updates, exactly-once meaningful plays, restrictive/cascading behavior, unavailable-file retention, stable playlist ranks, atomic queue ordering/checkpoints, schema export, close/reopen, and available on-device process restoration.
 
 **Exit:** An in-memory and on-device database can represent every MVP state without destructive migrations.
 
@@ -26,7 +26,7 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [ ] **T010 — Build recursive enumeration.** Traverse document-provider children off the main thread, admit supported audio only, stream bounded batches, expose progress/cancellation, and tolerate inaccessible/corrupt individual documents.
 - [ ] **T011 — Extract and normalize metadata.** Read duration, MIME type, embedded MP3/music tags, artwork reference, and source facts; apply tag → music path/filename → cleaned filename precedence without inventing stored unknown values.
 - [ ] **T012 — Implement filename/path fallback parsing.** Support `Artist/Album` inference and common disc/track prefixes; record which source supplied each result and summarize unrecognized naming patterns for sample-library analysis.
-- [ ] **T013 — Implement idempotent re-indexing.** Match provider ID/URI then relative path, apply unique conservative signature recovery, preserve user data, mark missing files unavailable, restore returned files, and publish an atomic scan result.
+- [ ] **T013 — Implement idempotent re-indexing.** Stage bounded scan batches, match provider ID/URI then relative path, apply unique conservative signature recovery, preserve first-indexed time and all user data, mark missing files unavailable, restore returned files, and publish the resolved scan as one atomic canonical snapshot.
 - [ ] **T014 — Build indexing UI states.** Show first-run explanation, collection naming, progress, cancel/retry, final counts, empty folders, permission loss, removable-storage absence, and corrupt/unsupported-file summaries.
 - [ ] **T015 — Test real provider behavior.** Cover internal shared storage and a removable/document-provider equivalent; verify persisted access and re-index behavior across process/device restart.
 
@@ -37,7 +37,7 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [ ] **T016 — Implement indexed library queries.** Provide reactive/paged artist, album, all-track, and folder-tree queries with availability, filter, search-text, and deterministic sort parameters.
 - [ ] **T017 — Build Artist and Album views.** Drill from artists to their albums/tracks and from albums to tracks; order by disc/track with title/filename fallbacks and clear unknown-metadata grouping.
 - [ ] **T018 — Build the folder browser.** Mirror indexed relative folders, show indexed/unavailable files, support file/folder multi-selection, and resolve folder selections to unique descendant media IDs.
-- [ ] **T019 — Add sort/filter controls.** Support artist, album, title/filename, track, most/least played, unplayed, most/least recent, most liked, and filter-out-disliked where appropriate.
+- [ ] **T019 — Add sort/filter controls.** Support artist, album, title/filename, track, recently added/indexed, most/least played, unplayed, most/least recent, most liked, and filter-out-disliked where appropriate.
 - [ ] **T020 — Verify large-library behavior.** Benchmark seeded datasets up to 25,000 media rows; remove main-thread I/O and avoid loading artwork/full lists eagerly.
 
 **Exit:** Users can efficiently find and select music by metadata or original folder structure.
@@ -86,7 +86,7 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 ## Milestone 8 — Restore Context and Finish the MVP (P1)
 
-- [ ] **T043 — Add queue and position checkpoints.** Save index/media ID/position periodically and on pause, transition, backgrounding, task removal, and service shutdown without excessive database writes.
+- [ ] **T043 — Add queue and position checkpoints.** Save queue ID, stable occurrence, index/media ID, position, play intent, playback speed, and repeat state periodically and on pause, transition, backgrounding, task removal, and service shutdown without excessive database writes.
 - [ ] **T044 — Restore playback safely.** Rebuild the exact explicit queue and seek to position after process death/restart; default to paused on normal launch and support Android's explicit media-resumption request.
 - [ ] **T045 — Restore browsing context.** Return to the last meaningful route with collection, folder, artist, album, playlist, filter, and sort state; fall back safely when a target no longer exists.
 - [ ] **T046 — Handle unavailable restore targets.** Explain missing permission/storage/media and offer reselect, retry, or skip-to-next without discarding queue/history state.
@@ -106,4 +106,3 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [ ] **T055 — Add global command search.** Search media, folders, artists, albums, playlists, history, and actions from one fast interface.
 - [ ] **T056 — Add safe disliked-file maintenance.** Preview and confirm move/delete operations through providers that grant write access; keep database/history reconciliation explicit.
 - [ ] **T057 — Add metadata/history backup and restore.** Export versioned app data without source audio and document identity/remapping behavior.
-
