@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,6 +42,9 @@ import com.app.resn8.playback.PlaybackQueueItemState
 fun QueueScreen(
     queueItems: List<PlaybackQueueItemState> = emptyList(),
     currentQueueItemId: String? = null,
+    queueTitle: String? = null,
+    sourcePlaylistId: String? = null,
+    onOpenPlaylist: ((String) -> Unit)? = null,
     onItemClick: (String) -> Unit = {},
     onSaveAsPlaylist: (List<String>, title: String, subtitle: String?) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
@@ -56,10 +60,26 @@ fun QueueScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Active Playback Queue",
-                    style = MaterialTheme.typography.headlineMedium
-                )
+                val headerText = queueTitle ?: "Active Playback Queue"
+                if (sourcePlaylistId != null && onOpenPlaylist != null) {
+                    Text(
+                        text = headerText,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { onOpenPlaylist(sourcePlaylistId) }
+                    )
+                    Text(
+                        text = "Tap to open playlist detail",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                } else {
+                    Text(
+                        text = headerText,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "${queueItems.size} items in queue",
                     style = MaterialTheme.typography.bodyMedium,

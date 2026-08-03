@@ -18,12 +18,23 @@ class StartQueueUseCase(
     private val uiSessionRepository: UiSessionRepository
 ) {
     suspend operator fun invoke(request: QueueStartRequest): Result<SavedQueue> {
+        var filterSnapshot: com.app.resn8.domain.model.QueueFilterSnapshot? = null
+
         val (orderedMediaIds, targetCollectionId) = when (request) {
             is QueueStartRequest.Library -> {
                 val availableOnlyQuery = request.query.copy(
                     filters = request.query.filters.copy(availability = AvailabilityFilter.AVAILABLE_ONLY)
                 )
                 val mediaIds = mediaRepository.snapshotVisibleMediaIds(availableOnlyQuery)
+                val artistName = (request.query.artist as? com.app.resn8.domain.model.MetadataGroupKey.Known)?.value
+                val albumName = (request.query.album as? com.app.resn8.domain.model.MetadataGroupKey.Known)?.value
+                filterSnapshot = com.app.resn8.domain.model.QueueFilterSnapshot(
+                    collectionId = request.query.collectionId,
+                    folderId = request.query.folderId,
+                    artist = artistName,
+                    album = albumName,
+                    searchQuery = request.query.searchText
+                )
                 Pair(mediaIds, request.query.collectionId)
             }
             is QueueStartRequest.Playlist -> {
@@ -34,6 +45,11 @@ class StartQueueUseCase(
                 val playlist = playlistRepository.getPlaylistById(request.playlistId)
                     ?: return Result.failure(IllegalStateException("The playlist no longer exists."))
                 val colId = playlist.collectionId
+                filterSnapshot = com.app.resn8.domain.model.QueueFilterSnapshot(
+                    collectionId = colId,
+                    playlistId = playlist.id,
+                    playlistName = playlist.name
+                )
                 Pair(mediaIds.filter { availableIds.contains(it) }, colId)
             }
         }
@@ -52,6 +68,7 @@ class StartQueueUseCase(
             id = queueId,
             collectionId = targetCollectionId,
             kind = SavedQueueKind.EXPLICIT,
+            filterSnapshot = filterSnapshot,
             currentIndex = startingIndex,
             currentMediaId = request.startingMediaId,
             positionMs = 0L,

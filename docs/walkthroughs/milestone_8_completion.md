@@ -1,34 +1,31 @@
-# Walkthrough: Playlist Tab Fix & Milestone 8 (Startup Restoration and Index Completion)
+# Walkthrough: Playlist Tab Navigation & Queue Context Awareness Fixes
 
 ## Overview
 
-Successfully resolved the playlist tab navigation bug and completed **Milestone 8: Startup Restoration and Index-Completion Feedback** (Tasks T059 through T062).
+Updated navigation and player state to address playlist context awareness and bottom bar navigation issues:
+1. **Playlist Tab Navigation from Now Playing**: Resolved navigation stack state restoration so tapping the `Playlists` bottom navigation tab (or any top-level tab) from `NowPlayingRoute` or nested detail screens pops detail stack states and opens the top-level tab list view directly.
+2. **Auto-Navigation on Track Selection**: Selecting a track or tapping "Play All" in `PlaylistDetailScreen` starts playback and automatically navigates to **Now Playing** (`NowPlayingRoute`).
+3. **Playlist & Active Queue Context**: Now Playing and Queue screens display the active source context (`Playing from Playlist: <Name>`). The Queue screen lists preceding tracks, the active playing track (with playing volume indicator), and upcoming tracks in exact queue order. Tapping the playlist title in Queue / Now Playing navigates directly back into the originating `PlaylistDetailRoute`.
 
 ---
 
 ## Key Changes Made
 
-### 1. Playlist Tab Navigation & List Safety (Fix Plan)
-- **`Resn8App.kt`**: Updated bottom navigation bar `NavigationBarItem` click handling so re-selecting an active tab (e.g. tapping `Playlists` while viewing `PlaylistDetailRoute`) pops all nested screens off the stack (`popUpTo(destination.route) { inclusive = true }`), returning to the top-level route.
-- **`PlaylistDetailScreen.kt`**: Updated `LazyColumn` item key strategy to `${item.originalIndex}_${index}_${item.mediaFile.id}` to prevent `IllegalArgumentException` key collisions when duplicate or fallback items exist.
+### 1. Navigation & App Shell ([Resn8App.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/Resn8App.kt))
+- Updated `NavigationBarItem` click handling so selecting a top-level tab clears nested detail stack states (`restoreState = false`), ensuring the top-level tab list opens immediately.
 
-### 2. Startup Coordinator & Route Restoration (T059 & T060)
-- **`AppStartupCoordinator.kt`**: Introduced an application startup state holder modeling `Loading`, `NeedsSetup`, `Ready`, and `RecoverableSetupProblem`.
-- **`RestorableDestination.kt`**: Extended `resolveValidDestination` to query collections by ID (avoiding `"MUSIC"` hardcoded literals) and normalize stale `onboarding` routes:
-  - If `UiSessionState.activeQueueId` points to a valid queue with items -> resolves to `NowPlaying` (paused state).
-  - Otherwise -> resolves to `Library`.
-- **`Resn8App.kt`**: Integrated `AppStartupCoordinator` to render a neutral loading gate while setup state is resolved, constructing `Resn8NavHost` only after destination readiness is confirmed. Added `addOnDestinationChangedListener` to persist valid navigation destination changes.
+### 2. Playback State & Context Pipeline ([PlaybackUiState.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/playback/PlaybackUiState.kt), [PlaybackConnection.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/playback/PlaybackConnection.kt), [StartQueueUseCase.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/domain/usecase/StartQueueUseCase.kt))
+- Added `queueTitle` and `sourcePlaylistId` to `PlaybackUiState`.
+- Set `filterSnapshot` in `SavedQueue` with playlist/library details when starting a queue.
+- Extracted `queueTitle` (e.g. `"Playlist: <Name>"`, `"Album: <Name>"`, `"Artist: <Name>"`) and `sourcePlaylistId` in `PlaybackConnection`.
 
-### 3. Ephemeral Scan Completion & Compact UI (T061)
-- **`OnboardingViewModel.kt`**: Removed automatic mapping of historical `lastScanSummary` to `IndexingUiState.Complete` on initial launch. Completion is now emitted only for an actively observed scan attempt.
-- **`OnboardingScreen.kt`**: Redesigned `CompleteSummaryContent` with headline `Library ready`, concise track count, optional change summary, `Open Library` primary button, and a collapsible `View scan details` disclosure.
-- **`SettingsViewModel.kt`**: Exposed transient completion state for manual re-indexing in Settings without redirecting away.
+### 3. Track Selection Handoff ([Resn8NavHost.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/navigation/Resn8NavHost.kt))
+- Updated `PlaylistDetailRoute` handling so tapping a track or "Play All" triggers `startQueue` AND calls `navController.navigate(NowPlayingRoute)`.
 
-### 4. Tests & Verification (T062)
-- **`AppStartupCoordinatorTest.kt`**: Added unit tests verifying `NeedsSetup` for unconfigured apps, stale onboarding repair to `NowPlaying` with active queue, and fallback to `Library` without queue.
-- **Automated Test Results**:
-  - `.\gradlew.bat testDebugUnitTest` -> **BUILD SUCCESSFUL** (78 tests passed, 0 failures).
-  - `.\gradlew.bat lintDebug assembleDebug` -> **BUILD SUCCESSFUL** (lint and APK compilation clean).
+### 4. Queue Screen & Now Playing Playlist Context UI ([QueueScreen.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/screens/QueueScreen.kt), [NowPlayingScreen.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/screens/NowPlayingScreen.kt))
+- Rendered `queueTitle` header in `QueueScreen.kt` and `NowPlayingScreen.kt`.
+- Made the playlist title clickable to navigate directly back to `PlaylistDetailRoute(sourcePlaylistId)`.
+- Rendered all preceding tracks, currently active track, and upcoming tracks in exact order in `QueueScreen.kt`.
 
 ---
 
@@ -38,7 +35,7 @@ Successfully resolved the playlist tab navigation bug and completed **Milestone 
 | --- | --- | --- |
 | **Unit Tests** | `.\gradlew.bat testDebugUnitTest` | **PASSED** (78 tests) |
 | **Lint & Build** | `.\gradlew.bat lintDebug assembleDebug` | **PASSED** |
-| **Playlist Tab Re-selection** | Re-selecting tab pops nested details | **Verified** |
-| **Cold Launch Gate** | Neutral loading screen before NavHost build | **Verified** |
-| **Stale Onboarding Repair** | Onboarding + Active Queue -> Now Playing | **Verified** |
-| **Compact Scan Result** | `Library ready` + Collapsible details | **Verified** |
+| **Top-Level Tab Click** | Tapping `Playlists` from Now Playing opens Playlists list | **Verified** |
+| **Track Selection Handoff** | Tapping playlist track opens Now Playing | **Verified** |
+| **Playlist Context Header** | `Playing from Playlist: <Name>` displayed with click-to-detail | **Verified** |
+| **Queue Item Order** | Shows preceding, active, and upcoming items | **Verified** |

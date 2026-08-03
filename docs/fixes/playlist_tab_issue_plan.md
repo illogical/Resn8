@@ -1,41 +1,50 @@
-# Investigation and Fix Plan: Playlist Tab Navigation & Multi-Track Playlist Oddities
+# Investigation and Fix Plan: Playlist Tab Navigation & Playlist Context Awareness
 
 ## Problem Summary
-When a user creates a new playlist and adds a single track from the Now Playing / Music Player view:
-- Navigating to the Playlists section, viewing the playlist contents, and tapping **Play All** works as expected.
-- However, after adding a **second track** to the playlist, tapping the **Playlists** tab in the bottom navigation bar appears unresponsive (nothing happens when tapped), even though adding to the playlist continues to accurately report "1 of 2" tracks in the selection sheet.
+
+1. **Unresponsive Bottom Navigation Tab from Now Playing**:
+   - When a user selects a track from a playlist (or taps Play All), playback starts and the app opens or displays Now Playing (`NowPlayingRoute`).
+   - From Now Playing, tapping the **Playlists** tab in the bottom navigation bar appears unresponsive or fails to return to the Playlists root screen because Navigation Compose's state restoration (`restoreState = true`) attempts to restore nested `PlaylistDetailRoute` state while `NowPlayingRoute` sits on top of the root backstack.
+
+2. **Missing Playlist & Queue Context Awareness**:
+   - When playback is initiated from a playlist, the player and active queue views do not clearly indicate that music is playing in the context of that specific playlist.
+   - Users need a transparent view of the active queue's item order (preceding tracks, current track, and upcoming tracks) and a direct way to navigate back to the originating playlist detail screen.
 
 ---
 
-## Investigation Hypotheses
+## Investigation Hypotheses & Remediation
 
-### Hypothesis 1: Navigation Compose Backstack & State Restoration Trap
-- **Mechanism**: In `Resn8App.kt`, bottom navigation items use `saveState = true` and `restoreState = true`.
-- **Behavior**: When viewing a single-item playlist, the navigation stack under the Playlists tab becomes `[PlaylistsRoute, PlaylistDetailRoute]`. When the user navigates away (or returns to Now Playing) and then taps the **Playlists** tab again, `restoreState = true` attempts to restore `PlaylistDetailRoute`. If the detail route has stale state, incomplete parameters, or crashes during recomposition, tapping the Playlists tab feels broken or unresponsive.
-- **Remediation**: Tapping an already selected or active bottom navigation tab should pop back to the top-level route (`PlaylistsRoute`), resetting any nested detail state.
+### Hypothesis 1: Bottom Navigation Bar State Restoration Trap
+- **Mechanism**: In `Resn8App.kt`, tapping a top-level tab uses `restoreState = true`. When coming from `NowPlayingRoute` (which was opened on top of `PlaylistDetailRoute`), `restoreState = true` restores `PlaylistDetailRoute` instead of taking the user to the top-level `PlaylistsRoute`. If the user is looking for the Playlists root list, tapping the tab appears unresponsive because it restores the exact detail view they just left.
+- **Remediation**:
+  - Tapping any top-level tab in `NavigationBar` must pop all nested destinations (such as `PlaylistDetailRoute`) and navigate directly to the top-level route (`PlaylistsRoute`).
+  - When a track is tapped in `PlaylistDetailScreen`, navigate to `NowPlayingRoute` explicitly while passing the playlist context (`playlistId` and `playlistName`) to `PlaybackUiState`.
 
-### Hypothesis 2: Compose `LazyColumn` Key Collision in `PlaylistDetailScreen`
-- **Mechanism**: `PlaylistDetailScreen.kt` currently renders track rows using `key = { _, item -> item.mediaFile.id }`.
-- **Behavior**: If the media repository returns duplicate media file IDs, fallback/unavailable media items with default IDs, or if identical tracks are added to a playlist, Compose throws an unhandled `IllegalArgumentException: Key was already used in this LazyColumn` during list layout. This silently breaks rendering and freezes user interaction on the screen.
-- **Remediation**: Use a unique composite key combining rank position and item identity, e.g. `key = { _, item -> "${item.originalIndex}_${item.mediaFile.id}" }`.
+### Hypothesis 2: Queue & Playlist Context Awareness
+- **Mechanism**: `PlaybackUiState` currently exposes track title, artist, album, and queue items, but lacks explicit queue source context (e.g., `queueTitle = "Playlist: Summer Favorites"`, `sourcePlaylistId = "p1"`).
+- **Remediation**:
+  - Update `SavedQueue` and `PlaybackUiState` to include `queueTitle` (e.g., `Playlist: <Name>`) and `sourcePlaylistId`.
+  - Update `QueueScreen.kt` to render the active queue title header (`Playing from Playlist: <Name>`) and list all items in queue order (preceding tracks, current track with playing indicator, and upcoming tracks).
+  - Add a direct navigation link on the queue header in `QueueScreen` allowing users to jump back into `PlaylistDetailRoute(playlistId)`.
 
-### Hypothesis 3: Room Flow Emission or `GROUP BY` Aggregation Edge Case
-- **Mechanism**: `PlaylistDao.getPlaylistsWithItemCountFlow` uses a `LEFT JOIN` and `GROUP BY p.id` with `COUNT(pi.mediaId)`.
-- **Behavior**: When items are added or positions updated, Room emits a new snapshot. We must verify whether multiple items or rapid sequential updates cause flow cancellation or unhandled UI state transitions in `PlaylistsViewModel`.
-- **Remediation**: Audit DAO queries and add unit tests verifying `RoomPlaylistRepository` and `PlaylistsViewModel` state emissions with 2+ items.
+### Hypothesis 3: Compose `LazyColumn` Composite Keys
+- **Mechanism**: Ensure `PlaylistDetailScreen.kt` uses composite keys `${item.originalIndex}_${index}_${item.mediaFile.id}` so item re-ordering and duplicate tracks do not crash `LazyColumn`.
 
 ---
 
 ## Proposed Changes
 
 ### 1. Navigation & App Shell ([Resn8App.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/Resn8App.kt))
-- Update bottom navigation tab click handlers to pop back to the root tab route when re-selecting the active top-level tab (or when navigating back to Playlists from a detail view).
+- Update bottom navigation tab click handlers to pop back to the top-level root route (`PlaylistsRoute`) when selecting any tab, clearing nested detail routes.
 
-### 2. Playlist Detail UI ([PlaylistDetailScreen.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/screens/PlaylistDetailScreen.kt))
-- Update `LazyColumn` item key strategy in `PlaylistDetailScreen` to prevent duplicate key crashes when multiple or unavailable items exist in a playlist.
+### 2. Playlist Detail & Nav Host ([Resn8NavHost.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/navigation/Resn8NavHost.kt) & [PlaylistDetailScreen.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/screens/PlaylistDetailScreen.kt))
+- When starting playback from a track or "Play All" in `PlaylistDetailScreen`, automatically navigate to `NowPlayingRoute`.
+- Pass `sourcePlaylistId` and `playlistName` when initiating `QueueStartRequest.Playlist`.
 
-### 3. Repository & ViewModel Tests ([RoomPlaylistRepositoryTest.kt](file:///c:/LocalDev/Projects/Resn8/app/src/test/java/com/app/resn8/data/RoomPlaylistRepositoryTest.kt))
-- Add automated unit tests covering multi-item playlist operations: adding 2+ tracks, reordering, deleting, and verifying `getPlaylistsWithItemCountFlow` emissions.
+### 3. Playback UI State & Queue Context ([PlaybackUiState.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/playback/PlaybackUiState.kt) & [QueueScreen.kt](file:///c:/LocalDev/Projects/Resn8/app/src/main/java/com/app/resn8/ui/screens/QueueScreen.kt))
+- Expose `queueTitle` and `sourcePlaylistId` in `PlaybackUiState`.
+- Display `"Playing from Playlist: <Name>"` in `QueueScreen.kt` and `NowPlayingScreen.kt` with a clickable action to return to `PlaylistDetailRoute`.
+- Render the full ordered list of queue items (preceding, current, and upcoming) in `QueueScreen.kt`.
 
 ---
 
@@ -47,12 +56,10 @@ $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat testDebugUnitTest
 .\gradlew.bat lintDebug assembleDebug
 ```
-- Verify repository unit tests pass for single and multi-track playlists.
-- Verify navigation and viewmodel state restoration tests pass.
 
 ### Manual Verification Workflow
-1. Create a new playlist.
-2. Add track #1 from Now Playing -> Open Playlists tab -> Open Playlist Detail -> Verify track #1 displays and "Play All" works.
-3. Return to Now Playing -> Add track #2 to the playlist.
-4. Tap the **Playlists** tab in the bottom bar -> Verify top-level Playlists screen opens with item count = 2.
-5. Tap into Playlist Detail -> Verify both tracks render, order controls work, and "Play All" enqueues both tracks.
+1. Create a playlist and add 2+ tracks.
+2. Open Playlist Detail -> tap track #1 to begin playing -> verify app navigates to Now Playing.
+3. Tap the **Playlists** tab in the bottom bar -> verify the top-level Playlists list screen opens immediately.
+4. Tap the **Queue** icon in Now Playing -> verify the screen shows `"Playing from Playlist: <Name>"` and lists preceding, current, and upcoming tracks in exact order.
+5. Tap the playlist title in Queue / Now Playing -> verify app navigates directly to Playlist Detail.

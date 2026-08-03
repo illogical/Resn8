@@ -1,6 +1,7 @@
 package com.app.resn8.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -72,6 +73,9 @@ fun NowPlayingScreen(
     canSeek: Boolean = true,
     canSkipPrevious: Boolean = true,
     canSkipNext: Boolean = true,
+    queueTitle: String? = null,
+    sourcePlaylistId: String? = null,
+    onOpenPlaylist: ((String) -> Unit)? = null,
     noticeMessage: String? = null,
     onPlayPauseToggle: () -> Unit = {},
     onSeek: (Long) -> Unit = {},
@@ -105,6 +109,35 @@ fun NowPlayingScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        if (queueTitle != null) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            ) {
+                if (sourcePlaylistId != null && onOpenPlaylist != null) {
+                    Text(
+                        text = queueTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { onOpenPlaylist(sourcePlaylistId) }
+                    )
+                    Text(
+                        text = "Tap to open playlist detail",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                } else {
+                    Text(
+                        text = queueTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         if (noticeMessage != null) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),

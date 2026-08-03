@@ -196,22 +196,12 @@ private fun Resn8AppContent(
                         NavigationBarItem(
                             selected = isSelected,
                             onClick = {
-                                if (isSelected) {
-                                    navController.navigate(destination.route) {
-                                        popUpTo(destination.route) {
-                                            inclusive = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = false
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = false
                                     }
-                                } else {
-                                    navController.navigate(destination.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
+                                    launchSingleTop = true
+                                    restoreState = false
                                 }
                             },
                             icon = { Icon(destination.icon, contentDescription = destination.label) },

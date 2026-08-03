@@ -158,7 +158,17 @@ class PlaybackConnection(
     }
 
     private fun updateQueueUiState(queue: SavedQueue?) {
-        if (queue == null) return
+        if (queue == null) {
+            _uiState.update {
+                it.copy(
+                    activeQueueId = null,
+                    queueItems = emptyList(),
+                    queueTitle = null,
+                    sourcePlaylistId = null
+                )
+            }
+            return
+        }
 
         scope.launch {
             val mediaFiles = container.mediaRepository.getMediaFilesByIdsPreservingOrder(queue.orderedMediaIds)
@@ -177,10 +187,22 @@ class PlaybackConnection(
                 )
             }
 
+            val filter = queue.filterSnapshot
+            val sourcePlaylistId = filter?.playlistId
+            val queueTitle = when {
+                filter?.playlistName != null -> "Playlist: ${filter.playlistName}"
+                filter?.album != null -> "Album: ${filter.album}"
+                filter?.artist != null -> "Artist: ${filter.artist}"
+                filter?.searchQuery != null -> "Search: ${filter.searchQuery}"
+                else -> "Active Playback Queue"
+            }
+
             _uiState.update {
                 it.copy(
                     activeQueueId = queue.id,
-                    queueItems = itemStates
+                    queueItems = itemStates,
+                    queueTitle = queueTitle,
+                    sourcePlaylistId = sourcePlaylistId
                 )
             }
         }

@@ -345,6 +345,7 @@ fun Resn8NavHost(
                                 startingMediaId = mediaFile.id
                             )
                         )
+                        navController.navigate(NowPlayingRoute)
                     },
                     onPlayAll = {
                         val firstAvailableId = tracks.find { it.mediaFile.isAvailable }?.mediaFile?.id
@@ -355,6 +356,7 @@ fun Resn8NavHost(
                                     startingMediaId = firstAvailableId
                                 )
                             )
+                            navController.navigate(NowPlayingRoute)
                         }
                     }
                 )
@@ -364,6 +366,9 @@ fun Resn8NavHost(
                 QueueScreen(
                     queueItems = playbackUiState.queueItems,
                     currentQueueItemId = playbackUiState.currentQueueItemId,
+                    queueTitle = playbackUiState.queueTitle,
+                    sourcePlaylistId = playbackUiState.sourcePlaylistId,
+                    onOpenPlaylist = { playlistId -> navController.navigate(PlaylistDetailRoute(playlistId)) },
                     onItemClick = { queueItemId ->
                         playbackConnection?.skipToQueueItem(queueItemId)
                     },
@@ -386,6 +391,9 @@ fun Resn8NavHost(
                     canSeek = playbackUiState.canSeek,
                     canSkipPrevious = playbackUiState.canSkipPrevious,
                     canSkipNext = playbackUiState.canSkipNext,
+                    queueTitle = playbackUiState.queueTitle,
+                    sourcePlaylistId = playbackUiState.sourcePlaylistId,
+                    onOpenPlaylist = { playlistId -> navController.navigate(PlaylistDetailRoute(playlistId)) },
                     noticeMessage = playbackUiState.notice?.message,
                     onPlayPauseToggle = { playbackConnection?.togglePlayPause() },
                     onSeek = { pos -> playbackConnection?.seekTo(pos) },

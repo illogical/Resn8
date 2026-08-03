@@ -24,7 +24,9 @@ data class QueueFilterSnapshot(
     val artist: String? = null,
     val album: String? = null,
     val searchQuery: String? = null,
-    val excludeDisliked: Boolean = true
+    val excludeDisliked: Boolean = true,
+    val playlistId: String? = null,
+    val playlistName: String? = null
 )
 
 data class SavedQueueItem(

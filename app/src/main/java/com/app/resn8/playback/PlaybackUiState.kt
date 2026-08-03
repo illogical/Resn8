@@ -39,5 +39,7 @@ data class PlaybackUiState(
     val canSkipPrevious: Boolean = false,
     val canSkipNext: Boolean = false,
     val queueItems: List<PlaybackQueueItemState> = emptyList(),
+    val queueTitle: String? = null,
+    val sourcePlaylistId: String? = null,
     val notice: PlaybackNotice? = null
 )
