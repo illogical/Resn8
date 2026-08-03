@@ -2,6 +2,8 @@ package com.app.resn8.data.repository
 
 import com.app.resn8.domain.model.Playlist
 import com.app.resn8.domain.model.PlaylistItem
+import com.app.resn8.domain.model.PlaylistMembershipState
+import com.app.resn8.domain.model.PlaylistWithMembership
 import com.app.resn8.domain.repository.PlaylistRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,6 +92,11 @@ class FakePlaylistRepository(
         _items.value = _items.value.filterNot { it.playlistId == playlistId && it.mediaId == mediaId }
     }
 
+    override suspend fun removeItemsFromPlaylist(playlistId: String, mediaIds: List<String>) {
+        val removeSet = mediaIds.toSet()
+        _items.value = _items.value.filterNot { it.playlistId == playlistId && removeSet.contains(it.mediaId) }
+    }
+
     override suspend fun reorderPlaylistItem(playlistId: String, mediaId: String, newPosition: Long) {
         _items.value = _items.value.map {
             if (it.playlistId == playlistId && it.mediaId == mediaId) {
@@ -107,5 +114,35 @@ class FakePlaylistRepository(
             item.copy(position = (index + 1) * 1024L)
         }
         _items.value = other + remapped
+    }
+
+    override fun getPlaylistsWithMembershipFlow(
+        collectionId: String,
+        mediaIds: List<String>
+    ): Flow<List<PlaylistWithMembership>> {
+        val targetSet = mediaIds.toSet()
+        return _playlists.map { playlists ->
+            val result = playlists.filter { it.collectionId == collectionId }.map { playlist ->
+                val items = _items.value.filter { it.playlistId == playlist.id }
+                val itemCount = items.size
+                val matchingCount = if (targetSet.isEmpty()) 0 else items.count { targetSet.contains(it.mediaId) }
+                val state = when {
+                    targetSet.isEmpty() -> PlaylistMembershipState.NONE
+                    matchingCount == targetSet.size -> PlaylistMembershipState.ALL
+                    matchingCount == 0 -> PlaylistMembershipState.NONE
+                    else -> PlaylistMembershipState.SOME
+                }
+                PlaylistWithMembership(playlist, state, itemCount)
+            }
+            result.sortedWith(
+                compareBy<PlaylistWithMembership> {
+                    when (it.membershipState) {
+                        PlaylistMembershipState.ALL -> 0
+                        PlaylistMembershipState.SOME -> 1
+                        PlaylistMembershipState.NONE -> 2
+                    }
+                }.thenBy { it.playlist.name }
+            )
+        }
     }
 }

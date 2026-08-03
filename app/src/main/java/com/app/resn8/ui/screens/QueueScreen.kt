@@ -1,16 +1,21 @@
 package com.app.resn8.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -28,6 +33,7 @@ fun QueueScreen(
     queueItems: List<PlaybackQueueItemState> = emptyList(),
     currentQueueItemId: String? = null,
     onItemClick: (String) -> Unit = {},
+    onSaveAsPlaylist: (List<String>, title: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -35,16 +41,37 @@ fun QueueScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = "Active Playback Queue",
-            style = MaterialTheme.typography.headlineMedium
-        )
-        Text(
-            text = "${queueItems.size} items in queue",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Active Playback Queue",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                Text(
+                    text = "${queueItems.size} items in queue",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (queueItems.isNotEmpty()) {
+                Button(
+                    onClick = {
+                        val mediaIds = queueItems.map { it.mediaId }
+                        onSaveAsPlaylist(mediaIds, "Save Active Queue (${mediaIds.size} tracks)")
+                    }
+                ) {
+                    Icon(imageVector = Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Save")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.padding(bottom = 12.dp))
 
         if (queueItems.isEmpty()) {
             Text(
@@ -107,7 +134,7 @@ fun QueueScreen(
 
                             if (isCurrent) {
                                 Icon(
-                                    imageVector = Icons.Default.VolumeUp,
+                                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
                                     contentDescription = "Playing",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(24.dp)

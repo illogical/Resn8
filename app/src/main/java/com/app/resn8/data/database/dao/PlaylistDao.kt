@@ -44,6 +44,9 @@ interface PlaylistDao {
     @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId AND mediaId = :mediaId")
     fun deletePlaylistItem(playlistId: String, mediaId: String)
 
+    @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId AND mediaId IN (:mediaIds)")
+    fun deletePlaylistItems(playlistId: String, mediaIds: List<String>)
+
     @Query("UPDATE playlist_items SET position = :newPosition WHERE playlistId = :playlistId AND mediaId = :mediaId")
     fun updatePlaylistItemPosition(playlistId: String, mediaId: String, newPosition: Long)
 

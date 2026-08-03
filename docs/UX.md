@@ -167,31 +167,104 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ---
 
-## 5. Manual Playlists (Milestone 6 — Upcoming)
+## 5. Manual Playlists (Milestone 6 — In Progress)
 
 ### US5.1 — Create and Manage Playlists
 - **As a** user,
-- **I want to** create, rename, and delete playlists without altering my source files,
-- **So that** I can organize custom mixes.
+- **I want to** create, rename, and delete playlists with unique normalized names within my collection,
+- **So that** I can assemble and maintain custom audio mixes without altering my source audio files on disk.
+- **Verification**:
+  1. Open Playlists tab -> tap **+** or "+ New Playlist".
+  2. Create a playlist (e.g., "Road Trip"). Try creating a duplicate name ("road trip") -> confirm validation error prevents duplicate normalized names.
+  3. Rename playlist to "Road Trip 2026" -> confirm updated title across app.
+  4. Enter a blank name and a duplicate with different surrounding whitespace/case -> confirm the dialog preserves the entered value and explains the problem.
+  5. Tap Delete -> confirm warning dialog explains that playlist membership will be removed while source audio files on disk remain safe and untouched.
+  6. Confirm the list shows the playlist's unique track count and updates it after membership changes.
+  7. Relaunch the app -> confirm the playlist remains under the persisted active collection rather than disappearing into a literal/default collection.
 
 ### US5.2 — Reusable Add-to-Playlist Workflow
 - **As a** user,
-- **I want to** add single tracks, multi-selected tracks, or entire folders to playlists using one consistent selector,
-- **So that** playlist creation is fast and intuitive.
+- **I want to** add single tracks, multi-selected tracks, full albums, artist track lists, active queue tracks, or folder descendants using one reusable bottom sheet selector,
+- **So that** adding music to playlists is fast, intuitive, and consistent from every screen.
+- **Verification**:
+  1. From **Now Playing**, **mini-player**, or any single **Track Row**, tap "Add to Playlist..." -> confirm the selector opens with the correct track and collection.
+  2. From **Album Detail**, tap "Add Album to Playlist..." -> confirm all album tracks are targeted in deterministic disc/track/title order, including rows beyond the currently loaded Paging window.
+  3. From **Artist Detail**, tap "Add Artist Songs to Playlist..." -> confirm all artist tracks are targeted, not only visible/loaded rows.
+  4. From **Folder Browser**, select a folder -> confirm all indexed audio in nested descendants contributes once to the resolved target count. Add an overlapping child file/folder -> confirm it is not counted twice.
+  5. From **Queue Screen**, save a queue that contains the same media more than once -> confirm Resn8 explains that manual playlists keep one membership per track and preserves the first occurrence's order.
+  6. Inspect candidate playlists in `PlaylistSelectorSheet`: confirm playlists containing **all** selected tracks appear first with checked `[✓]` boxes, playlists containing **some** appear with `[-]` mixed boxes, and others appear with `[ ]` unchecked boxes.
+  7. Activate an unchecked row -> confirm all targets are added. Activate a mixed row -> confirm missing targets are added and it becomes checked. Activate a checked row -> confirm all target memberships are removed.
+  8. Toggle multiple playlists without dismissing the sheet and rotate/recreate the Activity -> confirm completed mutations are not repeated and the target collection/payload remains correct.
+  9. Create a playlist inline -> confirm success adds the full payload and checks the new row; confirm duplicate-name or database failure keeps the dialog open and reports the error.
+
+### US5.3 — Playlist Detail, Text Search & Reordering
+- **As a** user,
+- **I want to** view playlist items in manual order, filter items by text for inspection, reorder items, and remove items,
+- **So that** I can maintain my custom playlist order.
+- **Verification**:
+  1. Open a playlist with multiple tracks -> verify items are rendered in manual position order (`1`, `2`, `3`...).
+  2. Type text in the playlist search bar -> verify visible items filter instantly, retain their original manual row numbers, and do not mutate rank positions.
+  3. While filtered, confirm reorder actions are unavailable. Clear the filter, then use drag reorder and overflow options ("Move to Top", "Move Up", "Move Down", "Move to Bottom") -> verify both paths produce the same order.
+  4. Tap "Remove from Playlist" on a track -> verify track is removed from playlist while source file remains intact.
+  5. Restart after repeated reorders -> confirm the exact order persists without duplicate/missing rows or lost added timestamps.
+  6. Tap an available filtered result -> confirm playback starts the full available-only playlist in manual order at that track. Confirm **Play All** also means the full playlist, not only filtered rows.
+
+### US5.4 — Unavailable Membership & Queue Isolation
+- **As a** user whose removable storage may be temporarily absent,
+- **I want** playlist membership and active queues to survive availability changes and playlist edits,
+- **So that** organization and listening context are never silently destroyed.
+- **Verification**:
+  1. Add tracks from removable/test storage to a playlist, make that source unavailable, and reopen playlist detail -> confirm those rows remain in their manual positions and are labeled unavailable.
+  2. Confirm an unavailable row can be removed from the playlist but cannot be chosen as a playback start.
+  3. Start a playlist containing available and unavailable tracks -> confirm the saved queue contains the available snapshot, playback skips unavailable media with a visible explanation, and the playlist retains all memberships.
+  4. Start an available playlist, then reorder/remove tracks and delete the playlist -> confirm the already active explicit queue and its queue-item IDs remain unchanged.
+  5. Restore source availability/re-index -> confirm retained playlist rows become playable again without re-adding them.
 
 ---
 
-## 6. Smart Queue Generation (Milestone 7 — Upcoming)
+## 6. Smart Queue Generation (Milestone 7 — Prepared)
 
 ### US6.1 — Generate Smart Queues
 - **As a** user,
-- **I want to** generate smart queues (Random Eligible, Unplayed, Least Played, Most Played, Most Liked, Recent) from the currently visible scope,
+- **I want to** generate Random Eligible, Unplayed, Least Played, Most Played, Most Liked, Most Recently Played, and Least Recently Played queues from the currently visible scope,
 - **So that** I can rediscover hidden music in my library.
+- **Verification**:
+  1. Apply a collection/folder, artist, album, search, and filter combination -> open generation and confirm the preview describes that exact scope and eligible count.
+  2. Change the visible UI after opening the preview -> confirm the pending request uses the immutable reviewed snapshot rather than silently adopting later changes.
+  3. Generate each of the seven modes -> confirm the resulting Queue screen shows an explicit order and starts through the normal playback connection.
+  4. Confirm Least/Most Played group by play count and randomize only equal-count peers.
+  5. Confirm Most Recently Played puts played tracks newest-first with unplayed tracks randomized last; Least Recently Played puts unplayed tracks randomized first, followed by oldest-played groups.
+  6. Confirm generation does not block navigation or the main thread for a representative large library.
 
 ### US6.2 — Disliked File Exclusion
 - **As a** user,
 - **I want** disliked tracks (`likeScore < 0`) excluded from smart queues by default,
 - **So that** tracks I dislike aren't suggested automatically.
+- **Verification**:
+  1. Prepare scores `3, 3, 1, 0, 0, -1`, generate Most Liked, and confirm `[3s randomized] -> [1] -> [0s randomized]` with the negative item absent.
+  2. Generate every other mode -> confirm negative-score and unavailable tracks are absent by default and the preview states both exclusions.
+  3. Use a scope containing only disliked/unavailable tracks -> confirm a specific zero-eligible state appears and no empty queue replaces the active queue.
+
+### US6.3 — Reproducible Explicit Snapshots
+- **As a** user,
+- **I want** a generated queue to remain stable until I explicitly regenerate it,
+- **So that** ratings, re-indexing, or new files do not unexpectedly reorder what I am listening to.
+- **Verification**:
+  1. Generate twice from identical fixture data with the same injected seed -> confirm identical explicit media order and distinct queue-item identities per saved queue.
+  2. Generate with a different seed -> confirm eligible membership remains equal while at least one randomized peer group can differ.
+  3. After generation, change ratings/play counts, add a file, and re-index -> confirm the active saved queue order does not change.
+  4. Tap **Regenerate** -> confirm a new request/seed is reviewed and a new explicit queue replaces the active queue only after successful persistence.
+  5. Relaunch the app/database process -> confirm the saved mode, normalized filter snapshot, seed, and explicit order can be inspected unchanged; exact playback-position restoration remains Milestone 8.
+
+### US6.4 — Smart Queue Errors, Cancellation & Manual Save
+- **As a** user,
+- **I want** generation failures and edge cases to preserve my current listening context,
+- **So that** experimenting with smart modes is safe.
+- **Verification**:
+  1. Cancel generation during a large request -> confirm no partial queue becomes active.
+  2. Simulate query/persistence failure -> confirm the current queue remains active and a retryable error explains which phase failed.
+  3. Generate empty and single-item scopes -> confirm empty produces no replacement and a single item persists/plays normally.
+  4. From a generated queue, choose **Save as Playlist** -> confirm the Milestone 6 selector creates unique manual membership in visible queue order without turning the playlist into a dynamic rule.
 
 ---
 

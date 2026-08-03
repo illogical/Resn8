@@ -29,4 +29,14 @@ class AlbumDetailViewModel(
             sort = SortOrder.TRACK
         )
     ).cachedIn(viewModelScope)
+
+    suspend fun getAllAlbumMediaIds(): List<String> {
+        return mediaRepository.snapshotVisibleMediaIds(
+            LibraryQuery(
+                collectionId = collectionId,
+                album = albumKey,
+                sort = SortOrder.TRACK
+            )
+        )
+    }
 }

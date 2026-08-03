@@ -18,19 +18,22 @@ class StartQueueUseCase(
     private val uiSessionRepository: UiSessionRepository
 ) {
     suspend operator fun invoke(request: QueueStartRequest): Result<SavedQueue> {
-        val orderedMediaIds = when (request) {
+        val (orderedMediaIds, targetCollectionId) = when (request) {
             is QueueStartRequest.Library -> {
                 val availableOnlyQuery = request.query.copy(
                     filters = request.query.filters.copy(availability = AvailabilityFilter.AVAILABLE_ONLY)
                 )
-                mediaRepository.snapshotVisibleMediaIds(availableOnlyQuery)
+                val mediaIds = mediaRepository.snapshotVisibleMediaIds(availableOnlyQuery)
+                Pair(mediaIds, request.query.collectionId)
             }
             is QueueStartRequest.Playlist -> {
                 val items = playlistRepository.getPlaylistItems(request.playlistId)
                 val mediaIds = items.map { it.mediaId }
                 val mediaFiles = mediaRepository.getMediaFilesByIdsPreservingOrder(mediaIds)
                 val availableIds = mediaFiles.filter { it.isAvailable }.map { it.id }.toSet()
-                mediaIds.filter { availableIds.contains(it) }
+                val playlist = playlistRepository.getPlaylistById(request.playlistId)
+                val colId = playlist?.collectionId ?: "DEFAULT_COLLECTION"
+                Pair(mediaIds.filter { availableIds.contains(it) }, colId)
             }
         }
 
@@ -46,7 +49,7 @@ class StartQueueUseCase(
         val queueId = UUID.randomUUID().toString()
         val queueToSave = SavedQueue(
             id = queueId,
-            collectionId = "DEFAULT_COLLECTION",
+            collectionId = targetCollectionId,
             kind = SavedQueueKind.EXPLICIT,
             currentIndex = startingIndex,
             currentMediaId = request.startingMediaId,

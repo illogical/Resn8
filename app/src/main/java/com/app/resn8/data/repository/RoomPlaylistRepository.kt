@@ -7,11 +7,18 @@ import com.app.resn8.data.database.entity.PlaylistItemEntity
 import com.app.resn8.data.database.entity.toDomain
 import com.app.resn8.domain.model.Playlist
 import com.app.resn8.domain.model.PlaylistItem
+import com.app.resn8.domain.model.PlaylistMembershipState
+import com.app.resn8.domain.model.PlaylistWithMembership
 import com.app.resn8.domain.repository.PlaylistRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class RoomPlaylistRepository(
     private val db: Resn8Database
 ) : PlaylistRepository {
@@ -115,10 +122,15 @@ class RoomPlaylistRepository(
 
         db.withTransaction {
             val playlist = playlistDao.getPlaylistById(playlistId) ?: return@withTransaction
+            val existingItems = playlistDao.getPlaylistItems(playlistId)
+            val existingMediaIds = existingItems.map { it.mediaId }.toSet()
             val maxPos = playlistDao.getMaxPosition(playlistId) ?: 0L
             val now = System.currentTimeMillis()
 
-            val newEntities = mediaIds.mapIndexed { index, mediaId ->
+            val newMediaIds = mediaIds.filterNot { existingMediaIds.contains(it) }
+            if (newMediaIds.isEmpty()) return@withTransaction
+
+            val newEntities = newMediaIds.mapIndexed { index, mediaId ->
                 PlaylistItemEntity(
                     playlistId = playlistId,
                     mediaId = mediaId,
@@ -135,6 +147,16 @@ class RoomPlaylistRepository(
     override suspend fun removeItemFromPlaylist(playlistId: String, mediaId: String) {
         db.withTransaction {
             playlistDao.deletePlaylistItem(playlistId, mediaId)
+            playlistDao.getPlaylistById(playlistId)?.let { playlist ->
+                playlistDao.updatePlaylist(playlist.copy(updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
+
+    override suspend fun removeItemsFromPlaylist(playlistId: String, mediaIds: List<String>) {
+        if (mediaIds.isEmpty()) return
+        db.withTransaction {
+            playlistDao.deletePlaylistItems(playlistId, mediaIds)
             playlistDao.getPlaylistById(playlistId)?.let { playlist ->
                 playlistDao.updatePlaylist(playlist.copy(updatedAt = System.currentTimeMillis()))
             }
@@ -164,6 +186,43 @@ class RoomPlaylistRepository(
 
             playlistDao.getPlaylistById(playlistId)?.let { playlist ->
                 playlistDao.updatePlaylist(playlist.copy(updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
+
+    override fun getPlaylistsWithMembershipFlow(
+        collectionId: String,
+        mediaIds: List<String>
+    ): Flow<List<PlaylistWithMembership>> {
+        return playlistDao.getPlaylistsFlow(collectionId).flatMapLatest { playlists ->
+            if (playlists.isEmpty()) return@flatMapLatest flowOf(emptyList())
+            val targetMediaSet = mediaIds.toSet()
+            combine(playlists.map { playlist ->
+                playlistDao.getPlaylistItemsFlow(playlist.id).map { items ->
+                    val itemCount = items.size
+                    val matchingCount = if (targetMediaSet.isEmpty()) 0 else items.count { targetMediaSet.contains(it.mediaId) }
+                    val state = when {
+                        targetMediaSet.isEmpty() -> PlaylistMembershipState.NONE
+                        matchingCount == targetMediaSet.size -> PlaylistMembershipState.ALL
+                        matchingCount == 0 -> PlaylistMembershipState.NONE
+                        else -> PlaylistMembershipState.SOME
+                    }
+                    PlaylistWithMembership(
+                        playlist = playlist.toDomain(),
+                        membershipState = state,
+                        itemCount = itemCount
+                    )
+                }
+            }) { array ->
+                array.sortedWith(
+                    compareBy<PlaylistWithMembership> {
+                        when (it.membershipState) {
+                            PlaylistMembershipState.ALL -> 0
+                            PlaylistMembershipState.SOME -> 1
+                            PlaylistMembershipState.NONE -> 2
+                        }
+                    }.thenBy { it.playlist.name }
+                ).toList()
             }
         }
     }

@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
@@ -34,6 +36,7 @@ import com.app.resn8.ui.library.TrackListItemRow
 fun FoldersScreen(
     viewModel: FoldersViewModel,
     onTrackClick: (com.app.resn8.domain.model.MediaFile) -> Unit = {},
+    onAddToPlaylist: (List<String>, title: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val breadcrumbs by viewModel.breadcrumbs.collectAsState(initial = emptyList())
@@ -51,6 +54,7 @@ fun FoldersScreen(
         )
 
         if (selectedFileIds.isNotEmpty() || selectedFolderIds.isNotEmpty()) {
+            val resolvedIds = selectionResolution?.uniqueMediaIds ?: emptyList()
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -60,12 +64,30 @@ fun FoldersScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(12.dp)
                 ) {
-                    Text(
-                        text = "Selected: ${selectedFileIds.size} files, ${selectedFolderIds.size} folders" +
-                            (selectionResolution?.let { " (${it.uniqueMediaIds.size} unique media)" } ?: ""),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Selected: ${selectedFileIds.size} files, ${selectedFolderIds.size} folders",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "${resolvedIds.size} unique audio tracks",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            if (resolvedIds.isNotEmpty()) {
+                                onAddToPlaylist(resolvedIds, "Add ${resolvedIds.size} selected tracks")
+                            }
+                        },
+                        enabled = resolvedIds.isNotEmpty()
+                    ) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add to Playlist")
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                     TextButton(onClick = { viewModel.clearSelection() }) {
                         Text("Clear")
                     }
@@ -126,7 +148,10 @@ fun FoldersScreen(
                             mediaFile = mediaFile,
                             isSelected = selectedFileIds.contains(mediaFile.id),
                             onSelectToggle = { viewModel.toggleFileSelection(mediaFile.id) },
-                            onClick = { onTrackClick(mediaFile) }
+                            onClick = { onTrackClick(mediaFile) },
+                            onAddToPlaylist = {
+                                onAddToPlaylist(listOf(mediaFile.id), "Add '${mediaFile.displayTitle}' to Playlist")
+                            }
                         )
                     }
                 }

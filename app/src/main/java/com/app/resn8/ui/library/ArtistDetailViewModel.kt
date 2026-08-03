@@ -58,4 +58,14 @@ class ArtistDetailViewModel(
     fun setSortOrder(sortOrder: SortOrder) {
         _sort.value = sortOrder
     }
+
+    suspend fun getAllArtistMediaIds(): List<String> {
+        return mediaRepository.snapshotVisibleMediaIds(
+            LibraryQuery(
+                collectionId = collectionId,
+                artist = artistKey,
+                sort = SortOrder.TRACK
+            )
+        )
+    }
 }
