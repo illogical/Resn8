@@ -58,6 +58,7 @@ class DatabaseSchemaTest {
 
         db.collectionDao().insertRootSource(src1)
         db.collectionDao().insertRootSource(src2) // Throws unique constraint exception
+        Unit
     }
 
     @Test(expected = Exception::class)
@@ -70,6 +71,7 @@ class DatabaseSchemaTest {
 
         db.playlistDao().insertPlaylist(p1)
         db.playlistDao().insertPlaylist(p2) // Throws constraint exception
+        Unit
     }
 
     @Test(expected = Exception::class)
@@ -97,5 +99,6 @@ class DatabaseSchemaTest {
 
         db.playbackHistoryDao().insertHistory(h1)
         db.playbackHistoryDao().insertHistory(h2) // Throws constraint exception
+        Unit
     }
 }

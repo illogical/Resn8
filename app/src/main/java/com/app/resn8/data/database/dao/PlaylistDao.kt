@@ -15,41 +15,41 @@ interface PlaylistDao {
     fun getPlaylistsFlow(collectionId: String): Flow<List<PlaylistEntity>>
 
     @Query("SELECT * FROM playlists WHERE id = :id LIMIT 1")
-    fun getPlaylistById(id: String): PlaylistEntity?
+    suspend fun getPlaylistById(id: String): PlaylistEntity?
 
     @Query("SELECT * FROM playlists WHERE collectionId = :collectionId AND normalizedName = :normalizedName LIMIT 1")
-    fun getPlaylistByNormalizedName(collectionId: String, normalizedName: String): PlaylistEntity?
+    suspend fun getPlaylistByNormalizedName(collectionId: String, normalizedName: String): PlaylistEntity?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun insertPlaylist(playlist: PlaylistEntity)
+    suspend fun insertPlaylist(playlist: PlaylistEntity): Long
 
     @Update
-    fun updatePlaylist(playlist: PlaylistEntity)
+    suspend fun updatePlaylist(playlist: PlaylistEntity)
 
     @Query("DELETE FROM playlists WHERE id = :id")
-    fun deletePlaylist(id: String)
+    suspend fun deletePlaylist(id: String)
 
     @Query("SELECT * FROM playlist_items WHERE playlistId = :playlistId ORDER BY position ASC")
     fun getPlaylistItemsFlow(playlistId: String): Flow<List<PlaylistItemEntity>>
 
     @Query("SELECT * FROM playlist_items WHERE playlistId = :playlistId ORDER BY position ASC")
-    fun getPlaylistItems(playlistId: String): List<PlaylistItemEntity>
+    suspend fun getPlaylistItems(playlistId: String): List<PlaylistItemEntity>
 
     @Query("SELECT MAX(position) FROM playlist_items WHERE playlistId = :playlistId")
-    fun getMaxPosition(playlistId: String): Long?
+    suspend fun getMaxPosition(playlistId: String): Long?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    fun insertPlaylistItems(items: List<PlaylistItemEntity>)
+    suspend fun insertPlaylistItems(items: List<PlaylistItemEntity>)
 
     @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId AND mediaId = :mediaId")
-    fun deletePlaylistItem(playlistId: String, mediaId: String)
+    suspend fun deletePlaylistItem(playlistId: String, mediaId: String)
 
     @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId AND mediaId IN (:mediaIds)")
-    fun deletePlaylistItems(playlistId: String, mediaIds: List<String>)
+    suspend fun deletePlaylistItems(playlistId: String, mediaIds: List<String>)
 
     @Query("UPDATE playlist_items SET position = :newPosition WHERE playlistId = :playlistId AND mediaId = :mediaId")
-    fun updatePlaylistItemPosition(playlistId: String, mediaId: String, newPosition: Long)
+    suspend fun updatePlaylistItemPosition(playlistId: String, mediaId: String, newPosition: Long)
 
     @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId")
-    fun deleteAllPlaylistItems(playlistId: String)
+    suspend fun deleteAllPlaylistItems(playlistId: String)
 }

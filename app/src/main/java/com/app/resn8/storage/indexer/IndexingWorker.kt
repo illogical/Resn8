@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
 import android.net.Uri
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -25,8 +26,13 @@ class IndexingWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result = coroutineScope {
-        val sourceId = inputData.getString(KEY_SOURCE_ID) ?: return@coroutineScope Result.failure()
-        val treeUri = inputData.getString(KEY_TREE_URI)?.let(Uri::parse) ?: return@coroutineScope Result.failure()
+        var phase = "PREPARE"
+        val sourceId = inputData.getString(KEY_SOURCE_ID) ?: return@coroutineScope Result.failure(
+            workDataOf(KEY_ERROR_PHASE to phase, KEY_ERROR_CATEGORY to "MissingInput")
+        )
+        val treeUri = inputData.getString(KEY_TREE_URI)?.let(Uri::parse) ?: return@coroutineScope Result.failure(
+            workDataOf(KEY_ERROR_PHASE to phase, KEY_ERROR_CATEGORY to "MissingInput")
+        )
         setForeground(createForegroundInfo("Preparing music index"))
 
         val container = (applicationContext as Resn8Application).container
@@ -35,6 +41,7 @@ class IndexingWorker(
             mediaRepository = container.mediaRepository,
             collectionRepository = container.collectionRepository
         )
+        phase = "PROGRESS_OBSERVE"
         val progressJob = launch {
             orchestrator.scanProgress.filterNotNull().collect { progress ->
                 setProgress(
@@ -58,6 +65,7 @@ class IndexingWorker(
             }
         }
         try {
+            phase = "SCAN_EXECUTE"
             val result = orchestrator.executeScan(sourceId, treeUri)
             Result.success(
                 workDataOf(
@@ -65,9 +73,10 @@ class IndexingWorker(
                     KEY_DURATION_MS to result.durationMs
                 )
             )
-        } catch (_: Exception) {
-            if (isStopped) Result.failure(workDataOf(KEY_ERROR_CATEGORY to "CANCELLED"))
-            else Result.failure(workDataOf(KEY_ERROR_CATEGORY to "INDEXING_FAILED"))
+        } catch (e: Exception) {
+            val category = if (isStopped) "CANCELLED" else (e::class.simpleName ?: "IndexingFailure")
+            Log.e(LOG_TAG, "indexing_failed workId=$id phase=$phase category=$category")
+            Result.failure(workDataOf(KEY_ERROR_PHASE to phase, KEY_ERROR_CATEGORY to category))
         } finally {
             progressJob.cancel()
         }
@@ -110,8 +119,10 @@ class IndexingWorker(
         const val KEY_ARTWORK = "artwork"
         const val KEY_DURATION_MS = "duration_ms"
         const val KEY_ERROR_CATEGORY = "error_category"
+        const val KEY_ERROR_PHASE = "error_phase"
         private const val CHANNEL_ID = "resn8_indexing"
         private const val NOTIFICATION_ID = 17107
+        private const val LOG_TAG = "Resn8IndexingWorker"
 
         fun uniqueWorkName(sourceId: String) = "index-source-$sourceId"
 

@@ -15,7 +15,7 @@ interface SavedQueueDao {
     fun getActiveQueueFlow(): Flow<SavedQueueEntity?>
 
     @Query("SELECT * FROM saved_queues WHERE id = :id LIMIT 1")
-    fun getSavedQueueById(id: String): SavedQueueEntity?
+    suspend fun getSavedQueueById(id: String): SavedQueueEntity?
 
     @Query("SELECT * FROM saved_queues WHERE id = :id LIMIT 1")
     fun getSavedQueueByIdFlow(id: String): Flow<SavedQueueEntity?>
@@ -24,19 +24,19 @@ interface SavedQueueDao {
     fun getSavedQueueItemsFlow(queueId: String): Flow<List<SavedQueueItemEntity>>
 
     @Query("SELECT * FROM saved_queue_items WHERE queueId = :queueId ORDER BY itemIndex ASC")
-    fun getSavedQueueItems(queueId: String): List<SavedQueueItemEntity>
+    suspend fun getSavedQueueItems(queueId: String): List<SavedQueueItemEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun upsertSavedQueue(queue: SavedQueueEntity)
+    suspend fun upsertSavedQueue(queue: SavedQueueEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertSavedQueueItems(items: List<SavedQueueItemEntity>)
+    suspend fun insertSavedQueueItems(items: List<SavedQueueItemEntity>)
 
     @Query("DELETE FROM saved_queue_items WHERE queueId = :queueId")
-    fun deleteSavedQueueItems(queueId: String)
+    suspend fun deleteSavedQueueItems(queueId: String)
 
     @Query("UPDATE saved_queues SET currentIndex = :currentIndex, positionMs = :positionMs, updatedAt = :updatedAt WHERE id = :queueId")
-    fun updatePosition(queueId: String, currentIndex: Int, positionMs: Long, updatedAt: Long)
+    suspend fun updatePosition(queueId: String, currentIndex: Int, positionMs: Long, updatedAt: Long)
 
     @Query(
         """
@@ -52,7 +52,7 @@ interface SavedQueueDao {
         WHERE id = :queueId
         """
     )
-    fun updateCheckpoint(
+    suspend fun updateCheckpoint(
         queueId: String,
         currentIndex: Int,
         currentMediaId: String?,

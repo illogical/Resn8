@@ -37,6 +37,7 @@ class ScanOrchestrator(
     suspend fun executeScan(sourceId: String, treeUri: Uri): ScanResult = withContext(Dispatchers.IO) {
         val startedAt = System.currentTimeMillis()
         val monotonicStart = SystemClock.elapsedRealtime()
+        var phase = "INIT"
         val scanId = mediaRepository.startScanRun(sourceId)
         collectionRepository.updateRootScanState(sourceId, "IN_PROGRESS", startedAt, null, null)
         Log.i(LOG_TAG, "scan_started scanId=$scanId sourceId=$sourceId")
@@ -50,6 +51,7 @@ class ScanOrchestrator(
         var lastLoggedAt = monotonicStart
 
         try {
+            phase = "TRAVERSAL"
             scanner.scanTree(
                 treeUri = treeUri,
                 onFolderBatch = { folderBatch ->
@@ -146,6 +148,7 @@ class ScanOrchestrator(
                 metadataFailureCount = metadataFailureCount,
                 artworkCandidateCount = traversal.artworkCandidates
             )
+            phase = "PUBLICATION"
             val result = mediaRepository.publishStagedScan(scanId, sourceId, preliminary)
             runCatching { artworkCandidateIndex.publish(sourceId) }
                 .onFailure { Log.w(LOG_TAG, "artwork_candidate_index_failed scanId=$scanId sourceId=$sourceId") }
@@ -168,11 +171,12 @@ class ScanOrchestrator(
             Log.i(LOG_TAG, "scan_cancelled scanId=$scanId sourceId=$sourceId elapsedMs=${SystemClock.elapsedRealtime() - monotonicStart}")
             throw cancelled
         } catch (error: Exception) {
+            phase = "CLEANUP"
             val category = error::class.simpleName ?: "ScanFailure"
             mediaRepository.failScanRun(scanId, category)
             if (error is SecurityException) collectionRepository.updateRootSourceAvailability(sourceId, false)
             collectionRepository.updateRootScanState(sourceId, "FAILED", startedAt, System.currentTimeMillis(), null)
-            Log.e(LOG_TAG, "scan_failed scanId=$scanId sourceId=$sourceId category=$category elapsedMs=${SystemClock.elapsedRealtime() - monotonicStart}")
+            Log.e(LOG_TAG, "scan_failed scanId=$scanId sourceId=$sourceId phase=$phase category=$category elapsedMs=${SystemClock.elapsedRealtime() - monotonicStart}")
             throw error
         }
     }

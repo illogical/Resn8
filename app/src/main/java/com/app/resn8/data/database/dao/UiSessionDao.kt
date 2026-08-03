@@ -13,8 +13,8 @@ interface UiSessionDao {
     fun getUiSessionStateFlow(): Flow<UiSessionStateEntity?>
 
     @Query("SELECT * FROM ui_session_state WHERE id = 1 LIMIT 1")
-    fun getUiSessionState(): UiSessionStateEntity?
+    suspend fun getUiSessionState(): UiSessionStateEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun upsertUiSessionState(state: UiSessionStateEntity)
+    suspend fun upsertUiSessionState(state: UiSessionStateEntity)
 }

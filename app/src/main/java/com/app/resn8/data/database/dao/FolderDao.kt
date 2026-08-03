@@ -72,27 +72,27 @@ interface FolderDao {
         ORDER BY mf.id ASC
         """
     )
-    fun resolveSelectionMediaIds(
+    suspend fun resolveSelectionMediaIds(
         fileIds: List<String>,
         folderIds: List<String>,
         availabilityFilter: String
     ): List<String>
 
     @Query("SELECT COUNT(*) FROM media_files WHERE id IN (:mediaIds) AND isAvailable = 1")
-    fun countAvailableMediaIds(mediaIds: List<String>): Int
+    suspend fun countAvailableMediaIds(mediaIds: List<String>): Int
 
     @Query("SELECT * FROM folder_nodes WHERE sourceId = :sourceId ORDER BY relativePath ASC")
     fun getFolderNodesFlow(sourceId: String): Flow<List<FolderNodeEntity>>
 
     @Query("SELECT * FROM folder_nodes WHERE id = :id LIMIT 1")
-    fun getFolderNodeById(id: String): FolderNodeEntity?
+    suspend fun getFolderNodeById(id: String): FolderNodeEntity?
 
     @Query("SELECT * FROM folder_nodes WHERE sourceId = :sourceId AND relativePath = :relativePath LIMIT 1")
-    fun getFolderNodeByPath(sourceId: String, relativePath: String): FolderNodeEntity?
+    suspend fun getFolderNodeByPath(sourceId: String, relativePath: String): FolderNodeEntity?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun insertFolderNode(folder: FolderNodeEntity)
+    suspend fun insertFolderNode(folder: FolderNodeEntity): Long
 
     @Update
-    fun updateFolderNode(folder: FolderNodeEntity)
+    suspend fun updateFolderNode(folder: FolderNodeEntity)
 }

@@ -86,8 +86,7 @@ abstract class Resn8Database : RoomDatabase() {
             return Room.inMemoryDatabaseBuilder(
                 context.applicationContext,
                 Resn8Database::class.java
-            ).allowMainThreadQueries()
-                .build()
+            ).build()
         }
     }
 }

@@ -9,7 +9,7 @@ activityCompose = "1.8.0"
 kotlin = "2.2.10"
 composeBom = "2026.02.01"
 media3 = "1.5.1"
-room = "2.6.1"
+room = "2.8.4"
 ksp = "2.2.10-2.0.2"
 navigationCompose = "2.8.7"
 kotlinxSerialization = "1.7.3"
@@ -72,4 +72,3 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-

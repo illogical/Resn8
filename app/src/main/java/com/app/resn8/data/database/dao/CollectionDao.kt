@@ -14,25 +14,25 @@ interface CollectionDao {
     fun getCollectionsFlow(): Flow<List<CollectionEntity>>
 
     @Query("SELECT * FROM collections WHERE id = :id LIMIT 1")
-    fun getCollectionById(id: String): CollectionEntity?
+    suspend fun getCollectionById(id: String): CollectionEntity?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun insertCollection(collection: CollectionEntity)
+    suspend fun insertCollection(collection: CollectionEntity): Long
 
     @Query("SELECT * FROM root_sources WHERE collectionId = :collectionId")
     fun getRootSourcesFlow(collectionId: String): Flow<List<RootSourceEntity>>
 
     @Query("SELECT * FROM root_sources WHERE id = :id LIMIT 1")
-    fun getRootSourceById(id: String): RootSourceEntity?
+    suspend fun getRootSourceById(id: String): RootSourceEntity?
 
     @Query("SELECT * FROM root_sources WHERE treeUri = :treeUri LIMIT 1")
-    fun getRootSourceByTreeUri(treeUri: String): RootSourceEntity?
+    suspend fun getRootSourceByTreeUri(treeUri: String): RootSourceEntity?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun insertRootSource(rootSource: RootSourceEntity)
+    suspend fun insertRootSource(rootSource: RootSourceEntity): Long
 
     @Query("UPDATE root_sources SET isAvailable = :isAvailable WHERE id = :sourceId")
-    fun updateRootSourceAvailability(sourceId: String, isAvailable: Boolean)
+    suspend fun updateRootSourceAvailability(sourceId: String, isAvailable: Boolean)
 
     @Query(
         """
@@ -45,7 +45,7 @@ interface CollectionDao {
         WHERE id = :sourceId
         """
     )
-    fun updateRootScanState(
+    suspend fun updateRootScanState(
         sourceId: String,
         status: String,
         startedAt: Long?,

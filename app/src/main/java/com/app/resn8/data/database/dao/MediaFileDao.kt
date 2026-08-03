@@ -30,22 +30,22 @@ data class AlbumSummaryRow(
 @Dao
 interface MediaFileDao {
     @Query("SELECT * FROM media_files WHERE sourceId = :sourceId")
-    fun getMediaFilesBySourceId(sourceId: String): List<MediaFileEntity>
+    suspend fun getMediaFilesBySourceId(sourceId: String): List<MediaFileEntity>
 
     @Query("SELECT * FROM media_files WHERE id = :id LIMIT 1")
-    fun getMediaFileById(id: String): MediaFileEntity?
+    suspend fun getMediaFileById(id: String): MediaFileEntity?
 
     @Query("SELECT * FROM media_files WHERE id IN (:ids)")
-    fun getMediaFilesByIds(ids: List<String>): List<MediaFileEntity>
+    suspend fun getMediaFilesByIds(ids: List<String>): List<MediaFileEntity>
 
     @Query("SELECT * FROM media_files WHERE sourceId = :sourceId AND relativePath = :relativePath LIMIT 1")
-    fun getMediaFileByPath(sourceId: String, relativePath: String): MediaFileEntity?
+    suspend fun getMediaFileByPath(sourceId: String, relativePath: String): MediaFileEntity?
 
     @Query("SELECT * FROM media_files WHERE sourceId = :sourceId AND documentUri = :documentUri LIMIT 1")
-    fun getMediaFileByUri(sourceId: String, documentUri: String): MediaFileEntity?
+    suspend fun getMediaFileByUri(sourceId: String, documentUri: String): MediaFileEntity?
 
     @Query("SELECT * FROM media_files WHERE sourceId = :sourceId AND documentId = :documentId LIMIT 1")
-    fun getMediaFileByDocumentId(sourceId: String, documentId: String): MediaFileEntity?
+    suspend fun getMediaFileByDocumentId(sourceId: String, documentId: String): MediaFileEntity?
 
     @Query(
         """
@@ -54,7 +54,7 @@ interface MediaFileDao {
         LIMIT 2
         """
     )
-    fun getMediaByCompleteSignature(
+    suspend fun getMediaByCompleteSignature(
         sourceId: String,
         size: Long,
         modifiedTimeMs: Long,
@@ -311,7 +311,7 @@ interface MediaFileDao {
           mf.id ASC
         """
     )
-    fun snapshotVisibleMediaIds(
+    suspend fun snapshotVisibleMediaIds(
         collectionId: String,
         sourceId: String?,
         folderId: String?,
@@ -356,25 +356,25 @@ interface MediaFileDao {
     ): Flow<List<MediaFileEntity>>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun insertMediaFile(file: MediaFileEntity)
+    suspend fun insertMediaFile(file: MediaFileEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun insertMediaFiles(files: List<MediaFileEntity>)
+    suspend fun insertMediaFiles(files: List<MediaFileEntity>)
 
     @Update
-    fun updateMediaFile(file: MediaFileEntity)
+    suspend fun updateMediaFile(file: MediaFileEntity)
 
     @Query("UPDATE media_files SET likeScore = likeScore + :delta WHERE id = :mediaId")
-    fun updateLikeScore(mediaId: String, delta: Int)
+    suspend fun updateLikeScore(mediaId: String, delta: Int)
 
     @Query("UPDATE media_files SET playCount = playCount + 1, lastPlayedAt = :now WHERE id = :mediaId")
-    fun incrementPlayCount(mediaId: String, now: Long)
+    suspend fun incrementPlayCount(mediaId: String, now: Long)
 
     @Query("UPDATE media_files SET isAvailable = :isAvailable WHERE id = :mediaId")
-    fun updateAvailability(mediaId: String, isAvailable: Boolean)
+    suspend fun updateAvailability(mediaId: String, isAvailable: Boolean)
 
     @Query("UPDATE media_files SET isAvailable = :isAvailable WHERE id IN (:mediaIds)")
-    fun updateAvailabilityForIds(mediaIds: List<String>, isAvailable: Boolean)
+    suspend fun updateAvailabilityForIds(mediaIds: List<String>, isAvailable: Boolean)
 
     @Query(
         """
@@ -386,7 +386,7 @@ interface MediaFileDao {
           )
         """
     )
-    fun countMissingFromStagedScan(sourceId: String, scanId: String): Int
+    suspend fun countMissingFromStagedScan(sourceId: String, scanId: String): Int
 
     @Query(
         """
@@ -398,5 +398,5 @@ interface MediaFileDao {
           )
         """
     )
-    fun markMissingFromStagedScanUnavailable(sourceId: String, scanId: String)
+    suspend fun markMissingFromStagedScanUnavailable(sourceId: String, scanId: String)
 }

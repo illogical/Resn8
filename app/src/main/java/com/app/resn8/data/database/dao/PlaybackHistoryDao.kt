@@ -10,14 +10,14 @@ import com.app.resn8.data.database.entity.PlaybackHistoryEntity
 @Dao
 interface PlaybackHistoryDao {
     @Query("SELECT * FROM playback_history WHERE sessionOccurrenceId = :sessionOccurrenceId LIMIT 1")
-    fun getHistoryByOccurrenceId(sessionOccurrenceId: String): PlaybackHistoryEntity?
+    suspend fun getHistoryByOccurrenceId(sessionOccurrenceId: String): PlaybackHistoryEntity?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun insertHistory(history: PlaybackHistoryEntity)
+    suspend fun insertHistory(history: PlaybackHistoryEntity): Long
 
     @Update
-    fun updateHistory(history: PlaybackHistoryEntity)
+    suspend fun updateHistory(history: PlaybackHistoryEntity)
 
     @Query("SELECT * FROM playback_history WHERE mediaId = :mediaId ORDER BY startedAt DESC")
-    fun getHistoryForMedia(mediaId: String): List<PlaybackHistoryEntity>
+    suspend fun getHistoryForMedia(mediaId: String): List<PlaybackHistoryEntity>
 }

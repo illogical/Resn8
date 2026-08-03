@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -66,14 +67,18 @@ class OnboardingViewModel(
 
     fun startIndexing(treeUriStr: String, collectionName: String) {
         viewModelScope.launch {
+            var phase = "CREATE_COLLECTION"
             try {
                 val collection = appContainer.collectionRepository.createCollection(collectionName)
+                phase = "ADD_ROOT_SOURCE"
                 val root = appContainer.collectionRepository.addRootSource(collection.id, treeUriStr, collectionName)
                 activeSourceId = root.id
+                phase = "ENQUEUE_WORK"
                 _uiState.value = IndexingUiState.Scanning(null)
                 observeWork(root.id)
                 IndexingWorker.enqueue(context, root.id, treeUriStr)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "onboarding_setup_failed phase=$phase category=${e::class.simpleName}")
                 _uiState.value = IndexingUiState.ScanError("Unable to start indexing")
             }
         }
@@ -115,7 +120,13 @@ class OnboardingViewModel(
                     }
                     WorkInfo.State.SUCCEEDED -> refreshCompletedRoot(sourceId)
                     WorkInfo.State.CANCELLED -> _uiState.value = IndexingUiState.ScanError("Indexing was cancelled. Your previous library was not changed.")
-                    WorkInfo.State.FAILED -> _uiState.value = IndexingUiState.ScanError("Indexing failed. Your previous library was not changed.")
+                    WorkInfo.State.FAILED -> {
+                        val errorPhase = info.outputData.getString(IndexingWorker.KEY_ERROR_PHASE)
+                        val errorCategory = info.outputData.getString(IndexingWorker.KEY_ERROR_CATEGORY)
+                        val detail = if (errorPhase != null) " (phase=$errorPhase category=$errorCategory)" else ""
+                        Log.e(LOG_TAG, "worker_failed sourceId=$sourceId$detail")
+                        _uiState.value = IndexingUiState.ScanError("Indexing failed. Your previous library was not changed.")
+                    }
                 }
             }
         }
@@ -152,5 +163,9 @@ class OnboardingViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             OnboardingViewModel(context, appContainer) as T
+    }
+
+    companion object {
+        private const val LOG_TAG = "Resn8Onboarding"
     }
 }
