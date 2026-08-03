@@ -1,6 +1,7 @@
 package com.app.resn8.data.database.dao
 
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -9,10 +10,42 @@ import com.app.resn8.data.database.entity.PlaylistEntity
 import com.app.resn8.data.database.entity.PlaylistItemEntity
 import kotlinx.coroutines.flow.Flow
 
+data class PlaylistWithItemCountEntity(
+    @Embedded val playlist: PlaylistEntity,
+    val itemCount: Int
+)
+
+data class PlaylistMembershipSummaryEntity(
+    val playlistId: String,
+    val totalCount: Int,
+    val matchingCount: Int
+)
+
 @Dao
 interface PlaylistDao {
     @Query("SELECT * FROM playlists WHERE collectionId = :collectionId ORDER BY name ASC")
     fun getPlaylistsFlow(collectionId: String): Flow<List<PlaylistEntity>>
+
+    @Query("""
+        SELECT p.*, COUNT(pi.mediaId) AS itemCount
+        FROM playlists p
+        LEFT JOIN playlist_items pi ON p.id = pi.playlistId
+        WHERE p.collectionId = :collectionId
+        GROUP BY p.id
+        ORDER BY p.name ASC
+    """)
+    fun getPlaylistsWithItemCountFlow(collectionId: String): Flow<List<PlaylistWithItemCountEntity>>
+
+    @Query("""
+        SELECT p.id AS playlistId,
+               COUNT(DISTINCT pi.mediaId) AS totalCount,
+               COUNT(DISTINCT CASE WHEN pi.mediaId IN (:mediaIds) THEN pi.mediaId END) AS matchingCount
+        FROM playlists p
+        LEFT JOIN playlist_items pi ON p.id = pi.playlistId
+        WHERE p.collectionId = :collectionId
+        GROUP BY p.id
+    """)
+    fun getPlaylistMembershipSummariesFlow(collectionId: String, mediaIds: List<String>): Flow<List<PlaylistMembershipSummaryEntity>>
 
     @Query("SELECT * FROM playlists WHERE id = :id LIMIT 1")
     suspend fun getPlaylistById(id: String): PlaylistEntity?
@@ -53,3 +86,4 @@ interface PlaylistDao {
     @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId")
     suspend fun deleteAllPlaylistItems(playlistId: String)
 }
+

@@ -109,7 +109,7 @@ Implementation is organized into dependency-ordered milestones:
 4. [x] **Milestone 3**: library and folder browsing
 5. [x] **Milestone 4**: reliable background playback
 6. [x] **Milestone 5**: ratings and meaningful-play tracking
-7. [ ] **Milestone 6**: manual playlists
+7. [x] **Milestone 6**: manual playlists
 8. [ ] **Milestone 7**: smart randomized queues
 9. [ ] **Milestone 8**: full queue and browsing-context restoration
 

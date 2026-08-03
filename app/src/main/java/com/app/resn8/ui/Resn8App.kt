@@ -18,6 +18,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -56,7 +59,9 @@ fun Resn8App(
     val currentDestination = navBackStackEntry?.destination
 
     val playbackConnection = container.playbackConnection
-    val playbackUiState by (playbackConnection?.uiState ?: androidx.compose.runtime.remember { kotlinx.coroutines.flow.MutableStateFlow(com.app.resn8.playback.PlaybackUiState()) }).collectAsState()
+    val playbackUiState by (playbackConnection?.uiState ?: remember { kotlinx.coroutines.flow.MutableStateFlow(com.app.resn8.playback.PlaybackUiState()) }).collectAsState()
+
+    var openSelectorHandler by remember { mutableStateOf<((List<String>, String, String?) -> Unit)?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -82,6 +87,12 @@ fun Resn8App(
                     },
                     onNextClick = {
                         playbackConnection?.skipToNext()
+                    },
+                    onAddToPlaylistClick = {
+                        val currentMediaId = playbackUiState.queueItems.find { it.queueItemId == playbackUiState.currentQueueItemId }?.mediaId
+                        if (currentMediaId != null) {
+                            openSelectorHandler?.invoke(listOf(currentMediaId), "Add Currently Playing Track", null)
+                        }
                     }
                 )
                 NavigationBar {
@@ -110,6 +121,7 @@ fun Resn8App(
             container = container,
             navController = navController,
             startDestination = OnboardingRoute,
+            onRegisterOpenSelector = { handler -> openSelectorHandler = handler },
             modifier = Modifier.padding(innerPadding)
         )
     }

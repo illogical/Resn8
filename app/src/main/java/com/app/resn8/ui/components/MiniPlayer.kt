@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -37,6 +38,7 @@ fun MiniPlayer(
     onMiniPlayerClick: () -> Unit = {},
     onPlayPauseClick: () -> Unit = {},
     onNextClick: () -> Unit = {},
+    onAddToPlaylistClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (title.isBlank()) return
@@ -90,6 +92,15 @@ fun MiniPlayer(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onAddToPlaylistClick != null) {
+                    IconButton(onClick = onAddToPlaylistClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                            contentDescription = "Add to Playlist"
+                        )
+                    }
+                }
+
                 IconButton(onClick = onPlayPauseClick, enabled = canPlayPause) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,

@@ -3,6 +3,7 @@ package com.app.resn8.ui.playlists
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.resn8.domain.model.Playlist
+import com.app.resn8.domain.model.PlaylistWithItemCount
 import com.app.resn8.domain.repository.PlaylistRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +15,8 @@ class PlaylistsViewModel(
     private val playlistRepository: PlaylistRepository
 ) : ViewModel() {
 
-    val playlists: StateFlow<List<Playlist>> = playlistRepository.getPlaylistsFlow(collectionId)
+    val playlists: StateFlow<List<PlaylistWithItemCount>> = playlistRepository
+        .getPlaylistsWithItemCountFlow(collectionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     suspend fun createPlaylist(name: String): Result<Playlist> {

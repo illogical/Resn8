@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
@@ -33,7 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -54,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.ui.components.RenamePlaylistDialog
 import com.app.resn8.ui.playlists.PlaylistDetailViewModel
+import com.app.resn8.ui.playlists.PlaylistItemUiModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -167,16 +166,25 @@ fun PlaylistDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "${filteredTracks.size} ${if (filteredTracks.size == 1) "track" else "tracks"}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column {
+                    Text(
+                        text = "${filteredTracks.size} ${if (filteredTracks.size == 1) "track" else "tracks"}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (searchQuery.isNotEmpty()) {
+                        Text(
+                            text = "Filtering hides reorder controls",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                }
 
                 Row {
                     Button(
                         onClick = onPlayAll,
-                        enabled = filteredTracks.isNotEmpty()
+                        enabled = filteredTracks.any { it.mediaFile.isAvailable }
                     ) {
                         Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
@@ -201,19 +209,23 @@ fun PlaylistDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    itemsIndexed(filteredTracks, key = { _, item -> item.id }) { index, mediaFile ->
+                    itemsIndexed(filteredTracks, key = { _, item -> item.mediaFile.id }) { index, item ->
                         PlaylistItemRow(
-                            index = index + 1,
-                            mediaFile = mediaFile,
+                            index = item.originalIndex,
+                            mediaFile = item.mediaFile,
                             isFirst = index == 0,
                             isLast = index == filteredTracks.size - 1,
                             isSearchActive = searchQuery.isNotEmpty(),
-                            onTrackClick = { onTrackClick(mediaFile) },
-                            onMoveToTop = { viewModel.moveTrackToTop(mediaFile.id) },
-                            onMoveUp = { viewModel.moveTrackUp(mediaFile.id) },
-                            onMoveDown = { viewModel.moveTrackDown(mediaFile.id) },
-                            onMoveToBottom = { viewModel.moveTrackToBottom(mediaFile.id) },
-                            onRemove = { viewModel.removeTrack(mediaFile.id) }
+                            onTrackClick = {
+                                if (item.mediaFile.isAvailable) {
+                                    onTrackClick(item.mediaFile)
+                                }
+                            },
+                            onMoveToTop = { viewModel.moveTrackToTop(item.mediaFile.id) },
+                            onMoveUp = { viewModel.moveTrackUp(item.mediaFile.id) },
+                            onMoveDown = { viewModel.moveTrackDown(item.mediaFile.id) },
+                            onMoveToBottom = { viewModel.moveTrackToBottom(item.mediaFile.id) },
+                            onRemove = { viewModel.removeTrack(item.mediaFile.id) }
                         )
                     }
                 }
@@ -243,7 +255,7 @@ fun PlaylistDetailScreen(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Playlist") },
-            text = { Text("Are you sure you want to delete '${playlist!!.name}'?") },
+            text = { Text("Are you sure you want to delete '${playlist!!.name}'? Audio files on disk will NOT be deleted.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -283,7 +295,7 @@ private fun PlaylistItemRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onTrackClick)
+            .clickable(enabled = mediaFile.isAvailable, onClick = onTrackClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -291,23 +303,34 @@ private fun PlaylistItemRow(
             text = "$index",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline,
             modifier = Modifier.width(28.dp)
         )
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = mediaFile.displayTitle,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = mediaFile.displayTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                )
+                if (!mediaFile.isAvailable) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "(Unavailable)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
             val subtitle = listOfNotNull(mediaFile.artist, mediaFile.album).joinToString(" • ")
             if (subtitle.isNotEmpty()) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

@@ -7,6 +7,7 @@ import com.app.resn8.data.repository.RoomMediaRepository
 import com.app.resn8.data.repository.RoomPlaylistRepository
 import com.app.resn8.domain.model.FolderNode
 import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.domain.model.MoveDirection
 import com.app.resn8.domain.model.ScanResult
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -73,8 +74,8 @@ class PlaylistPersistenceTest {
         assertEquals(2048L, items[1].position)
         assertEquals(3072L, items[2].position)
 
-        // Reorder m3 to position 500 (before m1)
-        playlistRepo.reorderPlaylistItem(playlist.id, "m3", 500L)
+        // Reorder m3 to top (before m1)
+        playlistRepo.movePlaylistItem(playlist.id, "m3", MoveDirection.TOP)
         val reordered = playlistRepo.getPlaylistItemsFlow(playlist.id).first()
         assertEquals("m3", reordered[0].mediaId)
         assertEquals("m1", reordered[1].mediaId)

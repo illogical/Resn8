@@ -3,6 +3,8 @@ package com.app.resn8.ui.playlists
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.domain.model.MetadataScanStatus
+import com.app.resn8.domain.model.MoveDirection
 import com.app.resn8.domain.model.Playlist
 import com.app.resn8.domain.model.PlaylistItem
 import com.app.resn8.domain.repository.MediaRepository
@@ -11,10 +13,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class PlaylistItemUiModel(
+    val originalIndex: Int,
+    val mediaFile: MediaFile
+)
 
 class PlaylistDetailViewModel(
     val playlistId: String,
@@ -29,24 +34,49 @@ class PlaylistDetailViewModel(
 
     val itemsFlow = playlistRepository.getPlaylistItemsFlow(playlistId)
 
-    val tracks: StateFlow<List<MediaFile>> = itemsFlow.combine(_playlist) { items, _ ->
+    val tracks: StateFlow<List<PlaylistItemUiModel>> = itemsFlow.combine(_playlist) { items, _ ->
         if (items.isEmpty()) emptyList()
         else {
             val mediaIds = items.map { it.mediaId }
-            mediaRepository.getMediaFilesByIdsPreservingOrder(mediaIds)
+            val fetchedFilesMap = mediaRepository.getMediaFilesByIdsPreservingOrder(mediaIds)
+                .associateBy { it.id }
+
+            items.mapIndexed { index, item ->
+                val fetched = fetchedFilesMap[item.mediaId]
+                val mediaFile = fetched ?: MediaFile(
+                    id = item.mediaId,
+                    sourceId = "",
+                    folderId = "",
+                    documentUri = "",
+                    relativePath = "",
+                    filename = "Unavailable Track",
+                    displayTitle = "Unavailable Track (${item.mediaId.take(8)})",
+                    mimeType = "audio/mpeg",
+                    size = 0,
+                    modifiedTimeMs = 0,
+                    isAvailable = false,
+                    metadataScanStatus = MetadataScanStatus.FAILED
+                )
+                PlaylistItemUiModel(
+                    originalIndex = index + 1,
+                    mediaFile = mediaFile
+                )
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val filteredTracks: StateFlow<List<MediaFile>> = combine(tracks, searchQuery) { trackList, query ->
+    val filteredTracks: StateFlow<List<PlaylistItemUiModel>> = combine(tracks, searchQuery) { trackModels, query ->
         val trimmed = query.trim().lowercase()
         if (trimmed.isEmpty()) {
-            trackList
+            trackModels
         } else {
-            trackList.filter { track ->
+            trackModels.filter { model ->
+                val track = model.mediaFile
                 (track.title?.lowercase()?.contains(trimmed) == true) ||
                 (track.artist?.lowercase()?.contains(trimmed) == true) ||
                 (track.album?.lowercase()?.contains(trimmed) == true) ||
-                track.filename.lowercase().contains(trimmed)
+                track.filename.lowercase().contains(trimmed) ||
+                track.displayTitle.lowercase().contains(trimmed)
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -65,53 +95,31 @@ class PlaylistDetailViewModel(
 
     fun moveTrackToTop(mediaId: String) {
         viewModelScope.launch {
-            val items = playlistRepository.getPlaylistItems(playlistId)
-            val minPos = items.minOfOrNull { it.position } ?: 0L
-            playlistRepository.reorderPlaylistItem(playlistId, mediaId, minPos - 1024L)
+            playlistRepository.movePlaylistItem(playlistId, mediaId, MoveDirection.TOP)
         }
     }
 
     fun moveTrackToBottom(mediaId: String) {
         viewModelScope.launch {
-            val items = playlistRepository.getPlaylistItems(playlistId)
-            val maxPos = items.maxOfOrNull { it.position } ?: 0L
-            playlistRepository.reorderPlaylistItem(playlistId, mediaId, maxPos + 1024L)
+            playlistRepository.movePlaylistItem(playlistId, mediaId, MoveDirection.BOTTOM)
         }
     }
 
     fun moveTrackUp(mediaId: String) {
         viewModelScope.launch {
-            val items = playlistRepository.getPlaylistItems(playlistId)
-            val index = items.indexOfFirst { it.mediaId == mediaId }
-            if (index > 0) {
-                val newPos = if (index == 1) {
-                    items[0].position - 1024L
-                } else {
-                    (items[index - 2].position + items[index - 1].position) / 2
-                }
-                playlistRepository.reorderPlaylistItem(playlistId, mediaId, newPos)
-                if (index > 1 && newPos == items[index - 2].position) {
-                    playlistRepository.compactPlaylistRanks(playlistId)
-                }
-            }
+            playlistRepository.movePlaylistItem(playlistId, mediaId, MoveDirection.UP)
         }
     }
 
     fun moveTrackDown(mediaId: String) {
         viewModelScope.launch {
-            val items = playlistRepository.getPlaylistItems(playlistId)
-            val index = items.indexOfFirst { it.mediaId == mediaId }
-            if (index in 0 until items.size - 1) {
-                val newPos = if (index == items.size - 2) {
-                    items[items.size - 1].position + 1024L
-                } else {
-                    (items[index + 1].position + items[index + 2].position) / 2
-                }
-                playlistRepository.reorderPlaylistItem(playlistId, mediaId, newPos)
-                if (index < items.size - 2 && newPos == items[index + 1].position) {
-                    playlistRepository.compactPlaylistRanks(playlistId)
-                }
-            }
+            playlistRepository.movePlaylistItem(playlistId, mediaId, MoveDirection.DOWN)
+        }
+    }
+
+    fun reorderTrack(mediaId: String, targetIndex: Int) {
+        viewModelScope.launch {
+            playlistRepository.movePlaylistItemToPosition(playlistId, mediaId, targetIndex)
         }
     }
 

@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.app.resn8.domain.model.Playlist
+import com.app.resn8.domain.model.PlaylistWithItemCount
 import com.app.resn8.ui.components.NewPlaylistDialog
 import com.app.resn8.ui.components.RenamePlaylistDialog
 import com.app.resn8.ui.playlists.PlaylistsViewModel
@@ -55,7 +56,7 @@ fun PlaylistsScreen(
     onPlaylistClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val playlists by viewModel.playlists.collectAsState()
+    val playlistsWithCount by viewModel.playlists.collectAsState()
     val scope = rememberCoroutineScope()
 
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -89,7 +90,7 @@ fun PlaylistsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (playlists.isEmpty()) {
+            if (playlistsWithCount.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -121,15 +122,16 @@ fun PlaylistsScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(playlists, key = { it.id }) { playlist ->
+                    items(playlistsWithCount, key = { it.playlist.id }) { item ->
                         PlaylistItemCard(
-                            playlist = playlist,
-                            onClick = { onPlaylistClick(playlist.id) },
+                            playlist = item.playlist,
+                            itemCount = item.itemCount,
+                            onClick = { onPlaylistClick(item.playlist.id) },
                             onRename = {
                                 renameError = null
-                                playlistToRename = playlist
+                                playlistToRename = item.playlist
                             },
-                            onDelete = { playlistToDelete = playlist }
+                            onDelete = { playlistToDelete = item.playlist }
                         )
                     }
                 }
@@ -199,6 +201,7 @@ fun PlaylistsScreen(
 @Composable
 private fun PlaylistItemCard(
     playlist: Playlist,
+    itemCount: Int,
     onClick: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
@@ -229,6 +232,11 @@ private fun PlaylistItemCard(
                     text = playlist.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "$itemCount ${if (itemCount == 1) "track" else "tracks"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 

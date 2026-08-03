@@ -3,17 +3,19 @@ package com.app.resn8.playlists
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.resn8.data.database.Resn8Database
+import com.app.resn8.data.repository.FakePlaylistRepository
 import com.app.resn8.data.repository.RoomCollectionRepository
 import com.app.resn8.data.repository.RoomMediaRepository
 import com.app.resn8.data.repository.RoomPlaylistRepository
-import com.app.resn8.domain.model.FolderNode
-import com.app.resn8.domain.model.MediaFile
-import com.app.resn8.domain.model.PlaylistMembershipState
-import com.app.resn8.domain.model.ScanResult
-import com.app.resn8.domain.usecase.StartQueueUseCase
-import com.app.resn8.domain.model.QueueStartRequest
 import com.app.resn8.data.repository.RoomQueueRepository
 import com.app.resn8.data.repository.RoomUiSessionRepository
+import com.app.resn8.domain.model.FolderNode
+import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.domain.model.MoveDirection
+import com.app.resn8.domain.model.PlaylistMembershipState
+import com.app.resn8.domain.model.QueueStartRequest
+import com.app.resn8.domain.model.ScanResult
+import com.app.resn8.domain.usecase.StartQueueUseCase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -99,7 +101,10 @@ class PlaylistMilestone6Test {
     fun bulkAddAndRemove_updatesPlaylistItemsAtomically() = runBlocking {
         val playlist = playlistRepo.createPlaylist(colId, "Bulk Ops").getOrThrow()
 
-        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m1", "m2", "m3"))
+        val addResult = playlistRepo.addItemsToPlaylist(playlist.id, listOf("m1", "m2", "m3"))
+        assertEquals(3, addResult.addedCount)
+        assertEquals(0, addResult.unchangedCount)
+
         val itemsAfterAdd = playlistRepo.getPlaylistItems(playlist.id)
         assertEquals(3, itemsAfterAdd.size)
 
@@ -114,12 +119,55 @@ class PlaylistMilestone6Test {
     fun duplicateAdditions_ignoredWithoutDuplicates() = runBlocking {
         val playlist = playlistRepo.createPlaylist(colId, "Dedupe").getOrThrow()
 
-        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m1", "m2"))
-        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m2", "m3"))
+        val res1 = playlistRepo.addItemsToPlaylist(playlist.id, listOf("m1", "m2"))
+        assertEquals(2, res1.addedCount)
+
+        val res2 = playlistRepo.addItemsToPlaylist(playlist.id, listOf("m2", "m3"))
+        assertEquals(1, res2.addedCount)
+        assertEquals(1, res2.unchangedCount)
 
         val items = playlistRepo.getPlaylistItems(playlist.id)
         assertEquals(3, items.size)
         assertEquals(listOf("m1", "m2", "m3"), items.map { it.mediaId })
+    }
+
+    @Test
+    fun directionalReordering_movesItemCorrectly() = runBlocking {
+        val playlist = playlistRepo.createPlaylist(colId, "Reorder Test").getOrThrow()
+        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m1", "m2", "m3"))
+
+        // Move m3 to top
+        playlistRepo.movePlaylistItem(playlist.id, "m3", MoveDirection.TOP)
+        var items = playlistRepo.getPlaylistItems(playlist.id).map { it.mediaId }
+        assertEquals(listOf("m3", "m1", "m2"), items)
+
+        // Move m1 down
+        playlistRepo.movePlaylistItem(playlist.id, "m1", MoveDirection.DOWN)
+        items = playlistRepo.getPlaylistItems(playlist.id).map { it.mediaId }
+        assertEquals(listOf("m3", "m2", "m1"), items)
+
+        // Move m1 up
+        playlistRepo.movePlaylistItem(playlist.id, "m1", MoveDirection.UP)
+        items = playlistRepo.getPlaylistItems(playlist.id).map { it.mediaId }
+        assertEquals(listOf("m3", "m1", "m2"), items)
+
+        // Move m3 to bottom
+        playlistRepo.movePlaylistItem(playlist.id, "m3", MoveDirection.BOTTOM)
+        items = playlistRepo.getPlaylistItems(playlist.id).map { it.mediaId }
+        assertEquals(listOf("m1", "m2", "m3"), items)
+    }
+
+    @Test
+    fun createAndRename_rejectsNormalizedDuplicatesWithLocaleRoot() = runBlocking {
+        val res1 = playlistRepo.createPlaylist(colId, "ROCK HITS")
+        assertTrue(res1.isSuccess)
+
+        val res2 = playlistRepo.createPlaylist(colId, "rock hits")
+        assertTrue(res2.isFailure)
+
+        val p2 = playlistRepo.createPlaylist(colId, "Jazz").getOrThrow()
+        val renameRes = playlistRepo.renamePlaylist(p2.id, "Rock Hits")
+        assertTrue(renameRes.isFailure)
     }
 
     @Test
@@ -155,5 +203,20 @@ class PlaylistMilestone6Test {
         // f1 contains m1, m2 directly and m3 in subfolder f2
         assertEquals(3, resolution!!.uniqueMediaIds.size)
         assertTrue(resolution.uniqueMediaIds.containsAll(listOf("m1", "m2", "m3")))
+    }
+
+    @Test
+    fun fakePlaylistRepository_obeysSameSemanticsAsRoom() = runBlocking {
+        val fakeRepo = FakePlaylistRepository()
+        val p1 = fakeRepo.createPlaylist(colId, "Chill Vibe").getOrThrow()
+
+        val duplicateRes = fakeRepo.createPlaylist(colId, "chill vibe")
+        assertTrue(duplicateRes.isFailure)
+
+        fakeRepo.addItemsToPlaylist(p1.id, listOf("m1", "m2", "m3"))
+        fakeRepo.movePlaylistItem(p1.id, "m3", MoveDirection.TOP)
+
+        val items = fakeRepo.getPlaylistItems(p1.id).map { it.mediaId }
+        assertEquals(listOf("m3", "m1", "m2"), items)
     }
 }

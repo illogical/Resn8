@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.IndeterminateCheckBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -29,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,19 +36,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.app.resn8.domain.model.PlaylistMembershipState
 import com.app.resn8.domain.model.PlaylistWithMembership
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistSelectorSheet(
     title: String,
+    subtitle: String? = null,
     playlists: List<PlaylistWithMembership>,
     onDismissRequest: () -> Unit,
     onTogglePlaylist: (playlistId: String, currentState: PlaylistMembershipState) -> Unit,
-    onCreatePlaylist: (name: String) -> Unit,
+    onCreatePlaylist: suspend (name: String) -> Result<Unit>,
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showNewPlaylistDialog by remember { mutableStateOf(false) }
+    var inlineCreateError by remember { mutableStateOf<String?>(null) }
+    var savingPlaylistId by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -76,9 +81,19 @@ fun PlaylistSelectorSheet(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (!subtitle.isNullOrEmpty()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
                 }
                 OutlinedButton(
-                    onClick = { showNewPlaylistDialog = true }
+                    onClick = {
+                        inlineCreateError = null
+                        showNewPlaylistDialog = true
+                    }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
@@ -105,11 +120,15 @@ fun PlaylistSelectorSheet(
                         .height(280.dp)
                 ) {
                     items(playlists, key = { it.playlist.id }) { item ->
+                        val isSavingThisRow = savingPlaylistId == item.playlist.id
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .clickable(enabled = !isSavingThisRow) {
+                                    savingPlaylistId = item.playlist.id
                                     onTogglePlaylist(item.playlist.id, item.membershipState)
+                                    savingPlaylistId = null
                                 }
                                 .padding(vertical = 12.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -127,7 +146,7 @@ fun PlaylistSelectorSheet(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = item.membershipState.name,
-                                tint = tint
+                                tint = if (isSavingThisRow) MaterialTheme.colorScheme.outline else tint
                             )
 
                             Spacer(modifier = Modifier.width(16.dp))
@@ -135,7 +154,8 @@ fun PlaylistSelectorSheet(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = item.playlist.name,
-                                    style = MaterialTheme.typography.titleMedium
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (isSavingThisRow) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = "${item.itemCount} ${if (item.itemCount == 1) "track" else "tracks"}",
@@ -161,10 +181,17 @@ fun PlaylistSelectorSheet(
 
     if (showNewPlaylistDialog) {
         NewPlaylistDialog(
+            errorMessage = inlineCreateError,
             onDismissRequest = { showNewPlaylistDialog = false },
             onCreatePlaylist = { name ->
-                showNewPlaylistDialog = false
-                onCreatePlaylist(name)
+                scope.launch {
+                    val result = onCreatePlaylist(name)
+                    if (result.isSuccess) {
+                        showNewPlaylistDialog = false
+                    } else {
+                        inlineCreateError = result.exceptionOrNull()?.message ?: "Failed to create playlist"
+                    }
+                }
             }
         )
     }

@@ -2,6 +2,7 @@ package com.app.resn8.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,13 +16,21 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,7 +42,7 @@ fun QueueScreen(
     queueItems: List<PlaybackQueueItemState> = emptyList(),
     currentQueueItemId: String? = null,
     onItemClick: (String) -> Unit = {},
-    onSaveAsPlaylist: (List<String>, title: String) -> Unit = { _, _ -> },
+    onSaveAsPlaylist: (List<String>, title: String, subtitle: String?) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -61,7 +70,14 @@ fun QueueScreen(
                 Button(
                     onClick = {
                         val mediaIds = queueItems.map { it.mediaId }
-                        onSaveAsPlaylist(mediaIds, "Save Active Queue (${mediaIds.size} tracks)")
+                        val distinctCount = mediaIds.distinct().size
+                        val title = "Save Queue as Playlist"
+                        val subtitle = if (distinctCount < mediaIds.size) {
+                            "$distinctCount unique tracks from ${mediaIds.size} queue items (duplicates collapsed)"
+                        } else {
+                            "$distinctCount tracks"
+                        }
+                        onSaveAsPlaylist(mediaIds, title, subtitle)
                     }
                 ) {
                     Icon(imageVector = Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
@@ -86,6 +102,7 @@ fun QueueScreen(
                     key = { _, item -> item.queueItemId }
                 ) { index, item ->
                     val isCurrent = item.queueItemId == currentQueueItemId
+                    var showRowMenu by remember { mutableStateOf(false) }
 
                     Card(
                         modifier = Modifier
@@ -137,8 +154,29 @@ fun QueueScreen(
                                     imageVector = Icons.AutoMirrored.Filled.VolumeUp,
                                     contentDescription = "Playing",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(24.dp).padding(end = 4.dp)
                                 )
+                            }
+
+                            Box {
+                                IconButton(onClick = { showRowMenu = true }) {
+                                    Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Item actions")
+                                }
+                                DropdownMenu(
+                                    expanded = showRowMenu,
+                                    onDismissRequest = { showRowMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Add to Playlist") },
+                                        leadingIcon = {
+                                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            showRowMenu = false
+                                            onSaveAsPlaylist(listOf(item.mediaId), "Add '${item.title}' to Playlist", null)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }

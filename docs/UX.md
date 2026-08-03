@@ -179,7 +179,7 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ---
 
-## 5. Manual Playlists (Milestone 6 — In Progress)
+## 5. Manual Playlists (Milestone 6)
 
 ### US5.1 — Create and Manage Playlists
 - **As a** user,
