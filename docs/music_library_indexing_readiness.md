@@ -135,6 +135,14 @@ The implemented selection order is deterministic: `cover`, `folder`, `front`, `a
 
 ## Verification completed
 
+### First physical-device scan result (2026-08-02)
+
+The first Android SAF scan completed in 7m 21s and published 6,583 tracks: 6,583 added, 0 updated, and 0 missing. It also reported 6,409 tag-derived titles, 211 path/filename enhancements, 3,706 unrecognized patterns, 1,697 broadly unsupported/ignored documents, and 621 preferred artwork candidates.
+
+The aggregate classification exactly accounts for the PC inventory: `6,583 admitted audio + 1,697 unsupported/ignored + 621 preferred artwork = 8,901 files`. Preferred artwork is an exact match. Android admitted one fewer audio file than the extension-based PC baseline (6,583 versus 6,584), with a corresponding one-count increase in the broad unsupported bucket. The original summary did not retain a reason histogram, so the exact provider MIME/size rejection is not yet known; the post-indexing handoff fix adds privacy-safe rejection reasons for the next scan.
+
+The post-scan PC structure fingerprint was not rerun before the app-owned index was removed by a connected-instrumentation cleanup. Source media was not modified, but a repeat scan and post-scan fingerprint are required to close physical acceptance.
+
 - The read-only MTP audit completed successfully with no sample-copy option.
 - Source inspection found no Android write grant, document creation, deletion, rename, move, or output-stream calls against the selected provider.
 - Room/KSP generation and merged manifest processing passed.

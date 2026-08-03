@@ -65,7 +65,7 @@ class PlaybackMilestone4Test {
         mediaRepository.addMediaFiles(tracks)
 
         val query = LibraryQuery(
-            collectionId = "DEFAULT_COLLECTION",
+            collectionId = "3b392d10-48c0-4b32-8ca3-7db67ef5a8d0",
             sort = SortOrder.TRACK
         )
 
@@ -80,6 +80,7 @@ class PlaybackMilestone4Test {
         val queue = result.getOrNull()
         assertNotNull(queue)
         assertEquals(SavedQueueKind.EXPLICIT, queue?.kind)
+        assertEquals("3b392d10-48c0-4b32-8ca3-7db67ef5a8d0", queue?.collectionId)
         assertEquals(5, queue?.orderedMediaIds?.size)
         assertEquals("track_3", queue?.currentMediaId)
         assertEquals(2, queue?.currentIndex)

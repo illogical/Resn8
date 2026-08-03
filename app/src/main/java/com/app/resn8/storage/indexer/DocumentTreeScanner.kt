@@ -32,7 +32,10 @@ data class ScanTraversalProgress(
     val unsupportedDocuments: Int,
     val unreadableBranches: Int,
     val artworkCandidates: Int,
-    val currentRelativePath: String
+    val currentRelativePath: String,
+    val unsupportedAudioLike: Int = 0,
+    val ignoredNonAudio: Int = 0,
+    val rejectionCounts: Map<AudioAdmissionPolicy.RejectionReason, Int> = emptyMap()
 )
 
 data class ArtworkCandidate(
@@ -79,6 +82,15 @@ class DocumentTreeScanner(
         var unsupportedDocuments = 0
         var unreadableBranches = 0
         var artworkCandidates = 0
+        var unsupportedAudioLike = 0
+        var ignoredNonAudio = 0
+        val rejectionCounts = mutableMapOf<AudioAdmissionPolicy.RejectionReason, Int>()
+
+        fun recordRejection(reason: AudioAdmissionPolicy.RejectionReason, audioLike: Boolean) {
+            unsupportedDocuments++
+            rejectionCounts[reason] = (rejectionCounts[reason] ?: 0) + 1
+            if (audioLike) unsupportedAudioLike++ else ignoredNonAudio++
+        }
 
         fun emitProgress(path: String) {
             onProgressUpdate(
@@ -89,7 +101,10 @@ class DocumentTreeScanner(
                     unsupportedDocuments = unsupportedDocuments,
                     unreadableBranches = unreadableBranches,
                     artworkCandidates = artworkCandidates,
-                    currentRelativePath = path
+                    currentRelativePath = path,
+                    unsupportedAudioLike = unsupportedAudioLike,
+                    ignoredNonAudio = ignoredNonAudio,
+                    rejectionCounts = rejectionCounts.toMap()
                 )
             )
         }
@@ -147,7 +162,7 @@ class DocumentTreeScanner(
                         val displayName = it.getString(nameCol)
                         val mimeType = it.getString(mimeCol).orEmpty()
                         if (childDocId.isNullOrBlank() || displayName.isNullOrBlank()) {
-                            unsupportedDocuments++
+                            recordRejection(AudioAdmissionPolicy.RejectionReason.MALFORMED_DOCUMENT, false)
                             continue
                         }
                         val size = if (sizeCol < 0 || it.isNull(sizeCol)) null else it.getLong(sizeCol)
@@ -164,7 +179,8 @@ class DocumentTreeScanner(
                         }
 
                         val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, childDocId)
-                        if (AudioAdmissionPolicy.isSupported(displayName, mimeType, size)) {
+                        val admission = AudioAdmissionPolicy.evaluate(displayName, mimeType, size)
+                        if (admission.isSupported) {
                             mediaBatch.add(
                                 DiscoveredFile(
                                     documentUri = fileUri,
@@ -187,7 +203,10 @@ class DocumentTreeScanner(
                                 ArtworkCandidate(fileUri, relativePath, displayName, size, modified)
                             )
                         } else {
-                            unsupportedDocuments++
+                            recordRejection(
+                                admission.rejectionReason ?: AudioAdmissionPolicy.RejectionReason.UNSUPPORTED_EXTENSION,
+                                AudioAdmissionPolicy.isAudioLike(displayName, mimeType)
+                            )
                         }
                     }
                 }

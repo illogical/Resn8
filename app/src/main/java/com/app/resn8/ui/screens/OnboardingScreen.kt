@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -101,7 +103,7 @@ fun OnboardingScreen(
             is IndexingUiState.Complete -> {
                 CompleteSummaryContent(
                     summary = state.summary,
-                    onGoToLibraryClicked = onNavigateToLibrary
+                    onGoToLibraryClicked = { viewModel.openLibrary(onNavigateToLibrary) }
                 )
             }
             is IndexingUiState.EmptyFolder -> {
@@ -249,7 +251,9 @@ private fun CompleteSummaryContent(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -258,21 +262,34 @@ private fun CompleteSummaryContent(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Total Tracks Discovered: ${summary.scannedCount}")
+            Text(text = "Indexed Audio Tracks: ${summary.scannedCount}")
             Text(text = "Elapsed: ${formatDuration(summary.durationMs)}")
+            Text(text = "Folders Scanned: ${summary.scannedFolderCount}")
+            Text(text = "Documents Inspected: ${summary.inspectedDocumentCount}")
             Text(text = "Added: ${summary.addedCount} | Updated: ${summary.updatedCount} | Missing: ${summary.unavailableCount}")
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Tag-Derived Metadata: ${summary.tagDerivedCount}")
-            Text(text = "Path/Filename-Derived: ${summary.pathDerivedCount}")
+            Text(text = "Tag-Derived Titles: ${summary.tagDerivedCount}")
+            Text(text = "Path/Filename Enhancements: ${summary.pathDerivedCount}")
+            Text(
+                text = "Metadata source counts may overlap",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Text(text = "Unrecognized Patterns: ${summary.unrecognizedCount}")
-            if (summary.unreadableCount > 0) {
-                Text(text = "Unreadable Files: ${summary.unreadableCount}")
+            Text(text = "Unreadable Branches: ${summary.unreadableCount}")
+            Text(text = "Metadata Fallbacks: ${summary.metadataFailureCount}")
+            Text(text = "Unsupported Audio-Like Files: ${summary.unsupportedAudioLikeCount}")
+            Text(text = "Ignored Non-Audio Documents: ${summary.ignoredNonAudioCount}")
+            if (summary.unsupportedCount != summary.unsupportedAudioLikeCount + summary.ignoredNonAudioCount) {
+                Text(text = "Other Unsupported Documents: ${summary.unsupportedCount - summary.unsupportedAudioLikeCount - summary.ignoredNonAudioCount}")
             }
-            if (summary.metadataFailureCount > 0) {
-                Text(text = "Metadata Fallbacks: ${summary.metadataFailureCount}")
-            }
-            Text(text = "Unsupported Files: ${summary.unsupportedCount}")
-            Text(text = "Artwork Candidates: ${summary.artworkCandidateCount}")
+            Text(
+                text = "Rejected: MIME ${summary.unsupportedMimeCount} • Extension ${summary.unsupportedExtensionCount} • " +
+                    "AppleDouble ${summary.appleDoubleCount} • Zero-byte ${summary.zeroByteCount} • Malformed ${summary.malformedDocumentCount}",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
+            Text(text = "Preferred Artwork Candidates: ${summary.artworkCandidateCount}")
             Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = onGoToLibraryClicked,

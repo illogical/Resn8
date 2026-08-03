@@ -14,21 +14,22 @@ import com.app.resn8.domain.model.SelectionResolutionResult
 import com.app.resn8.domain.model.SortOrder
 import com.app.resn8.domain.repository.CollectionRepository
 import com.app.resn8.domain.repository.MediaRepository
-import com.app.resn8.domain.repository.UiSessionRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FoldersViewModel(
+    private val collectionId: String,
+    private val initialSourceId: String?,
     private val mediaRepository: MediaRepository,
-    private val collectionRepository: CollectionRepository,
-    private val uiSessionRepository: UiSessionRepository
+    private val collectionRepository: CollectionRepository
 ) : ViewModel() {
 
     private val _sourceId = MutableStateFlow<String?>(null)
@@ -48,14 +49,13 @@ class FoldersViewModel(
 
     init {
         viewModelScope.launch {
-            collectionRepository.getRootSourcesFlow("MUSIC").collect { sources ->
-                val srcId = sources.firstOrNull()?.id
-                _sourceId.value = srcId
-                if (srcId != null && _currentFolderId.value == null) {
-                    mediaRepository.getRootFolderNode(srcId).collect { rootFolder ->
-                        if (rootFolder != null && _currentFolderId.value == null) {
-                            _currentFolderId.value = rootFolder.id
-                        }
+            val source = initialSourceId
+                ?: collectionRepository.getRootSourcesFlow(collectionId).first().firstOrNull()?.id
+            _sourceId.value = source
+            if (source != null) {
+                mediaRepository.getRootFolderNode(source).collect { rootFolder ->
+                    if (rootFolder != null && _currentFolderId.value == null) {
+                        _currentFolderId.value = rootFolder.id
                     }
                 }
             }
@@ -74,7 +74,7 @@ class FoldersViewModel(
         if (folderId == null) flowOf(PagingData.empty()) else mediaRepository.getPagedFolderMedia(
             folderId = folderId,
             query = LibraryQuery(
-                collectionId = "MUSIC",
+                collectionId = collectionId,
                 sourceId = _sourceId.value,
                 folderId = folderId,
                 sort = SortOrder.TITLE,

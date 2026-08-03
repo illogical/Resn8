@@ -32,7 +32,8 @@ class StartQueueUseCase(
                 val mediaFiles = mediaRepository.getMediaFilesByIdsPreservingOrder(mediaIds)
                 val availableIds = mediaFiles.filter { it.isAvailable }.map { it.id }.toSet()
                 val playlist = playlistRepository.getPlaylistById(request.playlistId)
-                val colId = playlist?.collectionId ?: "DEFAULT_COLLECTION"
+                    ?: return Result.failure(IllegalStateException("The playlist no longer exists."))
+                val colId = playlist.collectionId
                 Pair(mediaIds.filter { availableIds.contains(it) }, colId)
             }
         }

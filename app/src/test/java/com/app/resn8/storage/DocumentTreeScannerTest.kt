@@ -2,9 +2,11 @@ package com.app.resn8.storage
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.resn8.storage.indexer.AudioAdmissionPolicy
 import com.app.resn8.storage.indexer.DocumentTreeScanner
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -45,5 +47,23 @@ class DocumentTreeScannerTest {
         assertTrue(scanner.isSupportedAudio("UPPERCASE.FLAC", "application/octet-stream", size = null))
         assertTrue(scanner.isSupportedAudio(".hidden.opus", "", size = 10L))
         assertFalse(scanner.isSupportedAudio("cover.jpg", "application/octet-stream", size = 10L))
+    }
+
+    @Test
+    fun admissionRejectionsExposePrivacySafeReasonsAndAudioLikeClassification() {
+        assertEquals(
+            AudioAdmissionPolicy.RejectionReason.APPLEDOUBLE_SIDECAR,
+            AudioAdmissionPolicy.evaluate("._Song.mp3", "audio/mpeg", 4_096L).rejectionReason
+        )
+        assertEquals(
+            AudioAdmissionPolicy.RejectionReason.UNSUPPORTED_MIME,
+            AudioAdmissionPolicy.evaluate("song.mp3", "video/mp4", 4_096L).rejectionReason
+        )
+        assertEquals(
+            AudioAdmissionPolicy.RejectionReason.UNSUPPORTED_EXTENSION,
+            AudioAdmissionPolicy.evaluate("legacy.wma", "application/octet-stream", 4_096L).rejectionReason
+        )
+        assertTrue(AudioAdmissionPolicy.isAudioLike("legacy.wma", "application/octet-stream"))
+        assertFalse(AudioAdmissionPolicy.isAudioLike("cover.jpg", "image/jpeg"))
     }
 }

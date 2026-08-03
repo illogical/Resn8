@@ -163,6 +163,11 @@ interface MediaFileDao {
             (:albumKeyIsUnknown = 0 AND mf.album = :albumKeyValue)
           )
           AND (
+            :isAlbumArtistFilterNull = 1 OR
+            (:albumArtistKeyIsUnknown = 1 AND COALESCE(mf.albumArtist, mf.artist) IS NULL) OR
+            (:albumArtistKeyIsUnknown = 0 AND COALESCE(mf.albumArtist, mf.artist) = :albumArtistKeyValue)
+          )
+          AND (
             :availabilityFilter = 'ALL' OR
             (:availabilityFilter = 'AVAILABLE_ONLY' AND mf.isAvailable = 1) OR
             (:availabilityFilter = 'UNAVAILABLE_ONLY' AND mf.isAvailable = 0)
@@ -230,6 +235,9 @@ interface MediaFileDao {
         isAlbumFilterNull: Int,
         albumKeyIsUnknown: Int,
         albumKeyValue: String?,
+        isAlbumArtistFilterNull: Int = 1,
+        albumArtistKeyIsUnknown: Int = 0,
+        albumArtistKeyValue: String? = null,
         availabilityFilter: String,
         excludeDisliked: Int,
         searchPattern: String?,
@@ -252,6 +260,11 @@ interface MediaFileDao {
             :isAlbumFilterNull = 1 OR
             (:albumKeyIsUnknown = 1 AND mf.album IS NULL) OR
             (:albumKeyIsUnknown = 0 AND mf.album = :albumKeyValue)
+          )
+          AND (
+            :isAlbumArtistFilterNull = 1 OR
+            (:albumArtistKeyIsUnknown = 1 AND COALESCE(mf.albumArtist, mf.artist) IS NULL) OR
+            (:albumArtistKeyIsUnknown = 0 AND COALESCE(mf.albumArtist, mf.artist) = :albumArtistKeyValue)
           )
           AND (
             :availabilityFilter = 'ALL' OR
@@ -321,6 +334,9 @@ interface MediaFileDao {
         isAlbumFilterNull: Int,
         albumKeyIsUnknown: Int,
         albumKeyValue: String?,
+        isAlbumArtistFilterNull: Int = 1,
+        albumArtistKeyIsUnknown: Int = 0,
+        albumArtistKeyValue: String? = null,
         availabilityFilter: String,
         excludeDisliked: Int,
         searchPattern: String?,

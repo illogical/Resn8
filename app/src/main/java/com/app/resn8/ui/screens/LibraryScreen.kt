@@ -2,10 +2,12 @@ package com.app.resn8.ui.screens
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +36,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.MediaFile
@@ -61,6 +68,7 @@ fun LibraryScreen(
     val selectedFileIds by viewModel.selectedFileIds.collectAsState()
     val selectedFolderIds by viewModel.selectedFolderIds.collectAsState()
     val selectionResolution by viewModel.selectionResolution.collectAsState()
+    val sessionError by viewModel.sessionError.collectAsState()
 
     var showFilterSheet by remember { mutableStateOf(false) }
 
@@ -94,8 +102,13 @@ fun LibraryScreen(
             OutlinedTextField(
                 value = searchText,
                 onValueChange = { viewModel.setSearchText(it) },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Search title, artist, album...") },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 56.dp)
+                    .semantics {
+                        contentDescription = "Search library by title, artist, album, or filename"
+                    },
+                placeholder = { Text("Search library", maxLines = 1) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                 trailingIcon = {
                     if (searchText.isNotEmpty()) {
@@ -110,6 +123,15 @@ fun LibraryScreen(
             IconButton(onClick = { showFilterSheet = true }) {
                 Icon(Icons.Default.FilterList, contentDescription = "Sort and filter")
             }
+        }
+
+        if (sessionError != null) {
+            Text(
+                text = sessionError.orEmpty(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
 
         if (selectedFileIds.isNotEmpty() || selectedFolderIds.isNotEmpty()) {
@@ -157,13 +179,11 @@ fun LibraryScreen(
         Box(modifier = Modifier.weight(1f)) {
             when (currentSurface) {
                 LibrarySurface.ARTISTS -> {
-                    if (artistSummaries.itemCount == 0) {
-                        Text(
-                            text = "No artists found",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    } else {
+                    PagingContent(
+                        items = artistSummaries,
+                        searchText = searchText,
+                        emptyLabel = "No artists are indexed in this collection"
+                    ) {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             items(artistSummaries.itemCount) { index ->
                                 artistSummaries[index]?.let { artistSummary ->
@@ -177,13 +197,11 @@ fun LibraryScreen(
                     }
                 }
                 LibrarySurface.ALBUMS -> {
-                    if (albumSummaries.itemCount == 0) {
-                        Text(
-                            text = "No albums found",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    } else {
+                    PagingContent(
+                        items = albumSummaries,
+                        searchText = searchText,
+                        emptyLabel = "No albums are indexed in this collection"
+                    ) {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             items(albumSummaries.itemCount) { index ->
                                 albumSummaries[index]?.let { albumSummary ->
@@ -197,13 +215,11 @@ fun LibraryScreen(
                     }
                 }
                 LibrarySurface.ALL_TRACKS -> {
-                    if (tracks.itemCount == 0) {
-                        Text(
-                            text = "No tracks found",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    } else {
+                    PagingContent(
+                        items = tracks,
+                        searchText = searchText,
+                        emptyLabel = "No tracks are indexed in this collection"
+                    ) {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             items(tracks.itemCount) { index ->
                                 tracks[index]?.let { mediaFile ->
@@ -243,5 +259,39 @@ fun LibraryScreen(
             },
             onDismiss = { showFilterSheet = false }
         )
+    }
+}
+
+@Composable
+private fun <T : Any> PagingContent(
+    items: LazyPagingItems<T>,
+    searchText: String,
+    emptyLabel: String,
+    content: @Composable () -> Unit
+) {
+    val refresh = items.loadState.refresh
+    when {
+        refresh is LoadState.Loading -> Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        refresh is LoadState.Error -> Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text("Unable to load this library view", color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = items::retry) { Text("Retry") }
+        }
+        items.itemCount == 0 -> Text(
+            text = if (searchText.isBlank()) emptyLabel else "No matches for this search",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(16.dp)
+        )
+        else -> content()
     }
 }

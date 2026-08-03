@@ -33,6 +33,18 @@ This document defines user stories and manual UX verification workflows for Resn
   2. Trigger "Re-index Library" from settings/onboarding.
   3. Confirm new files are added, first-indexed timestamps are preserved for existing tracks, and ratings/history are unchanged.
 
+### US1.4 — Enter and Play the Indexed Library
+- **As a** user whose first scan completed successfully,
+- **I want to** open the exact collection that was indexed and start a track,
+- **So that** the scan immediately produces a usable music library.
+- **Verification**:
+  1. From the completion summary, confirm indexed-audio, folder, document, artwork, ignored non-audio, unsupported audio-like, unreadable, and metadata-fallback totals are visible.
+  2. Tap **Go to Library** -> confirm Artists loads populated data rather than a transient or synthetic empty collection.
+  3. Focus search, type and clear a query, then switch among Artists, Albums, and All Tracks -> confirm no process crash and no Room foreign-key error.
+  4. Open Folders and confirm it resolves the same indexed source hierarchy.
+  5. In All Tracks, tap one available song -> confirm an explicit queue is persisted for the active collection and audible playback begins through `Resn8MediaService`.
+  6. Background the app and use the media notification to pause/resume, then return and confirm the same song and queue remain active.
+
 ---
 
 ## 2. Library & Folder Browsing (Milestone 3)

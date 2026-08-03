@@ -1,5 +1,6 @@
 package com.app.resn8.ui.library
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
@@ -13,9 +14,9 @@ import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.domain.model.SelectionResolutionResult
 import com.app.resn8.domain.model.SortOrder
-import com.app.resn8.domain.repository.CollectionRepository
 import com.app.resn8.domain.repository.MediaRepository
 import com.app.resn8.domain.repository.UiSessionRepository
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -32,16 +33,22 @@ import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class LibraryViewModel(
+    collectionId: String,
+    private val sourceId: String?,
     private val mediaRepository: MediaRepository,
-    private val collectionRepository: CollectionRepository,
     private val uiSessionRepository: UiSessionRepository
 ) : ViewModel() {
 
     private val _surface = MutableStateFlow(LibrarySurface.ARTISTS)
     val surface: StateFlow<LibrarySurface> = _surface.asStateFlow()
 
-    private val _collectionId = MutableStateFlow("MUSIC")
+    private val _collectionId = MutableStateFlow(collectionId)
     val collectionId: StateFlow<String> = _collectionId.asStateFlow()
+
+    private val _sessionError = MutableStateFlow<String?>(null)
+    val sessionError: StateFlow<String?> = _sessionError.asStateFlow()
+
+    private val sessionSaveSignals = Channel<Unit>(Channel.CONFLATED)
 
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
@@ -65,10 +72,13 @@ class LibraryViewModel(
         viewModelScope.launch {
             val session = uiSessionRepository.getUiSessionStateFlow().first()
             _surface.value = session.activeSurface
-            _collectionId.value = session.selectedCollectionId ?: "MUSIC"
             _searchText.value = session.activeSearchQuery ?: ""
             _sort.value = session.activeSort
             _filters.value = session.libraryFilterSnapshot
+
+            for (signal in sessionSaveSignals) {
+                persistCurrentSession()
+            }
         }
     }
 
@@ -159,17 +169,30 @@ class LibraryViewModel(
     }
 
     private fun saveSessionState() {
-        viewModelScope.launch {
+        sessionSaveSignals.trySend(Unit)
+    }
+
+    private suspend fun persistCurrentSession() {
+        try {
             val session = uiSessionRepository.getUiSessionStateFlow().first()
             uiSessionRepository.saveUiSessionState(
                 session.copy(
                     activeSurface = _surface.value,
                     selectedCollectionId = _collectionId.value,
+                    selectedSourceId = sourceId,
                     activeSearchQuery = _searchText.value.ifBlank { null },
                     activeSort = _sort.value,
                     libraryFilterSnapshot = _filters.value
                 )
             )
+            _sessionError.value = null
+        } catch (error: Exception) {
+            _sessionError.value = "Library preferences could not be saved"
+            Log.e(LOG_TAG, "library_session_save_failed category=${error::class.simpleName}")
         }
+    }
+
+    companion object {
+        private const val LOG_TAG = "Resn8Library"
     }
 }

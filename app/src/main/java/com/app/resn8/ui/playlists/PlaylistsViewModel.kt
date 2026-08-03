@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class PlaylistsViewModel(
-    private val collectionId: String = "MUSIC",
+    private val collectionId: String,
     private val playlistRepository: PlaylistRepository
 ) : ViewModel() {
 

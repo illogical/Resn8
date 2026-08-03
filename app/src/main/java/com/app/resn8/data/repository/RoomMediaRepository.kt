@@ -99,6 +99,7 @@ class RoomMediaRepository(
     override fun getTracksPaged(query: LibraryQuery): Flow<PagingData<MediaFile>> {
         val (isArtistNull, artistIsUnknown, artistValue) = parseGroupKey(query.artist)
         val (isAlbumNull, albumIsUnknown, albumValue) = parseGroupKey(query.album)
+        val (isAlbumArtistNull, albumArtistIsUnknown, albumArtistValue) = parseGroupKey(query.albumArtist)
         return Pager(
             config = PagingConfig(pageSize = 50, prefetchDistance = 20, enablePlaceholders = false)
         ) {
@@ -112,6 +113,9 @@ class RoomMediaRepository(
                 isAlbumFilterNull = isAlbumNull,
                 albumKeyIsUnknown = albumIsUnknown,
                 albumKeyValue = albumValue,
+                isAlbumArtistFilterNull = isAlbumArtistNull,
+                albumArtistKeyIsUnknown = albumArtistIsUnknown,
+                albumArtistKeyValue = albumArtistValue,
                 availabilityFilter = query.filters.availability.name,
                 excludeDisliked = if (query.filters.excludeDisliked) 1 else 0,
                 searchPattern = query.escapedSearchPattern(),
@@ -173,6 +177,7 @@ class RoomMediaRepository(
     override suspend fun snapshotVisibleMediaIds(query: LibraryQuery): List<String> {
         val (isArtistNull, artistIsUnknown, artistValue) = parseGroupKey(query.artist)
         val (isAlbumNull, albumIsUnknown, albumValue) = parseGroupKey(query.album)
+        val (isAlbumArtistNull, albumArtistIsUnknown, albumArtistValue) = parseGroupKey(query.albumArtist)
         return mediaFileDao.snapshotVisibleMediaIds(
             collectionId = query.collectionId,
             sourceId = query.sourceId,
@@ -183,6 +188,9 @@ class RoomMediaRepository(
             isAlbumFilterNull = isAlbumNull,
             albumKeyIsUnknown = albumIsUnknown,
             albumKeyValue = albumValue,
+            isAlbumArtistFilterNull = isAlbumArtistNull,
+            albumArtistKeyIsUnknown = albumArtistIsUnknown,
+            albumArtistKeyValue = albumArtistValue,
             availabilityFilter = query.filters.availability.name,
             excludeDisliked = if (query.filters.excludeDisliked) 1 else 0,
             searchPattern = query.escapedSearchPattern(),

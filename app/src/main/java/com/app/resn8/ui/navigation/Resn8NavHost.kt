@@ -2,13 +2,17 @@ package com.app.resn8.ui.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
@@ -20,7 +24,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.model.LibraryQuery
-import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.domain.model.MetadataGroupKey
 import com.app.resn8.domain.model.PlaylistMembershipState
 import com.app.resn8.domain.model.QueueStartRequest
@@ -42,6 +45,8 @@ import com.app.resn8.ui.screens.PlaylistDetailScreen
 import com.app.resn8.ui.screens.PlaylistsScreen
 import com.app.resn8.ui.screens.QueueScreen
 import com.app.resn8.ui.screens.onboarding.OnboardingViewModel
+import com.app.resn8.ui.session.ActiveCollectionState
+import com.app.resn8.ui.session.ActiveCollectionViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -60,6 +65,20 @@ fun Resn8NavHost(
     val playbackConnection = container.playbackConnection
     val playbackUiState by (playbackConnection?.uiState ?: remember { MutableStateFlow(PlaybackUiState()) }).collectAsState()
     val scope = rememberCoroutineScope()
+    val activeCollectionViewModel: ActiveCollectionViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return ActiveCollectionViewModel(
+                    collectionRepository = container.collectionRepository,
+                    uiSessionRepository = container.uiSessionRepository
+                ) as T
+            }
+        }
+    )
+    val observedActiveCollectionState by activeCollectionViewModel.state.collectAsState()
+    val activeCollectionState = rememberUpdatedState(observedActiveCollectionState)
+    val activeSelection = (observedActiveCollectionState as? ActiveCollectionState.Ready)?.selection
 
     var activeSelectorRequest by remember { mutableStateOf<PlaylistSelectorRequest?>(null) }
 
@@ -91,13 +110,20 @@ fun Resn8NavHost(
             }
 
             composable<LibraryRoute> {
+                val routeState = activeCollectionState.value
+                val selection = (routeState as? ActiveCollectionState.Ready)?.selection
+                if (selection == null) {
+                    ActiveCollectionStatus(routeState)
+                } else {
                 val libraryViewModel: LibraryViewModel = viewModel(
+                    key = "library-${selection.collectionId}",
                     factory = object : ViewModelProvider.Factory {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
                             @Suppress("UNCHECKED_CAST")
                             return LibraryViewModel(
+                                collectionId = selection.collectionId,
+                                sourceId = selection.sourceId,
                                 mediaRepository = container.mediaRepository,
-                                collectionRepository = container.collectionRepository,
                                 uiSessionRepository = container.uiSessionRepository
                             ) as T
                         }
@@ -110,17 +136,19 @@ fun Resn8NavHost(
                 LibraryScreen(
                     viewModel = libraryViewModel,
                     onArtistClick = { artistKeySerialized ->
-                        navController.navigate(ArtistDetailRoute(artistKeySerialized = artistKeySerialized))
+                        navController.navigate(ArtistDetailRoute(selection.collectionId, artistKeySerialized))
                     },
-                    onAlbumClick = { albumKeySerialized ->
-                        navController.navigate(AlbumDetailRoute(albumKeySerialized = albumKeySerialized))
+                    onAlbumClick = { albumCompositeKey ->
+                        val (albumKey, albumArtistKey) = splitAlbumCompositeKey(albumCompositeKey)
+                        navController.navigate(AlbumDetailRoute(selection.collectionId, albumKey, albumArtistKey))
                     },
                     onFoldersClick = {
                         navController.navigate(FoldersRoute())
                     },
                     onTrackClick = { mediaFile ->
                         val query = LibraryQuery(
-                            collectionId = "MUSIC",
+                            collectionId = selection.collectionId,
+                            sourceId = selection.sourceId,
                             searchText = searchText,
                             filters = currentFilters,
                             sort = currentSort
@@ -134,6 +162,7 @@ fun Resn8NavHost(
                     },
                     onAddToPlaylist = openSelector
                 )
+                }
             }
 
             composable<ArtistDetailRoute> { backStackEntry ->
@@ -154,7 +183,8 @@ fun Resn8NavHost(
                 ArtistDetailScreen(
                     viewModel = viewModel,
                     onAlbumClick = { albumKeySerialized ->
-                        navController.navigate(AlbumDetailRoute(collectionId = route.collectionId, albumKeySerialized = albumKeySerialized))
+                        val (albumKey, albumArtistKey) = splitAlbumCompositeKey(albumKeySerialized)
+                        navController.navigate(AlbumDetailRoute(route.collectionId, albumKey, albumArtistKey))
                     },
                     onBack = { navController.popBackStack() },
                     onTrackClick = { mediaFile ->
@@ -176,6 +206,7 @@ fun Resn8NavHost(
             composable<AlbumDetailRoute> { backStackEntry ->
                 val route: AlbumDetailRoute = backStackEntry.toRoute()
                 val albumKey = MetadataGroupKey.deserialize(route.albumKeySerialized) ?: MetadataGroupKey.Unknown
+                val albumArtistKey = MetadataGroupKey.deserialize(route.albumArtistKeySerialized)
                 val viewModel: AlbumDetailViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -183,6 +214,7 @@ fun Resn8NavHost(
                             return AlbumDetailViewModel(
                                 collectionId = route.collectionId,
                                 albumKey = albumKey,
+                                albumArtistKey = albumArtistKey,
                                 mediaRepository = container.mediaRepository
                             ) as T
                         }
@@ -194,7 +226,8 @@ fun Resn8NavHost(
                     onTrackClick = { mediaFile ->
                         val query = LibraryQuery(
                             collectionId = route.collectionId,
-                            album = albumKey
+                            album = albumKey,
+                            albumArtist = albumArtistKey
                         )
                         playbackConnection?.startQueue(
                             QueueStartRequest.Library(
@@ -208,14 +241,21 @@ fun Resn8NavHost(
             }
 
             composable<FoldersRoute> {
+                val routeState = activeCollectionState.value
+                val selection = (routeState as? ActiveCollectionState.Ready)?.selection
+                if (selection == null) {
+                    ActiveCollectionStatus(routeState)
+                } else {
                 val foldersViewModel: FoldersViewModel = viewModel(
+                    key = "folders-${selection.collectionId}-${selection.sourceId}",
                     factory = object : ViewModelProvider.Factory {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
                             @Suppress("UNCHECKED_CAST")
                             return FoldersViewModel(
+                                collectionId = selection.collectionId,
+                                initialSourceId = selection.sourceId,
                                 mediaRepository = container.mediaRepository,
-                                collectionRepository = container.collectionRepository,
-                                uiSessionRepository = container.uiSessionRepository
+                                collectionRepository = container.collectionRepository
                             ) as T
                         }
                     }
@@ -226,7 +266,8 @@ fun Resn8NavHost(
                     viewModel = foldersViewModel,
                     onTrackClick = { mediaFile ->
                         val query = LibraryQuery(
-                            collectionId = "MUSIC",
+                            collectionId = selection.collectionId,
+                            sourceId = selection.sourceId,
                             folderId = currentFolderId
                         )
                         playbackConnection?.startQueue(
@@ -238,15 +279,22 @@ fun Resn8NavHost(
                     },
                     onAddToPlaylist = openSelector
                 )
+                }
             }
 
             composable<PlaylistsRoute> {
+                val routeState = activeCollectionState.value
+                val selection = (routeState as? ActiveCollectionState.Ready)?.selection
+                if (selection == null) {
+                    ActiveCollectionStatus(routeState)
+                } else {
                 val viewModel: PlaylistsViewModel = viewModel(
+                    key = "playlists-${selection.collectionId}",
                     factory = object : ViewModelProvider.Factory {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
                             @Suppress("UNCHECKED_CAST")
                             return PlaylistsViewModel(
-                                collectionId = "MUSIC",
+                                collectionId = selection.collectionId,
                                 playlistRepository = container.playlistRepository
                             ) as T
                         }
@@ -258,6 +306,7 @@ fun Resn8NavHost(
                         navController.navigate(PlaylistDetailRoute(playlistId = playlistId))
                     }
                 )
+                }
             }
 
             composable<PlaylistDetailRoute> { backStackEntry ->
@@ -347,8 +396,9 @@ fun Resn8NavHost(
         }
 
         activeSelectorRequest?.let { selectorReq ->
+            val collectionId = activeSelection?.collectionId ?: return@let
             val candidatePlaylists by container.playlistRepository
-                .getPlaylistsWithMembershipFlow("MUSIC", selectorReq.mediaIds)
+                .getPlaylistsWithMembershipFlow(collectionId, selectorReq.mediaIds)
                 .collectAsState(initial = emptyList())
 
             PlaylistSelectorSheet(
@@ -366,7 +416,7 @@ fun Resn8NavHost(
                 },
                 onCreatePlaylist = { name ->
                     scope.launch {
-                        val created = container.playlistRepository.createPlaylist("MUSIC", name)
+                        val created = container.playlistRepository.createPlaylist(collectionId, name)
                         if (created.isSuccess) {
                             container.playlistRepository.addItemsToPlaylist(created.getOrThrow().id, selectorReq.mediaIds)
                         }
@@ -375,4 +425,22 @@ fun Resn8NavHost(
             )
         }
     }
+}
+
+@Composable
+private fun ActiveCollectionStatus(state: ActiveCollectionState) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        when (state) {
+            ActiveCollectionState.Loading -> CircularProgressIndicator()
+            ActiveCollectionState.NoCollections -> Text("Select and index a music folder to open your library.")
+            ActiveCollectionState.SelectionRequired -> Text("Choose a collection before opening the library.")
+            is ActiveCollectionState.Error -> Text(state.message)
+            is ActiveCollectionState.Ready -> Unit
+        }
+    }
+}
+
+private fun splitAlbumCompositeKey(compositeKey: String): Pair<String, String?> {
+    val parts = compositeKey.split("||", limit = 2)
+    return parts.first() to parts.getOrNull(1)
 }

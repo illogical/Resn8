@@ -146,7 +146,14 @@ class ScanOrchestrator(
                 inspectedDocumentCount = traversal.inspectedDocuments,
                 unsupportedCount = traversal.unsupportedDocuments,
                 metadataFailureCount = metadataFailureCount,
-                artworkCandidateCount = traversal.artworkCandidates
+                artworkCandidateCount = traversal.artworkCandidates,
+                unsupportedAudioLikeCount = traversal.unsupportedAudioLike,
+                ignoredNonAudioCount = traversal.ignoredNonAudio,
+                zeroByteCount = traversal.rejectionCounts[AudioAdmissionPolicy.RejectionReason.ZERO_BYTE] ?: 0,
+                appleDoubleCount = traversal.rejectionCounts[AudioAdmissionPolicy.RejectionReason.APPLEDOUBLE_SIDECAR] ?: 0,
+                unsupportedMimeCount = traversal.rejectionCounts[AudioAdmissionPolicy.RejectionReason.UNSUPPORTED_MIME] ?: 0,
+                unsupportedExtensionCount = traversal.rejectionCounts[AudioAdmissionPolicy.RejectionReason.UNSUPPORTED_EXTENSION] ?: 0,
+                malformedDocumentCount = traversal.rejectionCounts[AudioAdmissionPolicy.RejectionReason.MALFORMED_DOCUMENT] ?: 0
             )
             phase = "PUBLICATION"
             val result = mediaRepository.publishStagedScan(scanId, sourceId, preliminary)
@@ -198,7 +205,9 @@ class ScanOrchestrator(
         unsupportedCount = unsupportedDocuments,
         unreadableCount = unreadableBranches,
         metadataFailureCount = metadataFailureCount,
-        artworkCandidateCount = artworkCandidates
+        artworkCandidateCount = artworkCandidates,
+        unsupportedAudioLikeCount = unsupportedAudioLike,
+        ignoredNonAudioCount = ignoredNonAudio
     )
 
     companion object {

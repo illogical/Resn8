@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 class AlbumDetailViewModel(
     val collectionId: String,
     val albumKey: MetadataGroupKey,
+    val albumArtistKey: MetadataGroupKey?,
     private val mediaRepository: MediaRepository
 ) : ViewModel() {
 
@@ -26,6 +27,7 @@ class AlbumDetailViewModel(
         LibraryQuery(
             collectionId = collectionId,
             album = albumKey,
+            albumArtist = albumArtistKey,
             sort = SortOrder.TRACK
         )
     ).cachedIn(viewModelScope)
@@ -35,6 +37,7 @@ class AlbumDetailViewModel(
             LibraryQuery(
                 collectionId = collectionId,
                 album = albumKey,
+                albumArtist = albumArtistKey,
                 sort = SortOrder.TRACK
             )
         )

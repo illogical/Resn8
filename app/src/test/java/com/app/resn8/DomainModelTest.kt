@@ -83,6 +83,9 @@ class DomainModelTest {
         assertEquals(12, decoded?.inspectedDocumentCount)
         assertEquals(0, decoded?.unsupportedCount)
         assertEquals(0, decoded?.metadataFailureCount)
-        assertEquals(2, decoded?.schemaVersion)
+        assertEquals(3, decoded?.schemaVersion)
+        assertEquals(0, decoded?.unsupportedAudioLikeCount)
+        assertEquals(0, decoded?.ignoredNonAudioCount)
+        assertEquals(0, decoded?.unsupportedMimeCount)
     }
 }

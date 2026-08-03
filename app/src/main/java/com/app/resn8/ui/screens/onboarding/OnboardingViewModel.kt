@@ -30,6 +30,7 @@ class OnboardingViewModel(
     private val _scanProgress = MutableStateFlow<ScanProgress?>(null)
     val scanProgress: StateFlow<ScanProgress?> = _scanProgress.asStateFlow()
     private var activeSourceId: String? = null
+    private var activeCollectionId: String? = null
     private var workObservation: Job? = null
 
     init {
@@ -44,6 +45,7 @@ class OnboardingViewModel(
                 val root = appContainer.collectionRepository.getRootSourcesFlow(collection.id).first().firstOrNull()
                     ?: return@runCatching
                 activeSourceId = root.id
+                activeCollectionId = collection.id
                 if (root.lastScanStatus == "IN_PROGRESS") observeWork(root.id)
                 else root.lastScanSummary?.let { _uiState.value = IndexingUiState.Complete(it) }
             }
@@ -73,6 +75,12 @@ class OnboardingViewModel(
                 phase = "ADD_ROOT_SOURCE"
                 val root = appContainer.collectionRepository.addRootSource(collection.id, treeUriStr, collectionName)
                 activeSourceId = root.id
+                activeCollectionId = collection.id
+                phase = "SELECT_COLLECTION"
+                runCatching { persistActiveSelection(collection.id, root.id, "onboarding") }
+                    .onFailure { error ->
+                        Log.w(LOG_TAG, "initial_selection_save_failed category=${error::class.simpleName}")
+                    }
                 phase = "ENQUEUE_WORK"
                 _uiState.value = IndexingUiState.Scanning(null)
                 observeWork(root.id)
@@ -90,6 +98,35 @@ class OnboardingViewModel(
 
     fun resetToFirstRun() {
         _uiState.value = IndexingUiState.FirstRun
+    }
+
+    fun openLibrary(onReady: () -> Unit) {
+        viewModelScope.launch {
+            val collectionId = activeCollectionId
+            val sourceId = activeSourceId
+            if (collectionId == null || sourceId == null) {
+                _uiState.value = IndexingUiState.ScanError("The indexed collection could not be selected.")
+                return@launch
+            }
+            try {
+                persistActiveSelection(collectionId, sourceId, "library")
+                onReady()
+            } catch (error: Exception) {
+                Log.e(LOG_TAG, "library_handoff_failed category=${error::class.simpleName}")
+                _uiState.value = IndexingUiState.ScanError("Unable to open the indexed collection.")
+            }
+        }
+    }
+
+    private suspend fun persistActiveSelection(collectionId: String, sourceId: String, route: String) {
+        val session = appContainer.uiSessionRepository.getUiSessionStateFlow().first()
+        appContainer.uiSessionRepository.saveUiSessionState(
+            session.copy(
+                currentRoute = route,
+                selectedCollectionId = collectionId,
+                selectedSourceId = sourceId
+            )
+        )
     }
 
     private fun observeWork(sourceId: String) {

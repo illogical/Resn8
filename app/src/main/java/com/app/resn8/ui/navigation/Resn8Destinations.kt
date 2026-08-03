@@ -9,10 +9,14 @@ object OnboardingRoute
 data class LibraryRoute(val tab: String = "artists")
 
 @Serializable
-data class ArtistDetailRoute(val collectionId: String = "MUSIC", val artistKeySerialized: String)
+data class ArtistDetailRoute(val collectionId: String, val artistKeySerialized: String)
 
 @Serializable
-data class AlbumDetailRoute(val collectionId: String = "MUSIC", val albumKeySerialized: String)
+data class AlbumDetailRoute(
+    val collectionId: String,
+    val albumKeySerialized: String,
+    val albumArtistKeySerialized: String? = null
+)
 
 @Serializable
 data class FoldersRoute(val folderId: String? = null)
