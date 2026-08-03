@@ -36,6 +36,7 @@ import com.app.resn8.ui.library.ArtistDetailScreen
 import com.app.resn8.ui.library.ArtistDetailViewModel
 import com.app.resn8.ui.library.LibraryViewModel
 import com.app.resn8.ui.playlists.PlaylistDetailViewModel
+import com.app.resn8.ui.playlists.currentMediaIdForPlaylist
 import com.app.resn8.ui.playlists.PlaylistsViewModel
 import com.app.resn8.ui.screens.FoldersScreen
 import com.app.resn8.ui.screens.LibraryScreen
@@ -335,6 +336,11 @@ fun Resn8NavHost(
                     }
                 )
                 val tracks by viewModel.tracks.collectAsState()
+                val currentPlaylistMediaId = currentMediaIdForPlaylist(
+                    viewedPlaylistId = route.playlistId,
+                    sourcePlaylistId = playbackUiState.sourcePlaylistId,
+                    currentMediaId = playbackUiState.currentMediaId
+                )
                 PlaylistDetailScreen(
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() },
@@ -358,7 +364,9 @@ fun Resn8NavHost(
                             )
                             navController.navigate(NowPlayingRoute)
                         }
-                    }
+                    },
+                    currentMediaId = currentPlaylistMediaId,
+                    isCurrentTrackPlaying = playbackUiState.isPlaying
                 )
             }
 

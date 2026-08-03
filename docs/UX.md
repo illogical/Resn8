@@ -220,6 +220,10 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   4. Tap "Remove from Playlist" on a track -> verify track is removed from playlist while source file remains intact.
   5. Restart after repeated reorders -> confirm the exact order persists without duplicate/missing rows or lost added timestamps.
   6. Tap an available filtered result -> confirm playback starts the full available-only playlist in manual order at that track. Confirm **Play All** also means the full playlist, not only filtered rows.
+  7. Start item 30 in a 50+ item playlist, return to that Playlist Detail, and confirm row 30 keeps its one-based position and has a visible, TalkBack-announced current-track state. Pause playback and confirm the row remains marked as the current paused track.
+  8. Scroll away and press **Jump to current track** -> confirm the list animates to row 30. Filter the current row out and press the action again -> confirm search clears and the current row becomes visible.
+  9. Advance to the next item while Playlist Detail is open -> confirm the marker moves without forcing the list to follow. Open another playlist containing the same media, or play it from the library -> confirm that playlist shows no current marker or jump action.
+  10. Place unavailable memberships before the current item -> confirm jump and row numbering use the live playlist position rather than the shorter available-only queue index. Remove the current membership -> confirm the marker and jump action disappear while the active queue continues unchanged.
 
 ### US5.4 — Unavailable Membership & Queue Isolation
 - **As a** user whose removable storage may be temporarily absent,

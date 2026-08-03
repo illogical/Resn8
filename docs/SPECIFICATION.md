@@ -152,6 +152,7 @@ Playback continues when the activity is backgrounded or the screen locks. The me
 - Checking adds missing unique memberships; unchecking removes present memberships. The selector stays open until dismissed and reports partial failures.
 - A playlist view supports search, removal, drag reorder, Move to Top, and Move to Bottom. Manual order is persisted with collision-free positions and compacted when needed.
 - Starting playback from a playlist creates a saved manual queue snapshot so later playlist edits do not unexpectedly reorder the active queue.
+- When the active queue originated from the viewed playlist, Playlist Detail preserves one-based manual position numbers, visibly and accessibly marks the current media row even while paused, and offers an explicit jump-to-current action for long lists. The action resolves against live playlist membership rather than the available-only queue index, clears a search that hides the target, and never marks matching media when playback came from another source context.
 
 ### 3.4 Restoration
 

@@ -1,6 +1,7 @@
 package com.app.resn8.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,16 +11,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VerticalAlignBottom
@@ -43,9 +48,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,6 +61,8 @@ import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.ui.components.RenamePlaylistDialog
 import com.app.resn8.ui.playlists.PlaylistDetailViewModel
 import com.app.resn8.ui.playlists.PlaylistItemUiModel
+import com.app.resn8.ui.playlists.currentPlaylistItemIndex
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,12 +72,17 @@ fun PlaylistDetailScreen(
     onBack: () -> Unit,
     onTrackClick: (MediaFile) -> Unit,
     onPlayAll: () -> Unit,
+    currentMediaId: String? = null,
+    isCurrentTrackPlaying: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val playlist by viewModel.playlist.collectAsState()
+    val tracks by viewModel.tracks.collectAsState()
     val filteredTracks by viewModel.filteredTracks.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+    val currentTrackIndex = currentPlaylistItemIndex(tracks, currentMediaId)
 
     var isSearchActive by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -182,6 +197,37 @@ fun PlaylistDetailScreen(
                 }
 
                 Row {
+                    if (currentTrackIndex >= 0 && currentMediaId != null) {
+                        IconButton(
+                            onClick = {
+                                val targetMediaId = currentMediaId
+                                scope.launch {
+                                    if (viewModel.searchQuery.value.isNotEmpty()) {
+                                        viewModel.searchQuery.value = ""
+                                        snapshotFlow { Triple(searchQuery, filteredTracks, tracks) }
+                                            .first { (query, visibleItems, allItems) ->
+                                                query.isEmpty() && (
+                                                    visibleItems.any { it.mediaFile.id == targetMediaId } ||
+                                                        allItems.none { it.mediaFile.id == targetMediaId }
+                                                    )
+                                            }
+                                    }
+
+                                    val targetIndex = filteredTracks.indexOfFirst {
+                                        it.mediaFile.id == targetMediaId
+                                    }
+                                    if (targetIndex >= 0) {
+                                        listState.animateScrollToItem(targetIndex)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MyLocation,
+                                contentDescription = "Jump to current track"
+                            )
+                        }
+                    }
                     Button(
                         onClick = onPlayAll,
                         enabled = filteredTracks.any { it.mediaFile.isAvailable }
@@ -206,6 +252,7 @@ fun PlaylistDetailScreen(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -219,6 +266,8 @@ fun PlaylistDetailScreen(
                             isFirst = index == 0,
                             isLast = index == filteredTracks.size - 1,
                             isSearchActive = searchQuery.isNotEmpty(),
+                            isCurrent = item.mediaFile.id == currentMediaId,
+                            isPlaying = isCurrentTrackPlaying,
                             onTrackClick = {
                                 if (item.mediaFile.isAvailable) {
                                     onTrackClick(item.mediaFile)
@@ -285,6 +334,8 @@ private fun PlaylistItemRow(
     isFirst: Boolean,
     isLast: Boolean,
     isSearchActive: Boolean,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
     onTrackClick: () -> Unit,
     onMoveToTop: () -> Unit,
     onMoveUp: () -> Unit,
@@ -298,6 +349,26 @@ private fun PlaylistItemRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .background(
+                if (isCurrent) {
+                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
+            )
+            .then(
+                if (isCurrent) {
+                    Modifier.semantics(mergeDescendants = true) {
+                        stateDescription = if (isPlaying) {
+                            "Currently playing"
+                        } else {
+                            "Current track, paused"
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .clickable(enabled = mediaFile.isAvailable, onClick = onTrackClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -319,6 +390,15 @@ private fun PlaylistItemRow(
                     overflow = TextOverflow.Ellipsis,
                     color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
                 )
+                if (isCurrent) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
                 if (!mediaFile.isAvailable) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
