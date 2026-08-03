@@ -10,6 +10,7 @@ import com.app.resn8.domain.model.FolderNode
 import com.app.resn8.domain.model.LibraryQuery
 import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.domain.model.MetadataGroupKey
+import com.app.resn8.domain.model.PlaybackHistory
 import com.app.resn8.domain.model.PlaybackHistoryResult
 import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.domain.model.SelectionResolutionResult
@@ -277,6 +278,10 @@ class FakeMediaRepository(
         val sessionOccurrenceId = UUID.randomUUID().toString()
         val result = if (isMeaningful) PlaybackHistoryResult.THRESHOLD_COUNTED else PlaybackHistoryResult.DISCARDED
         commitMeaningfulPlay(sessionOccurrenceId, mediaId, System.currentTimeMillis() - listenedDurationMs, System.currentTimeMillis(), listenedDurationMs, result)
+    }
+
+    override suspend fun getPlaybackHistoryByOccurrenceId(sessionOccurrenceId: String): PlaybackHistory? {
+        return null
     }
 
     override suspend fun commitMeaningfulPlay(

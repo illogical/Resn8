@@ -95,7 +95,7 @@ This document defines user stories and manual UX verification workflows for Resn
 - **So that** I can control playback from any screen.
 - **Verification**:
   1. Start playing a track.
-  2. Navigate between Onboarding, Library, Folders, and Playlists tabs.
+  2. Navigate between Settings, Library, Folders, and Playlists after setup (and through Onboarding during a fresh/recovery flow).
   3. Confirm mini-player stays anchored above navigation bar with current track info.
   4. Tap Play/Pause or Next on mini-player -> confirm immediate response.
   5. Tap mini-player body -> confirm navigation to Now Playing screen.
@@ -232,11 +232,64 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   4. Start an available playlist, then reorder/remove tracks and delete the playlist -> confirm the already active explicit queue and its queue-item IDs remain unchanged.
   5. Restore source availability/re-index -> confirm retained playlist rows become playable again without re-adding them.
 
+## 6. Relaunch Restoration & Context Recovery (Milestone 7 — Upcoming)
+
+### US6.1 — Seamless Relaunch Restoration
+- **As a** user returning to Resn8 after process death or app restart,
+- **I want** Resn8 to restore my exact queue, track, position (paused), and screen route,
+- **So that** I never lose my listening context.
+- **Verification**:
+  1. Start a queue containing duplicate occurrences of one media file, play the second occurrence, seek to a recognizable position, then kill the app process.
+  2. Relaunch normally -> confirm the exact saved queue and stable queue-item occurrence are rebuilt, the same item is prepared at the bounded saved position, and no audio starts automatically.
+  3. Confirm restoring the Activity/controller does not mint a new playback traversal occurrence or duplicate meaningful-play credit.
+  4. Change repeat/speed state through a test fixture or available control, restart, and confirm the saved values are applied before preparation even when their user-facing controls remain post-MVP.
+  5. Start a different queue while restoration is resolving -> confirm the newer user action wins and the older restore cannot replace it.
+
+### US6.2 — Durable, Efficient Checkpointing
+- **As a** user whose app or service may be stopped at any time,
+- **I want** recent listening progress saved without harming playback performance,
+- **So that** restoration is accurate and reliable.
+- **Verification**:
+  1. While playing, wait across multiple checkpoint intervals and confirm persisted position advances at a bounded cadence rather than on every UI poll.
+  2. Pause, complete a seek, change items, background the app, remove its task, and stop the service -> confirm each event requests an immediate checkpoint.
+  3. Race a periodic write with an item transition -> confirm serialized writes leave the newer item/index/occurrence state authoritative.
+  4. Force shutdown between periodic intervals -> confirm restoration loses no more than the documented checkpoint window.
+
+### US6.3 — Browsing Context Restoration and Safe Fallback
+- **As a** user browsing a large library,
+- **I want** to return to the artist, album, folder, playlist, queue, player, or filtered library view I last used,
+- **So that** I do not have to reconstruct my place after every relaunch.
+- **Verification**:
+  1. Relaunch separately from each meaningful destination and confirm its typed identifiers plus library surface, search, filters, and sort restore after session loading completes.
+  2. Confirm transient dialogs, sheets, multi-selection, and intermediate onboarding progress do not reopen.
+  3. Remove a selected playlist or make an artist/album/folder target invalid, then relaunch -> confirm deterministic fallback to its valid parent and persistence of the corrected destination.
+  4. Confirm active queue resolution follows `UiSessionState.activeQueueId`, not whichever saved queue was most recently updated.
+
+### US6.4 — Onboarding Graduation and Settings
+- **As a** returning user with a configured library,
+- **I want** the setup navigation item to become Settings,
+- **So that** source maintenance and future preferences have a durable, discoverable home.
+- **Verification**:
+  1. Fresh-install launch -> confirm Onboarding is shown until a usable collection/source exists.
+  2. Complete indexing and relaunch -> confirm the top-level slot is labeled Settings and normal startup does not flash or route through Onboarding.
+  3. Open Settings -> confirm collection/source status, Re-index Library, and permission-reselection/recovery actions are available.
+  4. Revoke source permission or remove the configured collection through a test fixture -> confirm recovery routes to an actionable Onboarding/Settings state rather than an empty library loop.
+
+### US6.5 — Unavailable Playback Recovery
+- **As a** user whose storage or permission is temporarily unavailable,
+- **I want** an explanation and recovery choices without losing my queue,
+- **So that** removable storage and permission problems do not erase listening context.
+- **Verification**:
+  1. Save progress on an item, revoke its source permission or detach its storage, and relaunch -> confirm Resn8 distinguishes the unavailable-source condition and preserves queue/history rows.
+  2. Use Retry or reselect permission -> confirm the same item and position can recover when access returns.
+  3. Choose Skip to Next Available -> confirm Resn8 advances once to a playable item and persists that replacement only after the action succeeds.
+  4. Test missing queue row, invalid index/media pairing, and a queue with no available items -> confirm each has a bounded fallback and no crash or silent queue deletion.
+
 ---
 
-## 6. Smart Queue Generation (Milestone 7 — Prepared)
+## 7. Smart Queue Generation (Milestone 8 — Planned)
 
-### US6.1 — Generate Smart Queues
+### US7.1 — Generate Smart Queues
 - **As a** user,
 - **I want to** generate Random Eligible, Unplayed, Least Played, Most Played, Most Liked, Most Recently Played, and Least Recently Played queues from the currently visible scope,
 - **So that** I can rediscover hidden music in my library.
@@ -248,7 +301,7 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   5. Confirm Most Recently Played puts played tracks newest-first with unplayed tracks randomized last; Least Recently Played puts unplayed tracks randomized first, followed by oldest-played groups.
   6. Confirm generation does not block navigation or the main thread for a representative large library.
 
-### US6.2 — Disliked File Exclusion
+### US7.2 — Disliked File Exclusion
 - **As a** user,
 - **I want** disliked tracks (`likeScore < 0`) excluded from smart queues by default,
 - **So that** tracks I dislike aren't suggested automatically.
@@ -257,7 +310,7 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   2. Generate every other mode -> confirm negative-score and unavailable tracks are absent by default and the preview states both exclusions.
   3. Use a scope containing only disliked/unavailable tracks -> confirm a specific zero-eligible state appears and no empty queue replaces the active queue.
 
-### US6.3 — Reproducible Explicit Snapshots
+### US7.3 — Reproducible Explicit Snapshots
 - **As a** user,
 - **I want** a generated queue to remain stable until I explicitly regenerate it,
 - **So that** ratings, re-indexing, or new files do not unexpectedly reorder what I am listening to.
@@ -266,9 +319,9 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   2. Generate with a different seed -> confirm eligible membership remains equal while at least one randomized peer group can differ.
   3. After generation, change ratings/play counts, add a file, and re-index -> confirm the active saved queue order does not change.
   4. Tap **Regenerate** -> confirm a new request/seed is reviewed and a new explicit queue replaces the active queue only after successful persistence.
-  5. Relaunch the app/database process -> confirm the saved mode, normalized filter snapshot, seed, and explicit order can be inspected unchanged; exact playback-position restoration remains Milestone 8.
+  5. Relaunch the app/database process -> confirm the saved mode, normalized filter snapshot, seed, and explicit order can be inspected unchanged through Milestone 7 restoration.
 
-### US6.4 — Smart Queue Errors, Cancellation & Manual Save
+### US7.4 — Smart Queue Errors, Cancellation & Manual Save
 - **As a** user,
 - **I want** generation failures and edge cases to preserve my current listening context,
 - **So that** experimenting with smart modes is safe.
@@ -280,18 +333,13 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ---
 
-## 7. Relaunch Restoration & Context Recovery (Milestone 8 — Upcoming)
+## 8. MVP Polish & Release Readiness (Milestone 9 — Upcoming)
 
-### US7.1 — Seamless Relaunch Restoration
-- **As a** user returning to Resn8 after process death or app restart,
-- **I want** Resn8 to restore my exact queue, track, position (paused), and screen route,
-- **So that** I never lose my listening context.
-
----
-
-## 8. Accessibility & Adaptive Design (Milestone 8 — Upcoming)
-
-### US8.1 — Screen Reader & Switch Access
+### US8.1 — Screen Reader, Adaptive Layout & Interaction Polish
 - **As a** user relying on accessibility services,
 - **I want** clear content descriptions, minimum 48dp touch targets, font scaling support, and high contrast,
 - **So that** the app is fully usable with TalkBack or hardware switches.
+- **Verification**:
+  1. Complete the core first-run, browse, playback, rating, playlist, restoration, and smart-queue flows with TalkBack or switch/keyboard navigation.
+  2. Repeat core surfaces in portrait, landscape, and supported large-font settings -> confirm controls remain reachable and state survives configuration changes.
+  3. Review loading, empty, success, and recoverable error feedback -> confirm long-running actions never appear inert and no essential action relies on gesture or color alone.

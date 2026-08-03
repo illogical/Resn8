@@ -35,17 +35,13 @@ import com.app.resn8.ui.navigation.OnboardingRoute
 import com.app.resn8.ui.navigation.PlaylistsRoute
 import com.app.resn8.ui.navigation.Resn8NavHost
 
+import androidx.compose.material.icons.filled.Settings
+import com.app.resn8.ui.navigation.SettingsRoute
+
 data class TopLevelDestination(
     val label: String,
     val route: Any,
     val icon: androidx.compose.ui.graphics.vector.ImageVector
-)
-
-val topLevelDestinations = listOf(
-    TopLevelDestination("Onboarding", OnboardingRoute, Icons.Default.Home),
-    TopLevelDestination("Library", LibraryRoute(), Icons.Default.LibraryMusic),
-    TopLevelDestination("Folders", FoldersRoute(), Icons.Default.Folder),
-    TopLevelDestination("Playlists", PlaylistsRoute, Icons.AutoMirrored.Filled.QueueMusic)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,10 +54,31 @@ fun Resn8App(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    val rootSources by container.collectionRepository.getRootSourcesFlow("MUSIC").collectAsState(initial = emptyList())
+    val isSetupComplete = rootSources.any { it.isAvailable }
+
+    val topLevelDestinations = remember(isSetupComplete) {
+        val firstDest = if (isSetupComplete) {
+            TopLevelDestination("Settings", SettingsRoute, Icons.Default.Settings)
+        } else {
+            TopLevelDestination("Onboarding", OnboardingRoute, Icons.Default.Home)
+        }
+        listOf(
+            firstDest,
+            TopLevelDestination("Library", LibraryRoute(), Icons.Default.LibraryMusic),
+            TopLevelDestination("Folders", FoldersRoute(), Icons.Default.Folder),
+            TopLevelDestination("Playlists", PlaylistsRoute, Icons.AutoMirrored.Filled.QueueMusic)
+        )
+    }
+
     val playbackConnection = container.playbackConnection
     val playbackUiState by (playbackConnection?.uiState ?: remember { kotlinx.coroutines.flow.MutableStateFlow(com.app.resn8.playback.PlaybackUiState()) }).collectAsState()
 
     var openSelectorHandler by remember { mutableStateOf<((List<String>, String, String?) -> Unit)?>(null) }
+
+    val startDestination = remember(isSetupComplete) {
+        if (isSetupComplete) LibraryRoute() else OnboardingRoute
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -120,7 +137,7 @@ fun Resn8App(
         Resn8NavHost(
             container = container,
             navController = navController,
-            startDestination = OnboardingRoute,
+            startDestination = startDestination,
             onRegisterOpenSelector = { handler -> openSelectorHandler = handler },
             modifier = Modifier.padding(innerPadding)
         )

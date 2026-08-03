@@ -7,6 +7,7 @@ data class UiSessionState(
     val selectedFolderId: String? = null,
     val selectedArtistKey: MetadataGroupKey? = null,
     val selectedAlbumKey: MetadataGroupKey? = null,
+    val selectedAlbumArtistKey: MetadataGroupKey? = null,
     val selectedPlaylistId: String? = null,
     val activeQueueId: String? = null,
     val activeSearchQuery: String? = null,

@@ -99,7 +99,7 @@ For `CONTEXTUAL` collections, relative folders are the category hierarchy and mu
 - Replaying through a new traversal occurrence can create another play.
 - When duration is unknown, four minutes or natural completion qualifies. Both an automatic transition after an item completes and final-queue `STATE_ENDED` are natural-completion signals. Natural completion qualifies a shorter or partially heard file only when accumulated active listening is greater than zero, so seeking directly to the end cannot count.
 - Finalize/qualify the prior occurrence before initializing the next one on a transition. Interrupted or failed playback cannot manufacture a count, and repeated commit attempts for one occurrence are idempotent.
-- On qualification, `playCount`, `lastPlayedAt`, and the history record are committed atomically. Position and process-death restoration state are checkpointed separately and more frequently in Milestone 8.
+- On qualification, `playCount`, `lastPlayedAt`, and the history record are committed atomically. Position and process-death restoration state are checkpointed separately and more frequently in Milestone 7.
 
 ### 2.7 Filters, Sorts, and Smart Queue Generation
 
@@ -135,6 +135,8 @@ Manual library sorts support artist, album, disc/track, filename/title, recently
 
 The folder browser mirrors indexed relative paths, shows file availability, supports file/folder multi-selection, and expands selected folders to all currently indexed descendant audio for bulk playlist operations.
 
+Onboarding is a conditional first-run/recovery flow, not a permanent destination once a usable collection and source exist. After setup, its top-level navigation slot becomes Settings. The MVP Settings surface provides collection/source status, manual re-indexing, and permission-reselection entry points; later collection management and user-configurable preferences extend that surface post-MVP.
+
 ### 3.2 Player and Queue
 
 The now-playing surface always exposes title, artist/album when available, elapsed/duration position, seek control, Previous, Play/Pause, Next, Like, Dislike, current score, queue access, and Add to Playlist. Album art is shown when available with a stable placeholder fallback.
@@ -155,7 +157,13 @@ Playback continues when the activity is backgrounded or the screen locks. The me
 
 Resn8 checkpoints the active saved queue, index, media ID, position, play/pause intent, playback speed, repeat state, and UI context. On relaunch it restores the same screen and queue and seeks to the saved position. Playback does not start audibly merely because the app was opened; the last item is ready in a paused state unless Android's explicit media-resumption path requested playback.
 
-Position is saved periodically while playing, on pause, item transition, task/background lifecycle events, and service shutdown. If the item is unavailable, Resn8 keeps the context, identifies the problem, and offers to skip to the next available item or reselect the source folder.
+`Resn8MediaService`, as the sole player owner, is authoritative for playback checkpoints. Position is saved periodically while playing and immediately on pause, completed seek, item transition, task/background lifecycle events, and service shutdown. Writes are serialized and coalesced so a delayed older checkpoint cannot overwrite newer state. A checkpoint retains the stable queue-item ID and playback occurrence ID separately, together with the occurrence's accumulated active-listening duration and qualification state; restoring controller or Activity state does not create a new traversal occurrence or discard already accumulated listening.
+
+Cold-start restoration waits for persisted session state before choosing a destination or installing media. It resolves the active queue only from `UiSessionState.activeQueueId`, rebuilds the stored explicit queue without minting replacement queue-item IDs, validates the saved index/media pair, bounds the seek position to the known duration when possible, and applies repeat/speed state before preparation. A newly selected queue always supersedes an in-flight restoration attempt.
+
+UI restoration persists typed destination state rather than an opaque back stack or display strings. It restores the last meaningful library surface, folder, artist, album, playlist, queue, or Now Playing destination together with the applicable collection, search, filter, and sort values. Transient dialogs, sheets, selection mode, and onboarding progress are not restored. If a destination no longer exists, Resn8 falls back deterministically through its valid parent (detail to list, folder to root, then Library) and updates persisted session state to that valid destination.
+
+If the current item or source is unavailable, Resn8 keeps the queue and history context, identifies whether permission, storage, media, or saved state is missing, and offers reselect, retry, Settings, or skip-to-next-available actions as applicable. Merely detecting an unavailable item does not destructively rewrite the saved queue.
 
 ## 4. Architecture and Quality Requirements
 
@@ -214,3 +222,4 @@ The MVP is complete when all of the following are demonstrated on an API 34+ dev
 5. Raycast/Alfred-style global search across metadata, folders, playlists, and history.
 6. Rating/history maintenance, including confirmed move/delete workflows for disliked files.
 7. Export/import backup for playlists, ratings, history, and settings without bundling source audio.
+8. Extend the existing player artwork seam with cached album artwork throughout library, album, artist, track, queue, and playlist surfaces when the current index exposes a usable artwork reference, with a stable placeholder when it does not.

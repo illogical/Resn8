@@ -32,3 +32,7 @@ object QueueRoute
 
 @Serializable
 object NowPlayingRoute
+
+@Serializable
+object SettingsRoute
+

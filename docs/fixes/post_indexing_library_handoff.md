@@ -40,7 +40,7 @@ The completion UI currently omits `scannedFolderCount` and `inspectedDocumentCou
 5. Search focus and text entry, sort/filter changes, and Library tab changes are nonfatal and preserve session state.
 6. Empty, loading, query-failure, and genuinely no-match states are visually distinct. Paging's initial empty placeholder must not briefly claim that an indexed collection has no artists.
 7. The search control remains compact at normal font scale while preserving a minimum accessible touch target and usable large-font behavior.
-8. Relaunching after a successful initial scan retains a valid collection/source selection. Full route and playback restoration remains Milestone 8, but the app must not fall back to an invalid synthetic collection ID.
+8. Relaunching after a successful initial scan retains a valid collection/source selection. Full route and playback restoration remains Milestone 7, but the app must not fall back to an invalid synthetic collection ID.
 
 ## Confirmed static findings and hypotheses to verify
 

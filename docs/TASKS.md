@@ -51,7 +51,7 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [x] **T025 — Integrate Android playback behavior.** Support background/lock-screen session controls, audio focus, Bluetooth/headset media keys, pause-on-headphone-disconnect, and bounded error/skip behavior that reports failures, retains the saved queue, and cannot loop forever when every remaining item fails.
 - [x] **T026 — Test live playback lifecycle.** Verify Activity/controller recreation, backgrounding, screen lock, playing/paused task removal, service cleanup/recreation, audio focus, unplug events, hardware/system controls, unsupported/corrupt/unavailable items, and single-player ownership with API 34+ device coverage. Exact process-death queue/position restoration remains T043-T046.
 
-**Exit:** Local audio plays reliably through the app and Android system surfaces from a persisted explicit queue, with live lifecycle/controller resilience and bounded failure handling. Periodic checkpoints, exact relaunch restoration, and Android playback resumption remain Milestone 8.
+**Exit:** Local audio plays reliably through the app and Android system surfaces from a persisted explicit queue, with live lifecycle/controller resilience and bounded failure handling. Periodic checkpoints, exact relaunch restoration, and Android playback resumption remain Milestone 7.
 
 ## Milestone 5 — Track Ratings and Meaningful Plays (P0)
 
@@ -60,7 +60,7 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [x] **T029 — Qualify and commit meaningful plays.** At `min(50% of known duration, 4 minutes)` or after four active minutes for unknown duration, atomically write one history result, increment play count, and set last-played time. Recognize both automatic item transitions and final `STATE_ENDED` as natural completion, require positive active listening for completion qualification, and use the traversal occurrence ID for exactly-once idempotency.
 - [x] **T030 — Verify rating and meaningful-play reliability.** Add deterministic tracker, repository, UI-state, and Media3 transition/lifecycle tests covering threshold boundaries, seeks, pause/resume, buffering/focus interruption, wall-clock changes, duplicate queue media, repeat/new occurrences, short and unknown durations, automatic/final completion, background playback, UI recreation, service/process interruption, rollback, and concurrent UI/service commits; complete API 34+ manual checks.
 
-**Exit:** Ratings and listening statistics remain atomic, occurrence-correct, and trustworthy during foreground/background playback and UI/controller recreation, making them safe inputs for sorting and generation. Full process-death queue/occurrence restoration remains Milestone 8.
+**Exit:** Ratings and listening statistics remain atomic, occurrence-correct, and trustworthy during foreground/background playback and UI/controller recreation, making them safe inputs for sorting and generation. Full process-death queue/occurrence restoration remains Milestone 7.
 
 ## Milestone 6 — Implement Manual Playlists (P1)
 
@@ -73,7 +73,16 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 **Exit:** Users can assemble and maintain durable ordered playlists from every specified context.
 
-## Milestone 7 — Generate Smart Randomized Queues (P1)
+## Milestone 7 — Restore Playback and Browsing Context (P1)
+
+- [x] **T043 — Add service-owned queue and position checkpoints.** From `Resn8MediaService`, persist the active queue ID, stable queue-item/current playback occurrence identity, validated index/media ID, bounded position, play intent, playback speed, repeat state, and the current occurrence's accumulated active-listening/accounting state. Checkpoint periodically while playing and immediately on pause, seek completion, item transition, app backgrounding, task removal, and service shutdown; serialize/coalesce writes so stale or high-frequency updates cannot win.
+- [x] **T044 — Restore playback safely.** On service/controller cold start, resolve `UiSessionState.activeQueueId`, rebuild the exact persisted queue with its stable `queueItemId` values, restore repeat/speed state, prepare the validated item, and seek to the bounded saved position. Normal app launch must remain paused even when prior play intent was true; only Android's explicit media-resumption request may resume audibly. Make restoration idempotent across Activity/controller recreation and prevent an older restore from replacing a newly selected queue.
+- [x] **T045 — Restore browsing context and graduate onboarding to Settings.** Persist typed destination state at meaningful navigation/filter changes and restore the last valid library surface, folder, artist, album, playlist, queue, or Now Playing context only after session readiness is known. Route incomplete setups to Onboarding; after a usable collection exists, replace the permanent Onboarding navigation item with a Settings destination that initially hosts source status, re-index, and permission-reselection actions and can later host collection/configuration preferences. Apply a deterministic parent fallback when a selected target no longer exists, and never derive the active queue from the most recently updated row.
+- [x] **T046 — Recover without discarding unavailable context.** Distinguish revoked permission, unavailable source/storage, missing queue row, missing media, invalid index, and an empty/no-playable queue. Preserve the saved queue and history, explain the problem, and offer context-appropriate reselect, retry, open Settings, or skip-to-next-available actions. Persist a replacement current item only after the user chooses it or playback successfully advances.
+
+**Exit:** A normal relaunch returns to the last valid screen and reconstructs the exact active queue, item, and bounded position in a paused state; explicit Android media resumption remains functional, and unavailable targets remain recoverable without losing queue or history data.
+
+## Milestone 8 — Generate Smart Randomized Queues (P1)
 
 - [ ] **T037 — Define and snapshot the smart-generation request.** Capture the authoritative active collection ID plus the current folder/descendant, artist, album, search, availability, sort-independent filter, and disliked-exclusion settings as one normalized, versioned immutable snapshot before asynchronous work begins. Resolve exactly the currently visible eligible media IDs, keep available media only, exclude `likeScore < 0` by default, and return an explainable zero-result reason.
 - [ ] **T038 — Implement every seeded ordering mode.** With an injectable seeded random source, implement Random Eligible and Unplayed shuffles plus linear grouping and ordered group traversal for Least Played, Most Played, Most Liked, Most Recently Played, and Least Recently Played. Shuffle independently inside every equal-key group, put unplayed rows in the specification-defined recent-mode positions, avoid quadratic grouping, and never depend on database row order.
@@ -82,19 +91,15 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [ ] **T041 — Build explainable generation and regeneration UI.** Offer all seven modes from supported library scopes, show source scope, disliked exclusion, eligible count, and ordering explanation before confirmation, handle loading/cancellation/zero eligible/error states, and make regeneration an explicit new seed/snapshot action. Preserve accessibility, rotation-safe state, and a clear path to inspect the resulting queue or save it as a manual playlist.
 - [ ] **T042 — Verify algorithms, persistence, and scale.** Add pure algorithm, repository/Room, ViewModel, Compose, playback handoff, and API 34+ tests for exact eligibility/filter scoping; all seven modes; the normative score example; randomized ties; same-seed reproducibility; different-seed variability without flaky assertions; empty/single/all-disliked/unplayed/null-recency inputs; unavailable media; immutable active queues; process reopen; cancellation; and 25,000-item time/memory behavior.
 
-**Exit:** Every specified smart mode creates a correct, explainable, durable queue from exactly the visible scope.
+**Exit:** Every specified smart mode creates a correct, explainable, durable queue from exactly the visible scope and inherits Milestone 7 restoration behavior.
 
-## Milestone 8 — Restore Context and Finish the MVP (P1)
+## Milestone 9 — Polish and Finish the MVP (P1)
 
-- [ ] **T043 — Add queue and position checkpoints.** Save queue ID, current playback occurrence ID, index/media ID, position, play intent, playback speed, and repeat state periodically and on pause, transition, backgrounding, task removal, and service shutdown without excessive database writes.
-- [ ] **T044 — Restore playback safely.** Rebuild the exact explicit queue and seek to position after process death/restart; default to paused on normal launch and support Android's explicit media-resumption request.
-- [ ] **T045 — Restore browsing context.** Return to the last meaningful route with collection, folder, artist, album, playlist, filter, and sort state; fall back safely when a target no longer exists.
-- [ ] **T046 — Handle unavailable restore targets.** Explain missing permission/storage/media and offer reselect, retry, or skip-to-next without discarding queue/history state.
-- [ ] **T047 — Complete accessibility/adaptive layout QA.** Validate screen reader labels, focus order, touch targets, font scaling, contrast, keyboard/switch access, portrait, and landscape. Ensure no core action requires a hidden gesture.
-- [ ] **T048 — Run MVP acceptance suite.** Execute unit, Room, Compose, instrumentation, service lifecycle, 25k-library, internal-storage, and removable-storage tests from `SPECIFICATION.md`; record any device-only limitations.
-- [ ] **T049 — Prepare release hygiene.** Confirm no sensitive paths or user media enter logs/backups, define database backup behavior, enable release optimization deliberately, and produce a signed-test release checklist.
+- [ ] **T047 — Complete accessibility, adaptive-layout, and interaction polish.** Validate screen reader labels, focus order, touch targets, font scaling, contrast, keyboard/switch access, portrait, and landscape. Ensure no core action requires a hidden gesture; review loading/empty/error feedback, navigation consistency, state-preserving rotation, and visible response to long-running actions across every MVP surface.
+- [ ] **T048 — Run the complete MVP acceptance and performance suite.** Execute unit, Room, Compose, instrumentation, service lifecycle, process-death/restoration, 25k-library, internal-storage, and removable-storage tests from `SPECIFICATION.md`; record device/provider coverage and any device-only limitations.
+- [ ] **T049 — Prepare release hygiene.** Confirm no sensitive paths or user media enter logs/backups, define database backup behavior, review notification/foreground-service behavior and app metadata, enable release optimization deliberately, and produce a signed-test release checklist.
 
-**Exit:** Every MVP acceptance criterion passes and the app can be used daily without losing its library, queue, ratings, playlists, or playback position.
+**Exit:** Every MVP acceptance criterion passes and the app can be used daily without losing its library, queue, ratings, playlists, browsing context, or playback position.
 
 ## Post-MVP Backlog (P2)
 
@@ -106,3 +111,4 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [ ] **T055 — Add global command search.** Search media, folders, artists, albums, playlists, history, and actions from one fast interface.
 - [ ] **T056 — Add safe disliked-file maintenance.** Preview and confirm move/delete operations through providers that grant write access; keep database/history reconciliation explicit.
 - [ ] **T057 — Add metadata/history backup and restore.** Export versioned app data without source audio and document identity/remapping behavior.
+- [ ] **T058 — Surface indexed album artwork throughout the library.** Extend the existing player artwork seam so an indexed artwork reference appears consistently on album, artist, track, queue, and playlist surfaces with caching, bounded decode work, accessibility semantics, and a stable placeholder. Do not rescan or modify source audio merely to decorate a list.

@@ -403,6 +403,14 @@ fun Resn8NavHost(
                     onDismissNotice = { playbackConnection?.clearNotice() }
                 )
             }
+
+            composable<SettingsRoute> {
+                val context = LocalContext.current
+                val settingsViewModel: com.app.resn8.ui.screens.settings.SettingsViewModel = viewModel(
+                    factory = com.app.resn8.ui.screens.settings.SettingsViewModel.Factory(context.applicationContext, container)
+                )
+                com.app.resn8.ui.screens.settings.SettingsScreen(viewModel = settingsViewModel)
+            }
         }
 
         activeSelectorRequest?.let { selectorReq ->

@@ -125,4 +125,39 @@ class MeaningfulPlayTrackerTest {
         assertNotEquals(occ1, occ3)
         assertNotEquals(occ2, occ3)
     }
+
+    @Test
+    fun `hydrate restores in-progress occurrence state without double-counting downtime`() {
+        // Hydrate with 40,000ms accumulated out of 100,000ms threshold (50,000ms threshold)
+        tracker.hydrate(
+            occurrenceId = "occ_hydrated",
+            mediaId = "track_hydrated",
+            durationMs = 100_000L,
+            accumulatedListenedMs = 40_000L,
+            occurrenceStartedAtEpochMs = 1700000000000L,
+            hasCommitted = false
+        )
+
+        assertEquals("occ_hydrated", tracker.currentOccurrenceId)
+        assertEquals("track_hydrated", tracker.currentMediaId)
+        assertEquals(40_000L, tracker.accumulatedListenedMs)
+
+        // Advance 10,000ms offline/downtime while not playing -> should not accumulate
+        fakeMonotonicTimeMs += 10_000L
+        tracker.onTick(100_000L)
+        assertEquals(40_000L, tracker.accumulatedListenedMs)
+        assertTrue(qualifiedEvents.isEmpty())
+
+        // Start playing and advance 10,000ms active listening -> total 50,000ms -> qualifies!
+        tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 100_000L)
+        tracker.onIsPlayingChanged(playing = true, durationMs = 100_000L)
+        fakeMonotonicTimeMs += 10_000L
+        tracker.onTick(100_000L)
+
+        assertEquals(1, qualifiedEvents.size)
+        val event = qualifiedEvents.first()
+        assertEquals("occ_hydrated", event.sessionOccurrenceId)
+        assertEquals("track_hydrated", event.mediaId)
+        assertEquals(50_000L, event.accumulatedMs)
+    }
 }

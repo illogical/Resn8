@@ -20,6 +20,7 @@ import com.app.resn8.domain.model.FolderNode
 import com.app.resn8.domain.model.LibraryQuery
 import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.domain.model.MetadataGroupKey
+import com.app.resn8.domain.model.PlaybackHistory
 import com.app.resn8.domain.model.PlaybackHistoryResult
 import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.domain.model.SelectionResolutionResult
@@ -277,6 +278,10 @@ class RoomMediaRepository(
             accumulatedListenedDurationMs = listenedDurationMs,
             result = result
         )
+    }
+
+    override suspend fun getPlaybackHistoryByOccurrenceId(sessionOccurrenceId: String): PlaybackHistory? {
+        return playbackHistoryDao.getHistoryByOccurrenceId(sessionOccurrenceId)?.toDomain()
     }
 
     override suspend fun commitMeaningfulPlay(

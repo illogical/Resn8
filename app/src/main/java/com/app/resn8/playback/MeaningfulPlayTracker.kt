@@ -21,13 +21,34 @@ class MeaningfulPlayTracker(
     var currentMediaId: String? = null
         private set
 
-    private var currentDurationMs: Long = 0L
-    private var accumulatedListenedMs: Long = 0L
-    private var occurrenceStartedAtEpochMs: Long = 0L
+    var currentDurationMs: Long = 0L
+        private set
+    var accumulatedListenedMs: Long = 0L
+        private set
+    var occurrenceStartedAtEpochMs: Long = 0L
+        private set
     private var lastMonotonicTickMs: Long = 0L
     private var isPlaying: Boolean = false
     private var playbackState: Int = 1 // Player.STATE_IDLE
-    private var hasCommitted: Boolean = false
+    var hasCommitted: Boolean = false
+        private set
+
+    fun hydrate(
+        occurrenceId: String,
+        mediaId: String,
+        durationMs: Long,
+        accumulatedListenedMs: Long,
+        occurrenceStartedAtEpochMs: Long,
+        hasCommitted: Boolean
+    ) {
+        this.currentOccurrenceId = occurrenceId
+        this.currentMediaId = mediaId
+        this.currentDurationMs = durationMs
+        this.accumulatedListenedMs = accumulatedListenedMs
+        this.occurrenceStartedAtEpochMs = occurrenceStartedAtEpochMs
+        this.lastMonotonicTickMs = monotonicClock()
+        this.hasCommitted = hasCommitted
+    }
 
     fun onMediaItemTransition(mediaId: String?, durationMs: Long) {
         checkNaturalCompletion()

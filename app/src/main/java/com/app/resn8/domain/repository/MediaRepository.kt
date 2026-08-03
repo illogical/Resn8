@@ -9,6 +9,7 @@ import com.app.resn8.domain.model.FolderListItem
 import com.app.resn8.domain.model.FolderNode
 import com.app.resn8.domain.model.LibraryQuery
 import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.domain.model.PlaybackHistory
 import com.app.resn8.domain.model.PlaybackHistoryResult
 import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.domain.model.SelectionResolutionResult
@@ -49,6 +50,7 @@ interface MediaRepository {
     fun getFolderNodesFlow(sourceId: String): Flow<List<FolderNode>>
     suspend fun updateLikeScore(mediaId: String, delta: Int): Result<Int>
     suspend fun recordPlay(mediaId: String, listenedDurationMs: Long, isMeaningful: Boolean)
+    suspend fun getPlaybackHistoryByOccurrenceId(sessionOccurrenceId: String): PlaybackHistory?
     suspend fun commitMeaningfulPlay(
         sessionOccurrenceId: String,
         mediaId: String,

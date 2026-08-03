@@ -5,7 +5,7 @@
 Resn8 is an offline-first Android audio player for people who keep their own music and audio files. Point it at a folder on internal storage or an SD card, and Resn8 will turn that library into something easy to browse, play, rate, organize, and rediscover without uploading your media or listening history.
 
 > [!IMPORTANT]
-> Resn8 is a working early-stage Android application through Milestone 4: local indexing, browsing, persisted explicit queues, and Media3 background playback are implemented. Ratings/meaningful-play accounting and later MVP milestones remain incomplete, so the feature lists below describe the intended finished MVP rather than the current release.
+> Resn8 is a working early-stage Android application through Milestone 7: local indexing and browsing, persisted explicit queues, Media3 background playback, ratings/meaningful-play accounting, manual playlists, and full playback/browsing context restoration are implemented. Smart queue generation and final MVP polish remain incomplete, so the feature lists below describe the intended finished MVP rather than the current release.
 
 ## Why Resn8?
 
@@ -110,10 +110,11 @@ Implementation is organized into dependency-ordered milestones:
 5. [x] **Milestone 4**: reliable background playback
 6. [x] **Milestone 5**: ratings and meaningful-play tracking
 7. [x] **Milestone 6**: manual playlists
-8. [ ] **Milestone 7**: smart randomized queues
-9. [ ] **Milestone 8**: full queue and browsing-context restoration
+8. [x] **Milestone 7**: full queue, playback-position, and browsing-context restoration
+9. [ ] **Milestone 8**: smart randomized queues
+10. [ ] **Milestone 9**: accessibility, adaptive-layout, acceptance, and release polish
 
-Post-MVP goals include multiple collections and source roots, contextual and flat-folder library profiles, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore.
+Post-MVP goals include multiple collections and source roots, contextual and flat-folder library profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore. The Milestone 7 Settings shell is intended to become the home for these later user-configurable capabilities.
 
 For the complete product decisions and acceptance criteria, see:
 
