@@ -51,25 +51,35 @@ sealed interface RestorableDestination {
             destination: RestorableDestination,
             collectionRepository: CollectionRepository,
             mediaRepository: MediaRepository,
-            playlistRepository: PlaylistRepository
+            playlistRepository: PlaylistRepository,
+            queueRepository: com.app.resn8.domain.repository.QueueRepository? = null,
+            sessionState: UiSessionState? = null
         ): RestorableDestination {
-            val collectionId = when (destination) {
-                is ArtistDetail -> destination.collectionId
-                is AlbumDetail -> destination.collectionId
-                is Folder -> destination.collectionId
-                is PlaylistDetail -> destination.collectionId
-                else -> "MUSIC"
+            val collections = collectionRepository.getCollectionsFlow().firstOrNull() ?: emptyList()
+            val availableCol = collections.find { col ->
+                collectionRepository.getRootSourcesFlow(col.id).firstOrNull()?.any { it.isAvailable } == true
             }
-            val hasSource = collectionRepository.getRootSourcesFlow(collectionId).firstOrNull()?.any { it.isAvailable } == true
-            if (!hasSource && destination != Onboarding && destination != Settings) {
+            val hasSource = availableCol != null
+
+            if (!hasSource && destination != Settings) {
                 return Onboarding
+            }
+
+            if (hasSource && destination == Onboarding) {
+                val activeQueueId = sessionState?.activeQueueId
+                if (activeQueueId != null && queueRepository != null) {
+                    val savedQueue = queueRepository.getQueueByIdFlow(activeQueueId).firstOrNull()
+                    if (savedQueue != null && savedQueue.items.isNotEmpty()) {
+                        return NowPlaying
+                    }
+                }
+                return Library(sessionState?.activeSurface ?: LibrarySurface.ARTISTS)
             }
 
             return when (destination) {
                 is Onboarding, is Library, is Queue, is NowPlaying, is Playlists, is Settings -> destination
 
                 is ArtistDetail -> {
-                    // Check if artist has any tracks
                     val artistTracks = mediaRepository.snapshotVisibleMediaIds(
                         com.app.resn8.domain.model.LibraryQuery(
                             collectionId = destination.collectionId,

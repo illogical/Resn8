@@ -246,6 +246,8 @@ private fun CompleteSummaryContent(
     summary: com.app.resn8.domain.model.ScanResult,
     onGoToLibraryClicked: () -> Unit
 ) {
+    var showDetails by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -257,45 +259,75 @@ private fun CompleteSummaryContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Indexing Complete!",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Indexed Audio Tracks: ${summary.scannedCount}")
-            Text(text = "Elapsed: ${formatDuration(summary.durationMs)}")
-            Text(text = "Folders Scanned: ${summary.scannedFolderCount}")
-            Text(text = "Documents Inspected: ${summary.inspectedDocumentCount}")
-            Text(text = "Added: ${summary.addedCount} | Updated: ${summary.updatedCount} | Missing: ${summary.unavailableCount}")
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Tag-Derived Titles: ${summary.tagDerivedCount}")
-            Text(text = "Path/Filename Enhancements: ${summary.pathDerivedCount}")
-            Text(
-                text = "Metadata source counts may overlap",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(text = "Unrecognized Patterns: ${summary.unrecognizedCount}")
-            Text(text = "Unreadable Branches: ${summary.unreadableCount}")
-            Text(text = "Metadata Fallbacks: ${summary.metadataFailureCount}")
-            Text(text = "Unsupported Audio-Like Files: ${summary.unsupportedAudioLikeCount}")
-            Text(text = "Ignored Non-Audio Documents: ${summary.ignoredNonAudioCount}")
-            if (summary.unsupportedCount != summary.unsupportedAudioLikeCount + summary.ignoredNonAudioCount) {
-                Text(text = "Other Unsupported Documents: ${summary.unsupportedCount - summary.unsupportedAudioLikeCount - summary.ignoredNonAudioCount}")
-            }
-            Text(
-                text = "Rejected: MIME ${summary.unsupportedMimeCount} • Extension ${summary.unsupportedExtensionCount} • " +
-                    "AppleDouble ${summary.appleDoubleCount} • Zero-byte ${summary.zeroByteCount} • Malformed ${summary.malformedDocumentCount}",
-                style = MaterialTheme.typography.bodySmall,
+                text = "Library ready",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center
             )
-            Text(text = "Preferred Artwork Candidates: ${summary.artworkCandidateCount}")
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "${summary.scannedCount} tracks indexed",
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center
+            )
+
+            val hasChanges = summary.addedCount > 0 || summary.updatedCount > 0 || summary.unavailableCount > 0
+            if (hasChanges) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${summary.addedCount} added • ${summary.updatedCount} updated • ${summary.unavailableCount} unavailable",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            val issueCount = summary.unreadableCount + summary.metadataFailureCount + summary.unsupportedAudioLikeCount
+            if (issueCount > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Some files need attention ($issueCount issues)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    textAlign = TextAlign.Center
+                )
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
+
             Button(
                 onClick = onGoToLibraryClicked,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Go to Library")
+                Text("Open Library")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TextButton(
+                onClick = { showDetails = !showDetails }
+            ) {
+                Text(if (showDetails) "Hide scan details" else "View scan details")
+            }
+
+            if (showDetails) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text("Elapsed: ${formatDuration(summary.durationMs)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Folders Scanned: ${summary.scannedFolderCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Documents Inspected: ${summary.inspectedDocumentCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Tag-Derived Titles: ${summary.tagDerivedCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Path/Filename Enhancements: ${summary.pathDerivedCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Unrecognized Patterns: ${summary.unrecognizedCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Unreadable Branches: ${summary.unreadableCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Metadata Fallbacks: ${summary.metadataFailureCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Unsupported Audio-Like: ${summary.unsupportedAudioLikeCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Ignored Non-Audio Documents: ${summary.ignoredNonAudioCount}", style = MaterialTheme.typography.bodySmall)
+                    Text("Preferred Artwork Candidates: ${summary.artworkCandidateCount}", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }

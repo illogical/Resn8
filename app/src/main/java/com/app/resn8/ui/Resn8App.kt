@@ -1,5 +1,6 @@
 package com.app.resn8.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -8,6 +9,8 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -16,12 +19,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -34,9 +41,11 @@ import com.app.resn8.ui.navigation.NowPlayingRoute
 import com.app.resn8.ui.navigation.OnboardingRoute
 import com.app.resn8.ui.navigation.PlaylistsRoute
 import com.app.resn8.ui.navigation.Resn8NavHost
-
-import androidx.compose.material.icons.filled.Settings
 import com.app.resn8.ui.navigation.SettingsRoute
+import com.app.resn8.ui.startup.AppStartupCoordinator
+import com.app.resn8.ui.startup.StartupState
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 
 data class TopLevelDestination(
     val label: String,
@@ -51,11 +60,47 @@ fun Resn8App(
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier
 ) {
+    val startupCoordinator: AppStartupCoordinator = viewModel(
+        factory = AppStartupCoordinator.Factory(container)
+    )
+    val startupState by startupCoordinator.state.collectAsState()
+
+    when (val state = startupState) {
+        StartupState.Loading -> {
+            Box(
+                modifier = modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        StartupState.NeedsSetup, is StartupState.Ready, is StartupState.RecoverableSetupProblem -> {
+            val isSetupComplete = state is StartupState.Ready
+            val startDestination = if (state is StartupState.Ready) state.startRoute else OnboardingRoute
+
+            Resn8AppContent(
+                container = container,
+                navController = navController,
+                isSetupComplete = isSetupComplete,
+                startDestination = startDestination,
+                modifier = modifier
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Resn8AppContent(
+    container: AppContainer,
+    navController: NavHostController,
+    isSetupComplete: Boolean,
+    startDestination: Any,
+    modifier: Modifier = Modifier
+) {
+    val scope = rememberCoroutineScope()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-
-    val rootSources by container.collectionRepository.getRootSourcesFlow("MUSIC").collectAsState(initial = emptyList())
-    val isSetupComplete = rootSources.any { it.isAvailable }
 
     val topLevelDestinations = remember(isSetupComplete) {
         val firstDest = if (isSetupComplete) {
@@ -76,8 +121,32 @@ fun Resn8App(
 
     var openSelectorHandler by remember { mutableStateOf<((List<String>, String, String?) -> Unit)?>(null) }
 
-    val startDestination = remember(isSetupComplete) {
-        if (isSetupComplete) LibraryRoute() else OnboardingRoute
+    LaunchedEffect(navController) {
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            val route = destination.route ?: return@addOnDestinationChangedListener
+            val simpleName = route.substringAfterLast('.').substringBefore('?')
+            val mappedRoute = when {
+                simpleName.contains("SettingsRoute") -> "settings"
+                simpleName.contains("NowPlayingRoute") -> "now_playing"
+                simpleName.contains("QueueRoute") -> "queue"
+                simpleName.contains("PlaylistsRoute") -> "playlists"
+                simpleName.contains("PlaylistDetailRoute") -> "playlist_detail"
+                simpleName.contains("FoldersRoute") -> "folders"
+                simpleName.contains("LibraryRoute") -> "library"
+                simpleName.contains("ArtistDetailRoute") -> "artist_detail"
+                simpleName.contains("AlbumDetailRoute") -> "album_detail"
+                else -> null
+            }
+            if (mappedRoute != null) {
+                scope.launch {
+                    val current = container.uiSessionRepository.getUiSessionStateFlow().firstOrNull()
+                        ?: com.app.resn8.domain.model.UiSessionState()
+                    if (current.currentRoute != mappedRoute) {
+                        container.uiSessionRepository.saveUiSessionState(current.copy(currentRoute = mappedRoute))
+                    }
+                }
+            }
+        }
     }
 
     Scaffold(
@@ -129,8 +198,8 @@ fun Resn8App(
                             onClick = {
                                 if (isSelected) {
                                     navController.navigate(destination.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = false
+                                        popUpTo(destination.route) {
+                                            inclusive = true
                                         }
                                         launchSingleTop = true
                                         restoreState = false

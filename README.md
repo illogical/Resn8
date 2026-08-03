@@ -111,7 +111,7 @@ Implementation is organized into dependency-ordered milestones:
 6. [x] **Milestone 5**: ratings and meaningful-play tracking
 7. [x] **Milestone 6**: manual playlists
 8. [x] **Milestone 7**: full queue, playback-position, and browsing-context restoration
-9. [ ] **Milestone 8**: startup restoration and index-completion feedback corrections
+9. [x] **Milestone 8**: startup restoration and index-completion feedback corrections
 10. [ ] **Milestone 9**: smart randomized queues
 11. [ ] **Milestone 10**: accessibility, adaptive-layout, acceptance, and release polish
 

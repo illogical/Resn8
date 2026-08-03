@@ -287,6 +287,20 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ---
 
+### US6.2 — Startup Restoration & Compact Index Feedback (Milestone 8)
+- **As a** user reopening Resn8 after a scan or setup completion,
+- **I want** the app to wait for authoritative state, restore my last valid destination or repair stale onboarding sessions cleanly, and show a compact success summary without repeating historical completion screens,
+- **So that** relaunch feels seamless and non-intrusive.
+- **Verification**:
+  1. **Clean Cold Launch**: Launch configured app -> confirm neutral loading screen displays briefly and navigates directly to the saved destination (Library, Playlist, Settings, or Now Playing) without flashing Onboarding or replaying historical scan summaries.
+  2. **Stale Onboarding Repair with Active Queue**: Launch app with saved route `onboarding` + active queue -> confirm app opens directly to Now Playing in a paused state at saved position.
+  3. **Stale Onboarding Repair without Queue**: Launch app with saved route `onboarding` + no active queue -> confirm app opens directly to Library.
+  4. **Compact Scan Completion**: Perform a fresh music folder scan -> confirm `Library ready` headline displays track count, concise change summary, `Open Library` button, and a collapsible `View scan details` toggle.
+  5. **Settings Re-Index Acknowledgement**: Perform manual re-index from Settings -> confirm user remains in Settings with a brief transient completion message while persistent last-scan info updates in the source card.
+  6. **Bottom Nav Re-selection**: While viewing a playlist detail screen, tap the Playlists bottom tab -> confirm backstack pops back to the top-level Playlists list view.
+
+---
+
 ## 7. Smart Queue Generation (Milestone 9 — Planned)
 
 ### US7.1 — Generate Smart Queues

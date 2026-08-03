@@ -46,8 +46,9 @@ class OnboardingViewModel(
                     ?: return@runCatching
                 activeSourceId = root.id
                 activeCollectionId = collection.id
-                if (root.lastScanStatus == "IN_PROGRESS") observeWork(root.id)
-                else root.lastScanSummary?.let { _uiState.value = IndexingUiState.Complete(it) }
+                if (root.lastScanStatus == "IN_PROGRESS") {
+                    observeWork(root.id)
+                }
             }
         }
     }
