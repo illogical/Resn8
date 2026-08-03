@@ -82,7 +82,16 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 **Exit:** A normal relaunch returns to the last valid screen and reconstructs the exact active queue, item, and bounded position in a paused state; explicit Android media resumption remains functional, and unavailable targets remain recoverable without losing queue or history data.
 
-## Milestone 8 — Generate Smart Randomized Queues (P1)
+## Milestone 8 — Correct Startup Restoration and Index Feedback (P1)
+
+- [ ] **T059 — Gate startup on authoritative persisted readiness.** Replace placeholder-empty setup detection with explicit Loading, Needs Setup, Ready, and Recoverable Setup Problem states; resolve the active collection/source by persisted IDs; and construct the navigation graph only after setup and session state are known so configured launches never flash or become stranded on Onboarding.
+- [ ] **T060 — Complete typed route restoration and stale-onboarding repair.** Make the existing `RestorableDestination` mapper part of production navigation, persist meaningful destination changes, validate targets with deterministic parent fallbacks, and normalize configured legacy `onboarding` sessions to Now Playing when `UiSessionState.activeQueueId` has a restorable current item or to Library otherwise. Keep normal launch paused and never select the newest queue by update time.
+- [ ] **T061 — Separate scan history from completion events and simplify feedback.** Stop treating durable `lastScanSummary` data as a repeatable navigation event; emit completion only for the currently observed indexing run; show a compact `Library ready` result with actionable warnings and collapsed details; and keep manual re-index completion in Settings with concise transient and persistent status.
+- [ ] **T062 — Prove startup and scan-feedback regression safety.** Add startup coordinator, route persistence, WorkManager event, presentation-model, Compose/navigation, service/repository regression, and API 34+ coverage for loading without Onboarding flash, exact valid-route restoration, stale-onboarding repair, paused Now Playing restoration, one-time completion, Settings re-index acknowledgement, configuration change, process restart, accessibility, and preservation of queue/history/library data.
+
+**Exit:** A configured relaunch waits for authoritative state and returns to the last valid destination without replaying indexing completion; affected stale-onboarding sessions with a restorable active queue open Now Playing at the saved position in a paused state; and indexing completion is concise by default with durable details available on demand.
+
+## Milestone 9 — Generate Smart Randomized Queues (P1)
 
 - [ ] **T037 — Define and snapshot the smart-generation request.** Capture the authoritative active collection ID plus the current folder/descendant, artist, album, search, availability, sort-independent filter, and disliked-exclusion settings as one normalized, versioned immutable snapshot before asynchronous work begins. Resolve exactly the currently visible eligible media IDs, keep available media only, exclude `likeScore < 0` by default, and return an explainable zero-result reason.
 - [ ] **T038 — Implement every seeded ordering mode.** With an injectable seeded random source, implement Random Eligible and Unplayed shuffles plus linear grouping and ordered group traversal for Least Played, Most Played, Most Liked, Most Recently Played, and Least Recently Played. Shuffle independently inside every equal-key group, put unplayed rows in the specification-defined recent-mode positions, avoid quadratic grouping, and never depend on database row order.
@@ -93,7 +102,7 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 **Exit:** Every specified smart mode creates a correct, explainable, durable queue from exactly the visible scope and inherits Milestone 7 restoration behavior.
 
-## Milestone 9 — Polish and Finish the MVP (P1)
+## Milestone 10 — Polish and Finish the MVP (P1)
 
 - [ ] **T047 — Complete accessibility, adaptive-layout, and interaction polish.** Validate screen reader labels, focus order, touch targets, font scaling, contrast, keyboard/switch access, portrait, and landscape. Ensure no core action requires a hidden gesture; review loading/empty/error feedback, navigation consistency, state-preserving rotation, and visible response to long-running actions across every MVP surface.
 - [ ] **T048 — Run the complete MVP acceptance and performance suite.** Execute unit, Room, Compose, instrumentation, service lifecycle, process-death/restoration, 25k-library, internal-storage, and removable-storage tests from `SPECIFICATION.md`; record device/provider coverage and any device-only limitations.

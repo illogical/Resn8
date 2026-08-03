@@ -55,8 +55,9 @@ If these changes require a Room schema update, increment the database version, e
 | **Milestone 4** | Convert a visible ordered library context plus selected media ID into an explicit saved playback queue and send commands through `MediaController`. |
 | **Milestone 5** | Mutate ratings/play statistics; Milestone 3 queries reactively refresh without changing their semantics. |
 | **Milestone 6** | Feed file/folder selections into the reusable playlist selector and preserve unavailable memberships. |
-| **Milestone 7** | Snapshot the current visible scope, force available-only eligibility, and exclude disliked media by default before seeded generation. |
-| **Milestone 8** | Restore the typed route, selected group/folder, search text, sort, filters, and safe fallback when a target no longer exists. |
+| **Milestone 7** | Restore the typed route, selected group/folder, search text, sort, filters, and safe fallback when a target no longer exists. |
+| **Milestone 8** | Correct startup readiness/route restoration integration and simplify index-completion feedback. |
+| **Milestone 9** | Snapshot the current visible scope, force available-only eligibility, and exclude disliked media by default before seeded generation. |
 | **Post-MVP** | Multiple-root management UI, contextual/flat presentation profiles, global command search, and source-file maintenance. |
 
 Milestone 3 must not conflate these concepts:
@@ -324,7 +325,7 @@ T019 requires `ARTIST`, `ALBUM`, `TITLE`, `TRACK`, `RECENTLY_ADDED`, `MOST_PLAYE
 - Evolve `UiSessionState` to persist a versioned browsing snapshot containing surface, collection ID, optional source/folder, explicit artist/album known-or-unknown group keys, normalized search text, sort, and `LibraryFilterSnapshot`.
 - Preserve current queue/playlist/session fields while migrating. Do not overload `QueueFilterSnapshot` with UI-only availability or surface state.
 - Save meaningful changes after debounce and on navigation transitions. Keep transient selection sets, paging keys, loaded pages, and scroll item objects out of Room.
-- Validate restored IDs/keys. If a collection/folder/group no longer exists, fall back to the nearest valid library surface and show an explanation where appropriate. Milestone 8 will complete full route/scroll/playback restoration using these contracts.
+- Validate restored IDs/keys. If a collection/folder/group no longer exists, fall back to the nearest valid library surface and show an explanation where appropriate. Milestone 7 completes full route/scroll/playback restoration using these contracts, and Milestone 8 closes the startup integration gaps found during device acceptance.
 
 #### 4. Accessibility and adaptive layout
 

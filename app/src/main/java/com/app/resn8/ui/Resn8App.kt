@@ -114,16 +114,35 @@ fun Resn8App(
                 )
                 NavigationBar {
                     topLevelDestinations.forEach { destination ->
-                        val selected = currentDestination?.route?.contains(destination.route::class.simpleName ?: "") == true
+                        val routeName = destination.route::class.simpleName ?: ""
+                        val currentRoute = currentDestination?.route ?: ""
+
+                        val isSelected = when (routeName) {
+                            "PlaylistsRoute" -> currentRoute.contains("PlaylistsRoute") || currentRoute.contains("PlaylistDetailRoute")
+                            "FoldersRoute" -> currentRoute.contains("FoldersRoute") || currentRoute.contains("FolderRoute")
+                            "LibraryRoute" -> currentRoute.contains("LibraryRoute") || currentRoute.contains("ArtistDetailRoute") || currentRoute.contains("AlbumDetailRoute")
+                            else -> currentRoute.contains(routeName)
+                        }
+
                         NavigationBarItem(
-                            selected = selected,
+                            selected = isSelected,
                             onClick = {
-                                navController.navigate(destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                                if (isSelected) {
+                                    navController.navigate(destination.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = false
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = false
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
+                                } else {
+                                    navController.navigate(destination.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
                             },
                             icon = { Icon(destination.icon, contentDescription = destination.label) },

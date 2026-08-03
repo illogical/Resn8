@@ -10,7 +10,7 @@ Milestone 4 deliberately does not complete:
 
 - durable Like/Dislike mutations or meaningful-play accounting, which belong to T027-T030 in Milestone 5;
 - playlist creation, membership editing, reordering, or the reusable playlist selector, which belong to T031-T036 in Milestone 6; or
-- periodic playback checkpoints, process-death restoration, browsing restoration, unavailable-target recovery, or Android playback resumption, which belong to T043-T046 in Milestone 8.
+- periodic playback checkpoints, process-death restoration, browsing restoration, unavailable-target recovery, or Android playback resumption, which belong to T043-T046 in Milestone 7.
 
 ---
 
@@ -52,8 +52,9 @@ No schema migration is expected for Milestone 4. If implementation proves a sche
 | Milestone 4 | Initial explicit queue persistence; live playback/session/controller state; transport, seek, queue and system controls; bounded active-playback error handling. |
 | Milestone 5 | Atomic signed rating actions and one meaningful-play result per stable queue occurrence. |
 | Milestone 6 | Playlist management and the reusable Add to Playlist workflow. |
-| Milestone 7 | Generated queue rules, seeds, eligibility, and explicit generated snapshots. |
-| Milestone 8 | Periodic/final checkpoints, exact process-death restoration, non-autoplay launch behavior, route restoration, missing-source recovery, and Media3 playback resumption. |
+| Milestone 7 | Periodic/final checkpoints, exact process-death restoration, non-autoplay launch behavior, route restoration, missing-source recovery, and Media3 playback resumption. |
+| Milestone 8 | Correct startup readiness/route restoration integration and simplify index-completion feedback. |
+| Milestone 9 | Generated queue rules, seeds, eligibility, and explicit generated snapshots. |
 
 Milestone 4 must maintain the seams later milestones need:
 
@@ -61,7 +62,7 @@ Milestone 4 must maintain the seams later milestones need:
 - The now-playing UI displays the current signed score and always contains accessible Like, Dislike, and Add to Playlist controls. Their composable/ViewModel contracts accept action handlers, but M5 and M6 provide the durable behavior. Until those handlers are available, controls must expose a clear disabled/unavailable semantic rather than silently doing nothing.
 - A playlist queue is supported from existing repository data and seeded tests. M6 later makes playlist creation and editing fully user-accessible; editing a playlist must never mutate an already saved active queue.
 - M4 persists the initial queue/current item before playback and exposes the live current item from MediaController. It does not claim periodic position/index persistence or exact relaunch restoration.
-- Activity or controller recreation reconnects to a still-running service and reflects its current timeline. If the service is recreated, tests prove clean initialization/release and no duplicate player; M8 owns rebuilding a previous timeline from Room.
+- Activity or controller recreation reconnects to a still-running service and reflects its current timeline. If the service is recreated, tests prove clean initialization/release and no duplicate player; M7 owns rebuilding a previous timeline from Room.
 
 ---
 

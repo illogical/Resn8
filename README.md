@@ -111,8 +111,9 @@ Implementation is organized into dependency-ordered milestones:
 6. [x] **Milestone 5**: ratings and meaningful-play tracking
 7. [x] **Milestone 6**: manual playlists
 8. [x] **Milestone 7**: full queue, playback-position, and browsing-context restoration
-9. [ ] **Milestone 8**: smart randomized queues
-10. [ ] **Milestone 9**: accessibility, adaptive-layout, acceptance, and release polish
+9. [ ] **Milestone 8**: startup restoration and index-completion feedback corrections
+10. [ ] **Milestone 9**: smart randomized queues
+11. [ ] **Milestone 10**: accessibility, adaptive-layout, acceptance, and release polish
 
 Post-MVP goals include multiple collections and source roots, contextual and flat-folder library profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore. The Milestone 7 Settings shell is intended to become the home for these later user-configurable capabilities.
 

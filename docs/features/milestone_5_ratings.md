@@ -6,7 +6,7 @@ Implement T027-T030 from [TASKS.md](../TASKS.md) so signed ratings and listening
 
 The result must satisfy [SPECIFICATION.md](../SPECIFICATION.md), preserve the local-first principles in [README.md](../../README.md), and retain the product intent in [BRAINSTORM.md](../BRAINSTORM.md). The specification is normative.
 
-Milestone 5 does not implement playlist editing (Milestone 6), smart queue generation (Milestone 7), or periodic position checkpoints, process-death restoration, and Media3 resumption (Milestone 8).
+Milestone 5 does not implement playlist editing (Milestone 6), periodic position checkpoints/process-death restoration/Media3 resumption (Milestone 7), startup-restoration integration corrections (Milestone 8), or smart queue generation (Milestone 9).
 
 ## Verified Baseline and Preflight
 

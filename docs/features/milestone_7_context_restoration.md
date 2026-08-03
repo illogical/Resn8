@@ -246,6 +246,6 @@ $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 
 Milestone 7 owns restoration infrastructure, the Settings shell, and the recovery actions needed to regain access to the one MVP collection/source. It does not implement multiple-collection management, scheduled indexing, playback-speed controls, settings backup, or rich preference UI; those post-MVP features extend Settings later.
 
-Milestone 8 owns smart generation. Its explicit saved queues must use the same queue loader, checkpoint coordinator, and restoration behavior delivered here.
+Milestone 8 owns the startup-restoration and index-completion feedback corrections discovered during this milestone's device acceptance. Milestone 9 owns smart generation; its explicit saved queues must use the same queue loader, checkpoint coordinator, and restoration behavior delivered here.
 
-Milestone 9 owns broad accessibility/adaptive-layout review, interaction polish, the complete acceptance/performance pass, and release hygiene. Indexed album-art presentation beyond the existing playback metadata/placeholder seam remains post-MVP T058 so it does not delay reliable context restoration.
+Milestone 10 owns broad accessibility/adaptive-layout review, interaction polish, the complete acceptance/performance pass, and release hygiene. Indexed album-art presentation beyond the existing playback metadata/placeholder seam remains post-MVP T058 so it does not delay reliable context restoration.

@@ -219,4 +219,23 @@ class PlaylistMilestone6Test {
         val items = fakeRepo.getPlaylistItems(p1.id).map { it.mediaId }
         assertEquals(listOf("m3", "m1", "m2"), items)
     }
+
+    @Test
+    fun addingSecondTrack_emitsUpdatedItemCountFlow() = runBlocking {
+        val playlist = playlistRepo.createPlaylist(colId, "MultiTrack Test").getOrThrow()
+
+        // 1 item added
+        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m1"))
+        var playlistsWithCount = playlistRepo.getPlaylistsWithItemCountFlow(colId).first()
+        var target = playlistsWithCount.find { it.playlist.id == playlist.id }
+        assertNotNull(target)
+        assertEquals(1, target!!.itemCount)
+
+        // 2nd item added
+        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m2"))
+        playlistsWithCount = playlistRepo.getPlaylistsWithItemCountFlow(colId).first()
+        target = playlistsWithCount.find { it.playlist.id == playlist.id }
+        assertNotNull(target)
+        assertEquals(2, target!!.itemCount)
+    }
 }

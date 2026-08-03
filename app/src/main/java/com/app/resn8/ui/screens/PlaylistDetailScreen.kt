@@ -209,7 +209,10 @@ fun PlaylistDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    itemsIndexed(filteredTracks, key = { _, item -> item.mediaFile.id }) { index, item ->
+                    itemsIndexed(
+                        items = filteredTracks,
+                        key = { index, item -> "${item.originalIndex}_${index}_${item.mediaFile.id}" }
+                    ) { index, item ->
                         PlaylistItemRow(
                             index = item.originalIndex,
                             mediaFile = item.mediaFile,

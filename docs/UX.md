@@ -287,7 +287,7 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ---
 
-## 7. Smart Queue Generation (Milestone 8 — Planned)
+## 7. Smart Queue Generation (Milestone 9 — Planned)
 
 ### US7.1 — Generate Smart Queues
 - **As a** user,
@@ -333,7 +333,7 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ---
 
-## 8. MVP Polish & Release Readiness (Milestone 9 — Upcoming)
+## 8. MVP Polish & Release Readiness (Milestone 10 — Upcoming)
 
 ### US8.1 — Screen Reader, Adaptive Layout & Interaction Polish
 - **As a** user relying on accessibility services,
