@@ -113,8 +113,13 @@ fun Resn8NavHost(
                 )
                 OnboardingScreen(
                     viewModel = onboardingViewModel,
-                    onNavigateToLibrary = {
-                        navController.navigate(LibraryRoute()) {
+                    onNavigateToCollectionHome = { profile ->
+                        val route = if (profile == com.app.resn8.domain.model.CollectionProfile.FLAT) {
+                            FoldersRoute()
+                        } else {
+                            LibraryRoute()
+                        }
+                        navController.navigate(route) {
                             popUpTo(OnboardingRoute) { inclusive = true }
                         }
                     }

@@ -6,12 +6,12 @@ This document defines user stories and manual UX verification workflows for Resn
 
 ## 1. Library Selection & Indexing (Milestones 0 – 2)
 
-### US1.1 — Select a Music Collection Folder
+### US1.1 — Select a First Collection Folder
 - **As a** user opening Resn8 for the first time,
 - **I want to** select my music folder using Android's system document picker (`ACTION_OPEN_DOCUMENT_TREE`),
 - **So that** Resn8 receives persistent access to my audio without requesting broad file system permissions.
 - **Verification**:
-  1. Launch app on a fresh install or tap "Select Music Folder" on Onboarding.
+  1. Launch app on a fresh install, choose Music or Audio Files, and tap the profile-specific folder action.
   2. Choose a folder containing audio files via Android's System File Picker.
   3. Confirm persistent read access is granted and indexing starts automatically.
 
@@ -306,6 +306,18 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 ---
 
 ## 7. Multiple Collections and Folder-First Audio (Milestone 9)
+
+### US7.0 — Choose the First Collection Profile
+- **As a** new user with either music or general audio files,
+- **I want to** classify my first collection before selecting its folder,
+- **So that** indexing and navigation match the content from the first scan onward.
+- **Verification**:
+  1. Clear Resn8 storage and launch -> confirm only Onboarding is available, Music is preselected, and the action says `Select Music Folder`.
+  2. Cancel the folder picker and naming dialog, rotate the device, and retry permission -> confirm the chosen profile remains selected.
+  3. Complete Music setup -> confirm the scan workflow is unchanged, completion offers `Open Library`, and bottom navigation immediately becomes Settings, Library, Folders, and Playlists without restarting.
+  4. Clear storage again, select Audio Files, and confirm the action changes exactly to `Select Audio Files Folder` with filename/folder-oriented explanatory copy.
+  5. Complete Audio Files setup -> confirm the collection is `FLAT`, completion offers `Open Folders`, and bottom navigation immediately becomes Settings, Folders, and Playlists without exposing Library or Onboarding.
+  6. Index untagged files and restart -> confirm no artist/album/path metadata is invented and the app restores Folders for the Audio Files collection.
 
 ### US7.1 — Create and Maintain Collections
 - **As a** user with different kinds of local audio,

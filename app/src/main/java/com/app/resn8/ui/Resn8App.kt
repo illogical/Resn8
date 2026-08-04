@@ -62,6 +62,23 @@ data class TopLevelDestination(
     val icon: androidx.compose.ui.graphics.vector.ImageVector
 )
 
+internal fun buildTopLevelDestinations(
+    hasCollections: Boolean,
+    activeProfile: CollectionProfile
+): List<TopLevelDestination> {
+    if (!hasCollections) {
+        return listOf(TopLevelDestination("Onboarding", OnboardingRoute, Icons.Default.Home))
+    }
+    return buildList {
+        add(TopLevelDestination("Settings", SettingsRoute, Icons.Default.Settings))
+        if (activeProfile == CollectionProfile.MUSIC) {
+            add(TopLevelDestination("Library", LibraryRoute(), Icons.Default.LibraryMusic))
+        }
+        add(TopLevelDestination("Folders", FoldersRoute(), Icons.Default.Folder))
+        add(TopLevelDestination("Playlists", PlaylistsRoute, Icons.AutoMirrored.Filled.QueueMusic))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Resn8App(
@@ -84,13 +101,11 @@ fun Resn8App(
             }
         }
         StartupState.NeedsSetup, is StartupState.Ready, is StartupState.RecoverableSetupProblem -> {
-            val isSetupComplete = state is StartupState.Ready
             val startDestination = if (state is StartupState.Ready) state.startRoute else OnboardingRoute
 
             Resn8AppContent(
                 container = container,
                 navController = navController,
-                isSetupComplete = isSetupComplete,
                 startDestination = startDestination,
                 modifier = modifier
             )
@@ -103,7 +118,6 @@ fun Resn8App(
 private fun Resn8AppContent(
     container: AppContainer,
     navController: NavHostController,
-    isSetupComplete: Boolean,
     startDestination: Any,
     modifier: Modifier = Modifier
 ) {
@@ -117,22 +131,11 @@ private fun Resn8AppContent(
     val activeCollection = collections.firstOrNull { it.id == session.selectedCollectionId }
         ?: collections.singleOrNull()
     val activeProfile = activeCollection?.profile ?: CollectionProfile.MUSIC
+    val hasCollections = collections.isNotEmpty()
     var collectionMenuExpanded by remember { mutableStateOf(false) }
 
-    val topLevelDestinations = remember(isSetupComplete, activeProfile) {
-        val firstDest = if (isSetupComplete) {
-            TopLevelDestination("Settings", SettingsRoute, Icons.Default.Settings)
-        } else {
-            TopLevelDestination("Onboarding", OnboardingRoute, Icons.Default.Home)
-        }
-        buildList {
-            add(firstDest)
-            if (activeProfile == CollectionProfile.MUSIC) {
-                add(TopLevelDestination("Library", LibraryRoute(), Icons.Default.LibraryMusic))
-            }
-            add(TopLevelDestination("Folders", FoldersRoute(), Icons.Default.Folder))
-            add(TopLevelDestination("Playlists", PlaylistsRoute, Icons.AutoMirrored.Filled.QueueMusic))
-        }
+    val topLevelDestinations = remember(hasCollections, activeProfile) {
+        buildTopLevelDestinations(hasCollections, activeProfile)
     }
 
     val playbackConnection = container.playbackConnection
@@ -176,7 +179,7 @@ private fun Resn8AppContent(
                     Box {
                         TextButton(
                             onClick = { collectionMenuExpanded = true },
-                            enabled = isSetupComplete && collections.isNotEmpty()
+                            enabled = hasCollections
                         ) {
                             Text(activeCollection?.name ?: "Resn8")
                             Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose collection")

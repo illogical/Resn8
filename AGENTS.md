@@ -43,6 +43,21 @@ $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 - Run unit tests to verify domain and repository logic.
 - Run `lintDebug` and `assembleDebug` to verify static checks and APK compilation.
 
+#### Connected-Device Data Safety
+
+Treat every physical Android device as containing user data unless the user explicitly identifies it as disposable. Android Gradle Plugin connected-test tasks can install, uninstall, or clean up the target application package; uninstalling `com.app.resn8` deletes its Room database, preferences, playlists, history, statistics, collection configuration, and persisted SAF grants. Selecting a serial with `ANDROID_SERIAL` does not make `connectedDebugAndroidTest` non-destructive, and `adb install -r` does not prevent a later Gradle cleanup from uninstalling the package.
+
+Before running `connectedAndroidTest`, `connectedDebugAndroidTest`, `connectedCheck`, any other Gradle connected-device task, direct instrumentation, APK replacement/downgrade, `adb uninstall`, `adb shell pm clear`, or any command that may reinstall or remove the app:
+
+1. Run a read-only device inventory and resolve the exact target serial and package ID.
+2. Prefer an emulator or a device/profile explicitly designated as disposable. Never allow an offline or unintended device to broaden the target set.
+3. If the target is a data-bearing physical device, stop and warn the user that the command may erase app-private data. Obtain explicit approval immediately before the mutating command; general permission to test or use the device is not sufficient.
+4. Do not proceed unless a verified backup/export exists or the user explicitly accepts that the listed app data may be unrecoverable. Persisted SAF permissions and source audio are separate: source files should remain untouched, but folder access must be granted again after app-data loss.
+5. Prefer compiling the instrumentation APK without installing it when device execution is not essential. For UI verification on a non-disposable device, favor manual checks or a dedicated test build/application ID that cannot replace the user's installed package.
+6. After an approved device run, verify whether the original package and app-private data remain present. Report any reset immediately and do not claim successful restoration unless the data itself was verified.
+
+Read-only commands such as `adb devices`, `adb shell getprop`, and package inspection do not require this destructive-test approval. Installation, instrumentation, package clearing, and uninstall commands do.
+
 ### Step 4: Maintenance & Documentation Updates
 Upon completing milestone exit criteria, agents MUST:
 1. Update [docs/TASKS.md](file:///c:/LocalDev/Projects/Resn8/docs/TASKS.md) to check off completed tasks (`[x]`).
@@ -59,6 +74,7 @@ Upon completing milestone exit criteria, agents MUST:
 | JDK Path (Windows) | `C:\Program Files\Android\Android Studio\jbr` |
 | Run Unit Tests | `$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; .\gradlew.bat testDebugUnitTest` |
 | Build & Lint | `$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; .\gradlew.bat lintDebug assembleDebug` |
+| Compile Instrumentation APK Only | `$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; .\gradlew.bat assembleDebugAndroidTest` |
 | Feature Plans | `docs/features/milestone_X_<name>.md` |
 | Task Backlog | `docs/TASKS.md` |
 | User Stories / UX | `docs/UX.md` |

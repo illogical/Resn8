@@ -7,10 +7,12 @@ import com.app.resn8.data.repository.FakePlaylistRepository
 import com.app.resn8.data.repository.FakeQueueRepository
 import com.app.resn8.di.TestAppContainer
 import com.app.resn8.domain.model.SavedQueue
+import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.domain.model.SavedQueueItem
 import com.app.resn8.domain.model.SavedQueueKind
 import com.app.resn8.domain.model.UiSessionState
 import com.app.resn8.ui.navigation.LibraryRoute
+import com.app.resn8.ui.navigation.FoldersRoute
 import com.app.resn8.ui.navigation.NowPlayingRoute
 import com.app.resn8.ui.navigation.RestorableDestination
 import kotlinx.coroutines.flow.first
@@ -127,5 +129,33 @@ class AppStartupCoordinatorTest {
 
         val savedSession = container.uiSessionRepository.getUiSessionStateFlow().first()
         assertEquals("library", savedSession.currentRoute)
+    }
+
+    @Test
+    fun flatCollection_withStaleLibraryRoute_resolvesToFolders() = runBlocking {
+        val collectionRepo = FakeCollectionRepository()
+        val col = collectionRepo.createCollection("Audio Files", CollectionProfile.FLAT)
+        val root = collectionRepo.addRootSource(col.id, "content://audio", "Audio Files")
+        val container = TestAppContainer(
+            collectionRepository = collectionRepo,
+            mediaRepository = FakeMediaRepository(),
+            playlistRepository = FakePlaylistRepository(),
+            queueRepository = FakeQueueRepository()
+        )
+        container.uiSessionRepository.saveUiSessionState(
+            UiSessionState(
+                currentRoute = "library",
+                selectedCollectionId = col.id,
+                selectedSourceId = root.id,
+                activeSurface = com.app.resn8.domain.model.LibrarySurface.ARTISTS
+            )
+        )
+
+        val coordinator = AppStartupCoordinator(container)
+        coordinator.resolveStartupState()
+
+        val ready = coordinator.state.value as StartupState.Ready
+        assertTrue(ready.startRoute is FoldersRoute)
+        assertEquals("folders", container.uiSessionRepository.getUiSessionStateFlow().first().currentRoute)
     }
 }

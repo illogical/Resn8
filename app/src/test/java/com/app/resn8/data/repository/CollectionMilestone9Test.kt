@@ -4,6 +4,7 @@ import com.app.resn8.domain.model.CollectionNameConflictException
 import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.domain.model.CollectionSourceConflictException
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import org.junit.Test
@@ -43,5 +44,22 @@ class CollectionMilestone9Test {
             repository.addRootSource(second.id, "content://music", "Audio")
             fail("Expected a duplicate folder to fail")
         } catch (_: CollectionSourceConflictException) {}
+    }
+
+    @Test
+    fun atomicCollectionSourceCreationDoesNotLeaveAnOrphanOnConflict() = runTest {
+        val repository = FakeCollectionRepository()
+        repository.createCollectionWithSource(
+            "Music", CollectionProfile.MUSIC, "content://shared", "Music"
+        )
+
+        try {
+            repository.createCollectionWithSource(
+                "Audio", CollectionProfile.FLAT, "content://shared", "Audio"
+            )
+            fail("Expected duplicate source creation to fail")
+        } catch (_: CollectionSourceConflictException) {}
+
+        assertEquals(listOf("Music"), repository.getCollectionsFlow().first().map { it.name })
     }
 }

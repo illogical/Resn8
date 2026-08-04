@@ -11,7 +11,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.app.resn8.di.AppContainer
+import com.app.resn8.domain.model.CollectionProfile
+import com.app.resn8.domain.model.LibraryFilterSnapshot
+import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.ScanProgress
+import com.app.resn8.domain.model.SortOrder
+import com.app.resn8.domain.model.UiSessionState
 import com.app.resn8.storage.indexer.IndexingWorker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +32,8 @@ class OnboardingViewModel(
     private val workManager = WorkManager.getInstance(context)
     private val _uiState = MutableStateFlow<IndexingUiState>(IndexingUiState.FirstRun)
     val uiState: StateFlow<IndexingUiState> = _uiState.asStateFlow()
+    private val _selectedProfile = MutableStateFlow(CollectionProfile.MUSIC)
+    val selectedProfile: StateFlow<CollectionProfile> = _selectedProfile.asStateFlow()
     private val _scanProgress = MutableStateFlow<ScanProgress?>(null)
     val scanProgress: StateFlow<ScanProgress?> = _scanProgress.asStateFlow()
     private var activeSourceId: String? = null
@@ -40,17 +47,27 @@ class OnboardingViewModel(
     fun checkExistingRoot() {
         viewModelScope.launch {
             runCatching {
-                val collection = appContainer.collectionRepository.getCollectionsFlow().first().firstOrNull()
+                val collections = appContainer.collectionRepository.getCollectionsFlow().first()
+                val session = appContainer.uiSessionRepository.getUiSessionStateFlow().first()
+                val collection = collections.firstOrNull { it.id == session.selectedCollectionId }
+                    ?: collections.singleOrNull()
+                    ?: collections.firstOrNull()
                     ?: return@runCatching
                 val root = appContainer.collectionRepository.getRootSourcesFlow(collection.id).first().firstOrNull()
                     ?: return@runCatching
                 activeSourceId = root.id
                 activeCollectionId = collection.id
+                _selectedProfile.value = collection.profile
                 if (root.lastScanStatus == "IN_PROGRESS") {
                     observeWork(root.id)
                 }
             }
         }
+    }
+
+    fun selectProfile(profile: CollectionProfile) {
+        require(profile == CollectionProfile.MUSIC || profile == CollectionProfile.FLAT)
+        _selectedProfile.value = profile
     }
 
     fun onFolderSelected(uri: Uri) {
@@ -70,15 +87,19 @@ class OnboardingViewModel(
 
     fun startIndexing(treeUriStr: String, collectionName: String) {
         viewModelScope.launch {
-            var phase = "CREATE_COLLECTION"
+            var phase = "CREATE_COLLECTION_SOURCE"
             try {
-                val collection = appContainer.collectionRepository.createCollection(collectionName)
-                phase = "ADD_ROOT_SOURCE"
-                val root = appContainer.collectionRepository.addRootSource(collection.id, treeUriStr, collectionName)
+                val profile = _selectedProfile.value
+                val (collection, root) = appContainer.collectionRepository.createCollectionWithSource(
+                    name = collectionName,
+                    profile = profile,
+                    treeUri = treeUriStr,
+                    displayName = collectionName
+                )
                 activeSourceId = root.id
                 activeCollectionId = collection.id
                 phase = "SELECT_COLLECTION"
-                runCatching { persistActiveSelection(collection.id, root.id, "onboarding") }
+                runCatching { persistActiveSelection(collection.id, root.id, profile, "onboarding") }
                     .onFailure { error ->
                         Log.w(LOG_TAG, "initial_selection_save_failed category=${error::class.simpleName}")
                     }
@@ -101,7 +122,7 @@ class OnboardingViewModel(
         _uiState.value = IndexingUiState.FirstRun
     }
 
-    fun openLibrary(onReady: () -> Unit) {
+    fun openCollection(onReady: (CollectionProfile) -> Unit) {
         viewModelScope.launch {
             val collectionId = activeCollectionId
             val sourceId = activeSourceId
@@ -110,23 +131,27 @@ class OnboardingViewModel(
                 return@launch
             }
             try {
-                persistActiveSelection(collectionId, sourceId, "library")
-                onReady()
+                val profile = appContainer.collectionRepository.getCollectionById(collectionId)?.profile
+                    ?: _selectedProfile.value
+                val route = if (profile == CollectionProfile.FLAT) "folders" else "library"
+                persistActiveSelection(collectionId, sourceId, profile, route)
+                onReady(profile)
             } catch (error: Exception) {
-                Log.e(LOG_TAG, "library_handoff_failed category=${error::class.simpleName}")
+                Log.e(LOG_TAG, "collection_handoff_failed category=${error::class.simpleName}")
                 _uiState.value = IndexingUiState.ScanError("Unable to open the indexed collection.")
             }
         }
     }
 
-    private suspend fun persistActiveSelection(collectionId: String, sourceId: String, route: String) {
+    private suspend fun persistActiveSelection(
+        collectionId: String,
+        sourceId: String,
+        profile: CollectionProfile,
+        route: String
+    ) {
         val session = appContainer.uiSessionRepository.getUiSessionStateFlow().first()
         appContainer.uiSessionRepository.saveUiSessionState(
-            session.copy(
-                currentRoute = route,
-                selectedCollectionId = collectionId,
-                selectedSourceId = sourceId
-            )
+            session.forInitialCollection(collectionId, sourceId, profile, route)
         )
     }
 
@@ -171,9 +196,11 @@ class OnboardingViewModel(
     }
 
     private suspend fun refreshCompletedRoot(sourceId: String) {
-        val collection = appContainer.collectionRepository.getCollectionsFlow().first().firstOrNull() ?: return
-        val root = appContainer.collectionRepository.getRootSourcesFlow(collection.id).first()
-            .firstOrNull { it.id == sourceId } ?: return
+        val root = appContainer.collectionRepository.getRootSourceById(sourceId) ?: return
+        val collection = appContainer.collectionRepository.getCollectionById(root.collectionId) ?: return
+        activeCollectionId = collection.id
+        activeSourceId = root.id
+        _selectedProfile.value = collection.profile
         val summary = root.lastScanSummary ?: return
         _uiState.value = if (summary.scannedCount == 0) IndexingUiState.EmptyFolder else IndexingUiState.Complete(summary)
     }
@@ -191,7 +218,7 @@ class OnboardingViewModel(
             )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
         }.getOrNull()?.takeIf { it.isNotBlank() }
             ?: uri.lastPathSegment?.substringAfterLast(':')?.trim().takeUnless { it.isNullOrBlank() }
-            ?: "Music Library"
+            ?: if (_selectedProfile.value == CollectionProfile.FLAT) "Audio Files" else "Music Library"
     }
 
     class Factory(
@@ -207,3 +234,25 @@ class OnboardingViewModel(
         private const val LOG_TAG = "Resn8Onboarding"
     }
 }
+
+internal fun UiSessionState.forInitialCollection(
+    collectionId: String,
+    sourceId: String,
+    profile: CollectionProfile,
+    route: String
+): UiSessionState = copy(
+    currentRoute = route,
+    selectedCollectionId = collectionId,
+    selectedSourceId = sourceId,
+    selectedFolderId = null,
+    selectedArtistKey = null,
+    selectedAlbumKey = null,
+    selectedAlbumArtistKey = null,
+    selectedPlaylistId = null,
+    activeQueueId = null,
+    activeSearchQuery = null,
+    activeSort = if (profile == CollectionProfile.FLAT) SortOrder.TITLE else SortOrder.ARTIST,
+    activeSurface = if (profile == CollectionProfile.FLAT) LibrarySurface.FOLDERS else LibrarySurface.ARTISTS,
+    libraryFilterSnapshot = LibraryFilterSnapshot(),
+    activeFilterSnapshot = null
+)

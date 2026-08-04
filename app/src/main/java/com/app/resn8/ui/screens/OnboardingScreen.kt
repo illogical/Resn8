@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.ui.screens.onboarding.IndexingUiState
 import com.app.resn8.ui.screens.onboarding.OnboardingViewModel
 import kotlinx.coroutines.delay
@@ -46,11 +49,12 @@ import kotlinx.coroutines.delay
 @Composable
 fun OnboardingScreen(
     viewModel: OnboardingViewModel,
-    onNavigateToLibrary: () -> Unit,
+    onNavigateToCollectionHome: (CollectionProfile) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scanProgress by viewModel.scanProgress.collectAsState()
+    val selectedProfile by viewModel.selectedProfile.collectAsState()
     val context = LocalContext.current
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -84,6 +88,8 @@ fun OnboardingScreen(
         when (val state = uiState) {
             is IndexingUiState.FirstRun -> {
                 FirstRunContent(
+                    selectedProfile = selectedProfile,
+                    onProfileSelected = viewModel::selectProfile,
                     onSelectFolderClicked = { folderPickerLauncher.launch(null) }
                 )
             }
@@ -96,14 +102,16 @@ fun OnboardingScreen(
             }
             is IndexingUiState.Scanning -> {
                 ScanningContent(
+                    profile = selectedProfile,
                     progress = scanProgress ?: state.progress,
                     onCancel = viewModel::cancelIndexing
                 )
             }
             is IndexingUiState.Complete -> {
                 CompleteSummaryContent(
+                    profile = selectedProfile,
                     summary = state.summary,
-                    onGoToLibraryClicked = { viewModel.openLibrary(onNavigateToLibrary) }
+                    onOpenCollectionClicked = { viewModel.openCollection(onNavigateToCollectionHome) }
                 )
             }
             is IndexingUiState.EmptyFolder -> {
@@ -113,6 +121,7 @@ fun OnboardingScreen(
             }
             is IndexingUiState.PermissionRevoked -> {
                 PermissionRevokedContent(
+                    profile = selectedProfile,
                     onGrantAccessClicked = { folderPickerLauncher.launch(null) }
                 )
             }
@@ -127,7 +136,11 @@ fun OnboardingScreen(
 }
 
 @Composable
-private fun FirstRunContent(onSelectFolderClicked: () -> Unit) {
+internal fun FirstRunContent(
+    selectedProfile: CollectionProfile,
+    onProfileSelected: (CollectionProfile) -> Unit,
+    onSelectFolderClicked: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -139,19 +152,45 @@ private fun FirstRunContent(onSelectFolderClicked: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "Local-first offline audio player. Select a folder to index your music library.",
+            text = "Local-first offline audio player. Choose how Resn8 should organize your first collection.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = "Collection type",
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = selectedProfile == CollectionProfile.MUSIC,
+                onClick = { onProfileSelected(CollectionProfile.MUSIC) },
+                label = { Text("Music") }
+            )
+            FilterChip(
+                selected = selectedProfile == CollectionProfile.FLAT,
+                onClick = { onProfileSelected(CollectionProfile.FLAT) },
+                label = { Text("Audio Files") }
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = onboardingProfileDescription(selectedProfile),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onSelectFolderClicked) {
-            Text("Select Music Folder")
+            Text(onboardingFolderButtonLabel(selectedProfile))
         }
     }
 }
 
 @Composable
-private fun FolderNamingDialog(
+internal fun FolderNamingDialog(
     defaultName: String,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit
@@ -195,6 +234,7 @@ private fun FolderNamingDialog(
 
 @Composable
 private fun ScanningContent(
+    profile: CollectionProfile,
     progress: com.app.resn8.domain.model.ScanProgress?,
     onCancel: () -> Unit
 ) {
@@ -213,7 +253,7 @@ private fun ScanningContent(
         CircularProgressIndicator()
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "Indexing Library...",
+            text = if (profile == CollectionProfile.FLAT) "Indexing Audio Files..." else "Indexing Library...",
             style = MaterialTheme.typography.titleLarge
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -221,7 +261,7 @@ private fun ScanningContent(
             text = "Elapsed: ${formatDuration(elapsedMs)}",
             style = MaterialTheme.typography.bodyMedium
         )
-        Text(text = "Tracks: ${progress?.admittedAudio ?: 0} • Files checked: ${progress?.inspectedDocuments ?: 0}")
+        Text(text = "${if (profile == CollectionProfile.FLAT) "Audio files" else "Tracks"}: ${progress?.admittedAudio ?: 0} • Files checked: ${progress?.inspectedDocuments ?: 0}")
         Text(text = "Folders: ${progress?.scannedFolders ?: 0} • Unsupported: ${progress?.unsupportedCount ?: 0}")
         val issueCount = (progress?.unreadableCount ?: 0) + (progress?.metadataFailureCount ?: 0)
         if (issueCount > 0) Text(text = "Read/metadata issues: $issueCount")
@@ -242,9 +282,10 @@ private fun ScanningContent(
 }
 
 @Composable
-private fun CompleteSummaryContent(
+internal fun CompleteSummaryContent(
+    profile: CollectionProfile,
     summary: com.app.resn8.domain.model.ScanResult,
-    onGoToLibraryClicked: () -> Unit
+    onOpenCollectionClicked: () -> Unit
 ) {
     var showDetails by remember { mutableStateOf(false) }
 
@@ -259,14 +300,14 @@ private fun CompleteSummaryContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Library ready",
+                text = if (profile == CollectionProfile.FLAT) "Audio files ready" else "Library ready",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "${summary.scannedCount} tracks indexed",
+                text = "${summary.scannedCount} ${if (profile == CollectionProfile.FLAT) "audio files" else "tracks"} indexed",
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center
             )
@@ -296,10 +337,10 @@ private fun CompleteSummaryContent(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = onGoToLibraryClicked,
+                onClick = onOpenCollectionClicked,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Open Library")
+                Text(onboardingCompletionButtonLabel(profile))
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -367,7 +408,10 @@ private fun EmptyFolderContent(onSelectAnotherClicked: () -> Unit) {
 }
 
 @Composable
-private fun PermissionRevokedContent(onGrantAccessClicked: () -> Unit) {
+private fun PermissionRevokedContent(
+    profile: CollectionProfile,
+    onGrantAccessClicked: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -379,7 +423,11 @@ private fun PermissionRevokedContent(onGrantAccessClicked: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Resn8 needs persistent access to your music folder to index and play audio.",
+            text = if (profile == CollectionProfile.FLAT) {
+                "Resn8 needs persistent access to your audio files folder to index and play audio."
+            } else {
+                "Resn8 needs persistent access to your music folder to index and play audio."
+            },
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center
         )
@@ -389,6 +437,19 @@ private fun PermissionRevokedContent(onGrantAccessClicked: () -> Unit) {
         }
     }
 }
+
+internal fun onboardingFolderButtonLabel(profile: CollectionProfile): String =
+    if (profile == CollectionProfile.FLAT) "Select Audio Files Folder" else "Select Music Folder"
+
+internal fun onboardingCompletionButtonLabel(profile: CollectionProfile): String =
+    if (profile == CollectionProfile.FLAT) "Open Folders" else "Open Library"
+
+internal fun onboardingProfileDescription(profile: CollectionProfile): String =
+    if (profile == CollectionProfile.FLAT) {
+        "Browse general audio by filename and folder."
+    } else {
+        "Browse music by artist, album, track, and folder."
+    }
 
 @Composable
 private fun ScanErrorContent(
