@@ -2,6 +2,7 @@ package com.app.resn8.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -295,7 +296,9 @@ private fun Resn8AppContent(
             navController = navController,
             startDestination = startDestination,
             onRegisterOpenSelector = { handler -> openSelectorHandler = handler },
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
         )
     }
 }

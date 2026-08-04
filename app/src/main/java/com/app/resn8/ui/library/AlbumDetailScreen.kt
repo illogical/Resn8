@@ -2,6 +2,7 @@ package com.app.resn8.ui.library
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -35,6 +36,7 @@ fun AlbumDetailScreen(
     val allAvailableSelected by viewModel.allAvailableSelected.collectAsState()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(viewModel.albumTitle) },
@@ -59,7 +61,8 @@ fun AlbumDetailScreen(
                             Icon(imageVector = Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add selected songs to playlist")
                         }
                     }
-                }
+                },
+                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { innerPadding ->

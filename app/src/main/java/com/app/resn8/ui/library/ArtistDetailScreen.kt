@@ -2,6 +2,7 @@ package com.app.resn8.ui.library
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ fun ArtistDetailScreen(
     val scope = rememberCoroutineScope()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(viewModel.artistName) },
@@ -58,7 +60,8 @@ fun ArtistDetailScreen(
                     ) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add Artist Songs to Playlist")
                     }
-                }
+                },
+                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { innerPadding ->

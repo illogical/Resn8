@@ -66,7 +66,7 @@ During indexing, Resn8 reads supported embedded metadata, including MP3 ID3 tags
 
 The parser accepts common track prefixes such as `01 Title`, `01 - Title`, and `1-01 Title`. It must not overwrite valid embedded tags. A scan summary records counts of tag-derived, path-derived, unrecognized, unreadable, and unsupported files so real sample libraries can inform later parser improvements.
 
-For `FLAT` collections, valid embedded common metadata may remain in nullable shared fields, but path and filename parsing must not invent artist, album, disc, or track metadata. The folder-first UI uses tag title or cleaned filename and does not show synthetic `Unknown Artist` or `Unknown Album` labels. For future `CONTEXTUAL` collections, relative folders become a category hierarchy and music fields remain optional.
+For `FLAT` collections, valid embedded common metadata may remain in nullable shared fields, but path and filename parsing must not invent artist, album, disc, or track metadata. The folder-first UI uses tag title or cleaned filename and does not show synthetic `Unknown Artist` or `Unknown Album` labels. Folder and playlist rows render that display title once, wrapping it to at most two lines with end ellipsis instead of repeating the raw filename as a subtitle. For future `CONTEXTUAL` collections, relative folders become a category hierarchy and music fields remain optional.
 
 ### 2.4 Re-indexing and File Identity
 
@@ -137,7 +137,7 @@ The folder browser mirrors indexed relative paths, uses the collection name for 
 
 Onboarding is a conditional first-run/recovery flow, not a permanent destination once a usable collection and source exist. After setup, its top-level navigation slot becomes Settings. Settings provides collection creation, rename, collection-folder status, manual re-indexing, and permission reselection. Collection deletion and multiple-root management remain post-MVP.
 
-The active collection name is an app-bar selector. `MUSIC` exposes Library, Folders, and Playlists. `FLAT` opens in Folders and omits Library/artist/album destinations while retaining collection-scoped playlists. Switching collections checkpoints and stops playback, clears the active queue association and collection-specific browsing state, and opens the target profile's home. The detached saved queue row, ratings, listening statistics, and history remain stored.
+The active collection name is an app-bar selector and the app shell is the sole owner of system-bar insets. Nested page toolbars begin directly beneath it without reserving a second status-bar inset. `MUSIC` exposes Library, Folders, and Playlists. `FLAT` opens in Folders and omits Library/artist/album destinations while retaining collection-scoped playlists. Switching collections checkpoints and stops playback, clears the active queue association and collection-specific browsing state, and opens the target profile's home. The detached saved queue row, ratings, listening statistics, and history remain stored.
 
 ### 3.2 Player and Queue
 

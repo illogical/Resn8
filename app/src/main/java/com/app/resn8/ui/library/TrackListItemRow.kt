@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.app.resn8.domain.model.MediaFile
@@ -90,17 +91,13 @@ fun TrackListItemRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = mediaFile.displayTitle,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = if (showMusicMetadata) 1 else 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (showMusicMetadata) {
                     Text(
                         text = "${mediaFile.artist ?: "Unknown Artist"} • ${mediaFile.album ?: "Unknown Album"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(
-                        text = mediaFile.filename,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

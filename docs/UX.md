@@ -326,6 +326,8 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   2. Confirm Audio Files opens in Folders, uses the collection name as the top breadcrumb, and does not expose Library, Artists, or Albums.
   3. Play an Audio Files item and confirm the row, mini-player, Now Playing, queue, and system metadata do not show synthetic `Unknown Artist` or `Unknown Album` labels.
   4. Confirm Music retains its existing tag/path/filename fallback and metadata-oriented Library surfaces.
+  5. Open Folders and a playlist containing sentence-length Audio Files names; confirm each cleaned title appears once, wraps to no more than two lines, and then uses end ellipsis instead of repeating the raw filename below it.
+  6. At default and increased font scale, open Playlists and its detail view; confirm each page toolbar begins directly below the persistent collection selector without a second status-bar-sized gap, all controls remain reachable, and TalkBack announces the complete untruncated title.
 
 ### US7.3 — Switch Collections Safely
 - **As a** user moving between collections,

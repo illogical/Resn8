@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -92,6 +93,7 @@ fun PlaylistDetailScreen(
     var showPlaylistMenu by remember { mutableStateOf(false) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (isSearchActive) {
                 TopAppBar(
@@ -118,7 +120,8 @@ fun PlaylistDetailScreen(
                                 Icon(imageVector = Icons.Default.Close, contentDescription = "Clear text")
                             }
                         }
-                    }
+                    },
+                    windowInsets = WindowInsets(0, 0, 0, 0)
                 )
             } else {
                 TopAppBar(
@@ -163,7 +166,8 @@ fun PlaylistDetailScreen(
                                 )
                             }
                         }
-                    }
+                    },
+                    windowInsets = WindowInsets(0, 0, 0, 0)
                 )
             }
         },
@@ -330,7 +334,7 @@ fun PlaylistDetailScreen(
 }
 
 @Composable
-private fun PlaylistItemRow(
+internal fun PlaylistItemRow(
     index: Int,
     mediaFile: MediaFile,
     isFirst: Boolean,
@@ -389,9 +393,10 @@ private fun PlaylistItemRow(
                 Text(
                     text = mediaFile.displayTitle,
                     style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
+                    maxLines = if (showMusicMetadata) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                    color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
                 if (isCurrent) {
                     Spacer(modifier = Modifier.width(8.dp))
@@ -413,10 +418,8 @@ private fun PlaylistItemRow(
             }
             val subtitle = if (showMusicMetadata) {
                 listOfNotNull(mediaFile.artist, mediaFile.album).joinToString(" • ")
-            } else {
-                mediaFile.filename
-            }
-            if (subtitle.isNotEmpty()) {
+            } else null
+            if (!subtitle.isNullOrEmpty()) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,

@@ -33,19 +33,20 @@ Smart randomized queues, multiple roots within one collection, collection deleti
 ## Folder-first presentation and selection
 
 1. Replace user-facing `Root` copy with the collection name or `collection folder`. Keep the internal `RootSource` model for future multiple-root support.
-2. Render the top folder breadcrumb as the collection name. In `FLAT`, audio rows and playback surfaces omit synthetic artist/album labels and use audio-file terminology.
+2. Render the top folder breadcrumb as the collection name. In `FLAT`, audio rows and playback surfaces omit synthetic artist/album labels and use audio-file terminology. Folder and playlist rows show the cleaned display title once, allow it to wrap to two lines, and do not repeat the raw filename as a subtitle; Music rows retain their title plus artist/album presentation.
 3. Add a repository snapshot query for all available media directly in a folder. Folder Select All uses this query across paging, excludes unavailable rows and every subfolder/descendant, toggles the complete direct-file set, and clears on folder/collection changes.
 4. Add album selection state and a Select All toggle backed by the full available album query. Reuse the standard selection summary and playlist selector; toggling again deselects the album set.
 5. Preserve explicit folder-checkbox behavior, which intentionally expands selected folders to unique indexed descendants.
+6. Treat the app shell as the sole owner of system-bar insets. The persistent collection selector remains above each page toolbar, while nested Playlists, playlist detail, artist detail, and album detail scaffolds consume no additional system-bar space.
 
 ## Verification
 
 - Migration tests cover version 3 data preservation, normalized-name backfill, and uniqueness.
 - Repository tests cover create/rename conflicts, one source per collection, duplicate tree rejection, and collection isolation.
 - Parser/indexer tests prove `FLAT` does not invent music hierarchy while `MUSIC` behavior remains unchanged.
-- ViewModel and UI tests cover creation, switching, profile-aware destinations, retained saved queues, hidden Library navigation, collection-name breadcrumbs, and selection clearing.
+- ViewModel and UI tests cover creation, switching, profile-aware destinations, retained saved queues, hidden Library navigation, collection-name breadcrumbs, selection clearing, single-instance two-line `FLAT` titles, and nested toolbar inset ownership.
 - Folder and album tests prove Select All includes available rows beyond the loaded page and excludes unavailable/direct-child folder descendants as specified.
-- Run `testDebugUnitTest`, then `lintDebug assembleDebug` with Android Studio's bundled JDK. Complete API 34+ SAF creation/reselection, collection switching during playback, restart restoration, and TalkBack checks manually.
+- Run `testDebugUnitTest`, then `lintDebug assembleDebug` with Android Studio's bundled JDK. Complete API 34+ SAF creation/reselection, collection switching during playback, restart restoration, compact toolbar spacing, long-title font scaling, and TalkBack checks manually.
 
 ## Exit criteria
 
