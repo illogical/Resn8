@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.model.UiSessionState
+import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.ui.navigation.AlbumDetailRoute
 import com.app.resn8.ui.navigation.ArtistDetailRoute
 import com.app.resn8.ui.navigation.FoldersRoute
@@ -54,9 +55,11 @@ class AppStartupCoordinator(
             return
         }
 
-        var activeCollection = collections.find { col ->
-            val sources = container.collectionRepository.getRootSourcesFlow(col.id).firstOrNull() ?: emptyList()
-            sources.any { it.isAvailable }
+        val sessionState = container.uiSessionRepository.getUiSessionStateFlow().firstOrNull() ?: UiSessionState()
+        var activeCollection = collections.firstOrNull { it.id == sessionState.selectedCollectionId }?.takeIf { col ->
+            container.collectionRepository.getRootSourcesFlow(col.id).firstOrNull()?.any { it.isAvailable } == true
+        } ?: collections.find { col ->
+            container.collectionRepository.getRootSourcesFlow(col.id).firstOrNull()?.any { it.isAvailable } == true
         }
 
         if (activeCollection == null) {
@@ -71,7 +74,6 @@ class AppStartupCoordinator(
 
         val collectionId = activeCollection.id
 
-        val sessionState = container.uiSessionRepository.getUiSessionStateFlow().firstOrNull() ?: UiSessionState()
         val initialDest = RestorableDestination.fromSessionState(sessionState)
 
         val resolvedDest = RestorableDestination.resolveValidDestination(
@@ -85,9 +87,13 @@ class AppStartupCoordinator(
 
         val startRoute: Any = when (resolvedDest) {
             is RestorableDestination.Onboarding -> OnboardingRoute
-            is RestorableDestination.Library -> LibraryRoute(tab = resolvedDest.surface.name.lowercase())
-            is RestorableDestination.ArtistDetail -> ArtistDetailRoute(resolvedDest.collectionId, resolvedDest.artistKey.serialize())
-            is RestorableDestination.AlbumDetail -> AlbumDetailRoute(resolvedDest.collectionId, resolvedDest.albumKey.serialize(), resolvedDest.albumArtistKey?.serialize())
+            is RestorableDestination.Library -> if (activeCollection.profile == CollectionProfile.FLAT) {
+                FoldersRoute()
+            } else {
+                LibraryRoute(tab = resolvedDest.surface.name.lowercase())
+            }
+            is RestorableDestination.ArtistDetail -> if (activeCollection.profile == CollectionProfile.FLAT) FoldersRoute() else ArtistDetailRoute(resolvedDest.collectionId, resolvedDest.artistKey.serialize())
+            is RestorableDestination.AlbumDetail -> if (activeCollection.profile == CollectionProfile.FLAT) FoldersRoute() else AlbumDetailRoute(resolvedDest.collectionId, resolvedDest.albumKey.serialize(), resolvedDest.albumArtistKey?.serialize())
             is RestorableDestination.Folder -> FoldersRoute(resolvedDest.folderId)
             is RestorableDestination.Playlists -> PlaylistsRoute
             is RestorableDestination.PlaylistDetail -> PlaylistDetailRoute(resolvedDest.playlistId)
@@ -99,7 +105,7 @@ class AppStartupCoordinator(
         if (initialDest != resolvedDest || sessionState.selectedCollectionId != collectionId) {
             val updatedRouteName = when (resolvedDest) {
                 is RestorableDestination.NowPlaying -> "now_playing"
-                is RestorableDestination.Library -> "library"
+                is RestorableDestination.Library -> if (activeCollection.profile == CollectionProfile.FLAT) "folders" else "library"
                 is RestorableDestination.Settings -> "settings"
                 else -> sessionState.currentRoute
             }

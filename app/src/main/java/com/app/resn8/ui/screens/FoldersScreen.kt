@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -44,6 +45,7 @@ fun FoldersScreen(
     val selectedFileIds by viewModel.selectedFileIds.collectAsState()
     val selectedFolderIds by viewModel.selectedFolderIds.collectAsState()
     val selectionResolution by viewModel.selectionResolution.collectAsState()
+    val allDirectFilesSelected by viewModel.allDirectFilesSelected.collectAsState()
 
     val mediaFiles = viewModel.folderMediaPaged.collectAsLazyPagingItems()
 
@@ -52,6 +54,17 @@ fun FoldersScreen(
             breadcrumbs = breadcrumbs,
             onBreadcrumbClick = { viewModel.navigateToFolder(it) }
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = viewModel::toggleSelectAllDirectAvailable) {
+                Icon(Icons.Default.SelectAll, contentDescription = null)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(if (allDirectFilesSelected) "Deselect All Audio Files" else "Select All Audio Files")
+            }
+        }
 
         if (selectedFileIds.isNotEmpty() || selectedFolderIds.isNotEmpty()) {
             val resolvedIds = selectionResolution?.uniqueMediaIds ?: emptyList()
@@ -70,7 +83,7 @@ fun FoldersScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "${resolvedIds.size} unique audio tracks",
+                            text = "${resolvedIds.size} unique audio files",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -78,7 +91,7 @@ fun FoldersScreen(
                     Button(
                         onClick = {
                             if (resolvedIds.isNotEmpty()) {
-                                onAddToPlaylist(resolvedIds, "Add ${resolvedIds.size} selected tracks")
+                                onAddToPlaylist(resolvedIds, "Add ${resolvedIds.size} selected audio files")
                             }
                         },
                         enabled = resolvedIds.isNotEmpty()
@@ -151,7 +164,8 @@ fun FoldersScreen(
                             onClick = { onTrackClick(mediaFile) },
                             onAddToPlaylist = {
                                 onAddToPlaylist(listOf(mediaFile.id), "Add '${mediaFile.displayTitle}' to Playlist")
-                            }
+                            },
+                            showMusicMetadata = viewModel.collectionProfile == com.app.resn8.domain.model.CollectionProfile.MUSIC
                         )
                     }
                 }

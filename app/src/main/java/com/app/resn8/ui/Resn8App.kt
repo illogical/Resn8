@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -18,6 +19,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +48,10 @@ import com.app.resn8.ui.navigation.Resn8NavHost
 import com.app.resn8.ui.navigation.SettingsRoute
 import com.app.resn8.ui.startup.AppStartupCoordinator
 import com.app.resn8.ui.startup.StartupState
+import com.app.resn8.domain.model.CollectionProfile
+import com.app.resn8.domain.model.LibrarySurface
+import com.app.resn8.domain.model.LibraryFilterSnapshot
+import com.app.resn8.domain.model.SortOrder
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -101,19 +109,29 @@ private fun Resn8AppContent(
     val scope = rememberCoroutineScope()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val collections by container.collectionRepository.getCollectionsFlow().collectAsState(initial = emptyList())
+    val session by container.uiSessionRepository.getUiSessionStateFlow().collectAsState(
+        initial = com.app.resn8.domain.model.UiSessionState()
+    )
+    val activeCollection = collections.firstOrNull { it.id == session.selectedCollectionId }
+        ?: collections.singleOrNull()
+    val activeProfile = activeCollection?.profile ?: CollectionProfile.MUSIC
+    var collectionMenuExpanded by remember { mutableStateOf(false) }
 
-    val topLevelDestinations = remember(isSetupComplete) {
+    val topLevelDestinations = remember(isSetupComplete, activeProfile) {
         val firstDest = if (isSetupComplete) {
             TopLevelDestination("Settings", SettingsRoute, Icons.Default.Settings)
         } else {
             TopLevelDestination("Onboarding", OnboardingRoute, Icons.Default.Home)
         }
-        listOf(
-            firstDest,
-            TopLevelDestination("Library", LibraryRoute(), Icons.Default.LibraryMusic),
-            TopLevelDestination("Folders", FoldersRoute(), Icons.Default.Folder),
-            TopLevelDestination("Playlists", PlaylistsRoute, Icons.AutoMirrored.Filled.QueueMusic)
-        )
+        buildList {
+            add(firstDest)
+            if (activeProfile == CollectionProfile.MUSIC) {
+                add(TopLevelDestination("Library", LibraryRoute(), Icons.Default.LibraryMusic))
+            }
+            add(TopLevelDestination("Folders", FoldersRoute(), Icons.Default.Folder))
+            add(TopLevelDestination("Playlists", PlaylistsRoute, Icons.AutoMirrored.Filled.QueueMusic))
+        }
     }
 
     val playbackConnection = container.playbackConnection
@@ -153,7 +171,66 @@ private fun Resn8AppContent(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Resn8") }
+                title = {
+                    Box {
+                        TextButton(
+                            onClick = { collectionMenuExpanded = true },
+                            enabled = isSetupComplete && collections.isNotEmpty()
+                        ) {
+                            Text(activeCollection?.name ?: "Resn8")
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose collection")
+                        }
+                        DropdownMenu(
+                            expanded = collectionMenuExpanded,
+                            onDismissRequest = { collectionMenuExpanded = false }
+                        ) {
+                            collections.forEach { collection ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(if (collection.profile == CollectionProfile.FLAT) "${collection.name} · Audio Files" else "${collection.name} · Music")
+                                    },
+                                    onClick = {
+                                        collectionMenuExpanded = false
+                                        if (collection.id != activeCollection?.id) {
+                                            scope.launch {
+                                                playbackConnection?.stopForCollectionSwitch()
+                                                val source = container.collectionRepository
+                                                    .getRootSourcesFlow(collection.id).firstOrNull()
+                                                    ?.singleOrNull()
+                                                val current = container.uiSessionRepository.getUiSessionStateFlow().firstOrNull()
+                                                    ?: com.app.resn8.domain.model.UiSessionState()
+                                                val targetRoute = if (collection.profile == CollectionProfile.FLAT) "folders" else "library"
+                                                container.uiSessionRepository.saveUiSessionState(
+                                                    current.copy(
+                                                        currentRoute = targetRoute,
+                                                        selectedCollectionId = collection.id,
+                                                        selectedSourceId = source?.id,
+                                                        selectedFolderId = null,
+                                                        selectedArtistKey = null,
+                                                        selectedAlbumKey = null,
+                                                        selectedAlbumArtistKey = null,
+                                                        selectedPlaylistId = null,
+                                                        activeQueueId = null,
+                                                        activeSearchQuery = null,
+                                                        activeSort = if (collection.profile == CollectionProfile.FLAT) SortOrder.TITLE else SortOrder.ARTIST,
+                                                        activeSurface = if (collection.profile == CollectionProfile.FLAT) LibrarySurface.FOLDERS else LibrarySurface.ARTISTS,
+                                                        libraryFilterSnapshot = LibraryFilterSnapshot(),
+                                                        activeFilterSnapshot = null
+                                                    )
+                                                )
+                                                val route = if (collection.profile == CollectionProfile.FLAT) FoldersRoute() else LibraryRoute()
+                                                navController.navigate(route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                                                    launchSingleTop = true
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             )
         },
         bottomBar = {
@@ -161,6 +238,7 @@ private fun Resn8AppContent(
                 MiniPlayer(
                     title = playbackUiState.title,
                     artist = playbackUiState.artist,
+                    showUnknownArtist = !playbackUiState.isFlatCollection,
                     isPlaying = playbackUiState.isPlaying,
                     likeScore = playbackUiState.likeScore,
                     canPlayPause = playbackUiState.canPlayPause,

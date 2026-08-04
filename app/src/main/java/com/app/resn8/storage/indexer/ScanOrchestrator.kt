@@ -35,6 +35,10 @@ class ScanOrchestrator(
     val scanProgress: Flow<ScanProgress?> = _scanProgress.asStateFlow()
 
     suspend fun executeScan(sourceId: String, treeUri: Uri): ScanResult = withContext(Dispatchers.IO) {
+        val source = collectionRepository.getRootSourceById(sourceId)
+            ?: throw IllegalArgumentException("Collection folder does not exist")
+        val collection = collectionRepository.getCollectionById(source.collectionId)
+            ?: throw IllegalArgumentException("Collection does not exist")
         val startedAt = System.currentTimeMillis()
         val monotonicStart = SystemClock.elapsedRealtime()
         var phase = "INIT"
@@ -72,7 +76,12 @@ class ScanOrchestrator(
                     val stagedMedia = mediaBatch.map { file ->
                         val extraction = metadataExtractor.extract(file.documentUri)
                         if (!extraction.succeeded) metadataFailureCount++
-                        val normalized = FallbackParser.normalize(file.relativePath, file.filename, extraction.tags)
+                        val normalized = FallbackParser.normalize(
+                            file.relativePath,
+                            file.filename,
+                            extraction.tags,
+                            collection.profile
+                        )
                         if (normalized.titleSource == MetadataValueSource.TAG) tagDerivedCount++
                         if (
                             normalized.artistSource == MetadataValueSource.PATH ||

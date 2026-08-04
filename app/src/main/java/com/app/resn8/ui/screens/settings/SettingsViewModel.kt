@@ -11,6 +11,10 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.model.RootSource
+import com.app.resn8.domain.model.Collection
+import com.app.resn8.domain.model.CollectionProfile
+import com.app.resn8.domain.model.LibrarySurface
+import com.app.resn8.domain.model.SortOrder
 import com.app.resn8.domain.model.ScanProgress
 import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.storage.indexer.IndexingWorker
@@ -19,10 +23,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
-    val collectionName: String = "MUSIC",
+    val collections: List<Collection> = emptyList(),
+    val activeCollection: Collection? = null,
     val activeSource: RootSource? = null,
     val isIndexing: Boolean = false,
     val indexingProgress: ScanProgress? = null,
@@ -45,19 +52,78 @@ class SettingsViewModel(
 
     fun loadSettings() {
         viewModelScope.launch {
-            appContainer.collectionRepository.getCollectionsFlow().collect { collections ->
-                val collection = collections.firstOrNull() ?: return@collect
+            combine(
+                appContainer.collectionRepository.getCollectionsFlow(),
+                appContainer.uiSessionRepository.getUiSessionStateFlow()
+            ) { collections, session -> collections to session }.collectLatest { (collections, session) ->
+                val collection = collections.firstOrNull { it.id == session.selectedCollectionId }
+                    ?: collections.singleOrNull()
+                    ?: return@collectLatest
                 val rootSources = appContainer.collectionRepository.getRootSourcesFlow(collection.id).firstOrNull().orEmpty()
-                val activeRoot = rootSources.firstOrNull()
+                val activeRoot = rootSources.firstOrNull { it.id == session.selectedSourceId } ?: rootSources.firstOrNull()
 
                 _uiState.value = _uiState.value.copy(
-                    collectionName = collection.name,
+                    collections = collections,
+                    activeCollection = collection,
                     activeSource = activeRoot
                 )
 
                 if (activeRoot != null) {
                     observeWork(activeRoot.id)
                 }
+            }
+        }
+    }
+
+    fun createCollection(name: String, profile: CollectionProfile, uri: Uri, onCreated: (CollectionProfile) -> Unit) {
+        viewModelScope.launch {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val (collection, source) = appContainer.collectionRepository.createCollectionWithSource(
+                    name = name,
+                    profile = profile,
+                    treeUri = uri.toString(),
+                    displayName = name.trim()
+                )
+                appContainer.playbackConnection?.stopForCollectionSwitch()
+                val current = appContainer.uiSessionRepository.getUiSessionStateFlow().firstOrNull()
+                    ?: com.app.resn8.domain.model.UiSessionState()
+                appContainer.uiSessionRepository.saveUiSessionState(
+                    current.copy(
+                        currentRoute = if (profile == CollectionProfile.FLAT) "folders" else "library",
+                        selectedCollectionId = collection.id,
+                        selectedSourceId = source.id,
+                        selectedFolderId = null,
+                        selectedArtistKey = null,
+                        selectedAlbumKey = null,
+                        selectedAlbumArtistKey = null,
+                        selectedPlaylistId = null,
+                        activeQueueId = null,
+                        activeSearchQuery = null,
+                        activeSort = if (profile == CollectionProfile.FLAT) SortOrder.TITLE else SortOrder.ARTIST,
+                        activeSurface = if (profile == CollectionProfile.FLAT) LibrarySurface.FOLDERS else LibrarySurface.ARTISTS,
+                        libraryFilterSnapshot = com.app.resn8.domain.model.LibraryFilterSnapshot()
+                    )
+                )
+                IndexingWorker.enqueue(context, source.id, source.treeUri)
+                observeWork(source.id)
+                _uiState.value = _uiState.value.copy(errorMessage = null)
+                onCreated(profile)
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "create_collection_failed category=${e::class.simpleName}")
+                _uiState.value = _uiState.value.copy(errorMessage = e.message ?: "Unable to create collection")
+            }
+        }
+    }
+
+    fun renameActiveCollection(name: String) {
+        val collection = _uiState.value.activeCollection ?: return
+        viewModelScope.launch {
+            try {
+                appContainer.collectionRepository.renameCollection(collection.id, name)
+                _uiState.value = _uiState.value.copy(errorMessage = null)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = e.message ?: "Unable to rename collection")
             }
         }
     }
@@ -80,8 +146,8 @@ class SettingsViewModel(
         viewModelScope.launch {
             try {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                appContainer.collectionRepository.addRootSource(root.collectionId, uri.toString(), root.displayName)
-                IndexingWorker.enqueue(context, root.id, uri.toString())
+                val updated = appContainer.collectionRepository.reselectRootSource(root.id, uri.toString())
+                IndexingWorker.enqueue(context, updated.id, updated.treeUri)
                 observeWork(root.id)
             } catch (e: Exception) {
                 Log.e(LOG_TAG, "reselect_permission_failed", e)
@@ -101,7 +167,7 @@ class SettingsViewModel(
                         val progress = ScanProgress(
                             processedFiles = data.getInt(IndexingWorker.KEY_AUDIO, 0),
                             totalFiles = 0,
-                            currentStep = "Indexing music library",
+                            currentStep = "Indexing collection",
                             scanId = info.id.toString(),
                             phase = data.getString(IndexingWorker.KEY_PHASE) ?: "SCANNING"
                         )

@@ -46,7 +46,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SavedQueueItemEntity::class,
         UiSessionStateEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -80,12 +80,20 @@ abstract class Resn8Database : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE collections ADD COLUMN normalizedName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE collections SET normalizedName = lower(trim(name))")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_collections_normalizedName ON collections(normalizedName)")
+            }
+        }
+
         fun buildDatabase(context: Context): Resn8Database {
             return Room.databaseBuilder(
                 context.applicationContext,
                 Resn8Database::class.java,
                 DB_NAME
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
         }
 

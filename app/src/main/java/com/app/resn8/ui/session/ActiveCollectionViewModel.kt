@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.resn8.domain.model.UiSessionState
+import com.app.resn8.domain.model.Collection
 import com.app.resn8.domain.repository.CollectionRepository
 import com.app.resn8.domain.repository.UiSessionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,9 +17,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class ActiveCollectionSelection(
-    val collectionId: String,
+    val collection: Collection,
     val sourceId: String?
-)
+) {
+    val collectionId: String get() = collection.id
+}
 
 sealed interface ActiveCollectionState {
     data object Loading : ActiveCollectionState
@@ -50,34 +53,34 @@ class ActiveCollectionViewModel(
             ) { session, collections -> session to collections }
                 .distinctUntilChanged()
                 .collectLatest { (session, collections) ->
-                    resolve(session, collections.map { it.id })
+                    resolve(session, collections)
                 }
         }
     }
 
-    private suspend fun resolve(session: UiSessionState, collectionIds: List<String>) {
-        if (collectionIds.isEmpty()) {
+    private suspend fun resolve(session: UiSessionState, collections: List<Collection>) {
+        if (collections.isEmpty()) {
             _state.value = ActiveCollectionState.NoCollections
             return
         }
 
-        val collectionId = when {
-            session.selectedCollectionId in collectionIds -> session.selectedCollectionId
-            collectionIds.size == 1 -> collectionIds.single()
+        val collection = when {
+            collections.any { it.id == session.selectedCollectionId } -> collections.first { it.id == session.selectedCollectionId }
+            collections.size == 1 -> collections.single()
             else -> null
         }
-        if (collectionId == null) {
+        if (collection == null) {
             _state.value = ActiveCollectionState.SelectionRequired
             return
         }
 
         try {
-            val roots = collectionRepository.getRootSourcesFlow(collectionId).first()
+            val roots = collectionRepository.getRootSourcesFlow(collection.id).first()
             val sourceId = session.selectedSourceId
                 ?.takeIf { selected -> roots.any { it.id == selected } }
                 ?: roots.singleOrNull()?.id
                 ?: roots.firstOrNull()?.id
-            val selection = ActiveCollectionSelection(collectionId, sourceId)
+            val selection = ActiveCollectionSelection(collection, sourceId)
 
             if (
                 session.selectedCollectionId != selection.collectionId ||

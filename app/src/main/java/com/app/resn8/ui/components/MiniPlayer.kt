@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 fun MiniPlayer(
     title: String = "",
     artist: String = "",
+    showUnknownArtist: Boolean = true,
     isPlaying: Boolean = false,
     likeScore: Int = 0,
     canPlayPause: Boolean = true,
@@ -66,13 +67,15 @@ fun MiniPlayer(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = artist.ifEmpty { "Unknown Artist" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (artist.isNotBlank() || showUnknownArtist) {
+                    Text(
+                        text = artist.ifEmpty { "Unknown Artist" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             if (likeScore > 0) {

@@ -14,6 +14,7 @@ import androidx.media3.session.SessionToken
 import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.model.QueueStartRequest
 import com.app.resn8.domain.model.SavedQueue
+import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.domain.usecase.StartQueueUseCase
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
@@ -162,15 +163,32 @@ class PlaybackConnection(
             _uiState.update {
                 it.copy(
                     activeQueueId = null,
+                    currentQueueItemId = null,
+                    currentMediaId = null,
+                    currentIndex = -1,
+                    title = "",
+                    artist = "",
+                    album = "",
+                    artworkUri = null,
+                    positionMs = 0L,
+                    durationMs = 0L,
+                    isPlaying = false,
+                    isBuffering = false,
+                    canPlayPause = false,
+                    canSeek = false,
+                    canSkipPrevious = false,
+                    canSkipNext = false,
                     queueItems = emptyList(),
                     queueTitle = null,
-                    sourcePlaylistId = null
+                    sourcePlaylistId = null,
+                    isFlatCollection = false
                 )
             }
             return
         }
 
         scope.launch {
+            val isFlat = container.collectionRepository.getCollectionById(queue.collectionId)?.profile == CollectionProfile.FLAT
             val mediaFiles = container.mediaRepository.getMediaFilesByIdsPreservingOrder(queue.orderedMediaIds)
             val fileMap = mediaFiles.associateBy { it.id }
 
@@ -180,8 +198,8 @@ class PlaybackConnection(
                     queueItemId = item.queueItemId,
                     mediaId = item.mediaId,
                     title = mediaFile?.displayTitle ?: item.mediaId,
-                    artist = mediaFile?.artist ?: "Unknown Artist",
-                    album = mediaFile?.album ?: "Unknown Album",
+                    artist = if (isFlat) "" else mediaFile?.artist ?: "Unknown Artist",
+                    album = if (isFlat) "" else mediaFile?.album ?: "Unknown Album",
                     isAvailable = mediaFile?.isAvailable ?: true,
                     isCurrent = item.queueItemId == _uiState.value.currentQueueItemId
                 )
@@ -202,7 +220,8 @@ class PlaybackConnection(
                     activeQueueId = queue.id,
                     queueItems = itemStates,
                     queueTitle = queueTitle,
-                    sourcePlaylistId = sourcePlaylistId
+                    sourcePlaylistId = sourcePlaylistId,
+                    isFlatCollection = isFlat
                 )
             }
         }
@@ -448,6 +467,16 @@ class PlaybackConnection(
 
     fun clearNotice() {
         _uiState.update { it.copy(notice = null) }
+    }
+
+    fun stopForCollectionSwitch() {
+        attemptedFailedItems.clear()
+        controller?.let { ctrl ->
+            ctrl.pause()
+            ctrl.stop()
+            ctrl.clearMediaItems()
+        }
+        stopPollingPosition()
     }
 
     fun release() {

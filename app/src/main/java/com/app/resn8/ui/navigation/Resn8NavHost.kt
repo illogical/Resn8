@@ -19,6 +19,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
@@ -251,7 +252,8 @@ fun Resn8NavHost(
                 )
             }
 
-            composable<FoldersRoute> {
+            composable<FoldersRoute> { backStackEntry ->
+                val route: FoldersRoute = backStackEntry.toRoute()
                 val routeState = activeCollectionState.value
                 val selection = (routeState as? ActiveCollectionState.Ready)?.selection
                 if (selection == null) {
@@ -264,9 +266,13 @@ fun Resn8NavHost(
                                 @Suppress("UNCHECKED_CAST")
                                 return FoldersViewModel(
                                     collectionId = selection.collectionId,
+                                    collectionName = selection.collection.name,
+                                    collectionProfile = selection.collection.profile,
                                     initialSourceId = selection.sourceId,
                                     mediaRepository = container.mediaRepository,
-                                    collectionRepository = container.collectionRepository
+                                    collectionRepository = container.collectionRepository,
+                                    initialFolderId = route.folderId,
+                                    uiSessionRepository = container.uiSessionRepository
                                 ) as T
                             }
                         }
@@ -366,7 +372,8 @@ fun Resn8NavHost(
                         }
                     },
                     currentMediaId = currentPlaylistMediaId,
-                    isCurrentTrackPlaying = playbackUiState.isPlaying
+                    isCurrentTrackPlaying = playbackUiState.isPlaying,
+                    showMusicMetadata = activeSelection?.collection?.profile != com.app.resn8.domain.model.CollectionProfile.FLAT
                 )
             }
 
@@ -388,6 +395,7 @@ fun Resn8NavHost(
                 NowPlayingScreen(
                     title = playbackUiState.title,
                     artist = playbackUiState.artist,
+                    showUnknownArtist = !playbackUiState.isFlatCollection,
                     album = playbackUiState.album,
                     artworkUri = playbackUiState.artworkUri,
                     likeScore = playbackUiState.likeScore,
@@ -425,7 +433,16 @@ fun Resn8NavHost(
                 val settingsViewModel: com.app.resn8.ui.screens.settings.SettingsViewModel = viewModel(
                     factory = com.app.resn8.ui.screens.settings.SettingsViewModel.Factory(context.applicationContext, container)
                 )
-                com.app.resn8.ui.screens.settings.SettingsScreen(viewModel = settingsViewModel)
+                com.app.resn8.ui.screens.settings.SettingsScreen(
+                    viewModel = settingsViewModel,
+                    onCollectionCreated = { profile ->
+                        val route = if (profile == com.app.resn8.domain.model.CollectionProfile.FLAT) FoldersRoute() else LibraryRoute()
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
         }
 

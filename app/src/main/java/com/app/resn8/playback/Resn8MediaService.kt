@@ -275,6 +275,14 @@ class Resn8MediaService : MediaSessionService() {
     ): List<MediaItem> {
         if (container == null) return mediaItems
 
+        val queueId = mediaItems.firstNotNullOfOrNull { item ->
+            item.requestMetadata.extras?.getString(RESN8_QUEUE_ID)
+        }
+        val isFlat = queueId?.let { id ->
+            val queue = container.queueRepository.getQueueByIdFlow(id).firstOrNull()
+            queue?.let { container.collectionRepository.getCollectionById(it.collectionId) }
+        }?.profile == com.app.resn8.domain.model.CollectionProfile.FLAT
+
         val mediaFileIds = mediaItems.mapNotNull { item ->
             item.requestMetadata.extras?.getString(RESN8_MEDIA_FILE_ID) ?: item.mediaId
         }
@@ -289,8 +297,8 @@ class Resn8MediaService : MediaSessionService() {
             if (mediaFile != null) {
                 val metadata = MediaMetadata.Builder()
                     .setTitle(mediaFile.displayTitle)
-                    .setArtist(mediaFile.artist ?: "Unknown Artist")
-                    .setAlbumTitle(mediaFile.album ?: "Unknown Album")
+                    .setArtist(if (isFlat) null else mediaFile.artist ?: "Unknown Artist")
+                    .setAlbumTitle(if (isFlat) null else mediaFile.album ?: "Unknown Album")
                     .setArtworkUri(mediaFile.artworkUri?.let { Uri.parse(it) })
                     .setTrackNumber(mediaFile.trackNumber)
                     .setDiscNumber(mediaFile.discNumber)

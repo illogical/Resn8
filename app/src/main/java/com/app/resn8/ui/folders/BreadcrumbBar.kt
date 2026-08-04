@@ -32,7 +32,7 @@ fun BreadcrumbBar(
         breadcrumbs.forEachIndexed { index, crumb ->
             val isLast = index == breadcrumbs.lastIndex
             Text(
-                text = crumb.displayName.ifEmpty { "Root" },
+                text = crumb.displayName.ifEmpty { "Collection" },
                 style = if (isLast) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
                 color = if (isLast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.clickable(!isLast) { onBreadcrumbClick(crumb.id) }

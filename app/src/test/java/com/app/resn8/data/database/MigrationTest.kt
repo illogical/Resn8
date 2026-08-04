@@ -79,4 +79,37 @@ class MigrationTest {
         assertEquals("library", route)
         assertEquals("ARTISTS", surface)
     }
+
+    @Test
+    fun migrate3To4BackfillsNormalizedCollectionNamesAndAddsUniqueIndex() {
+        db.execSQL(
+            """
+            CREATE TABLE collections (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                profile TEXT NOT NULL,
+                createdAt INTEGER NOT NULL,
+                updatedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL("INSERT INTO collections VALUES ('col_1', '  My Audio  ', 'MUSIC', 1, 1)")
+
+        Resn8Database.MIGRATION_3_4.migrate(db)
+
+        val cursor = db.query("SELECT normalizedName FROM collections WHERE id = 'col_1'")
+        cursor.moveToFirst()
+        assertEquals("my audio", cursor.getString(0))
+        cursor.close()
+
+        val indexes = db.query("PRAGMA index_list('collections')")
+        var foundUnique = false
+        while (indexes.moveToNext()) {
+            if (indexes.getString(indexes.getColumnIndexOrThrow("name")) == "index_collections_normalizedName") {
+                foundUnique = indexes.getInt(indexes.getColumnIndexOrThrow("unique")) == 1
+            }
+        }
+        indexes.close()
+        assertEquals(true, foundUnique)
+    }
 }

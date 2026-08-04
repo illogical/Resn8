@@ -16,11 +16,20 @@ interface CollectionDao {
     @Query("SELECT * FROM collections WHERE id = :id LIMIT 1")
     suspend fun getCollectionById(id: String): CollectionEntity?
 
+    @Query("SELECT * FROM collections WHERE normalizedName = :normalizedName LIMIT 1")
+    suspend fun getCollectionByNormalizedName(normalizedName: String): CollectionEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertCollection(collection: CollectionEntity): Long
 
+    @Query("UPDATE collections SET name = :name, normalizedName = :normalizedName, updatedAt = :updatedAt WHERE id = :collectionId")
+    suspend fun renameCollection(collectionId: String, name: String, normalizedName: String, updatedAt: Long): Int
+
     @Query("SELECT * FROM root_sources WHERE collectionId = :collectionId")
     fun getRootSourcesFlow(collectionId: String): Flow<List<RootSourceEntity>>
+
+    @Query("SELECT * FROM root_sources WHERE collectionId = :collectionId")
+    suspend fun getRootSourcesForCollection(collectionId: String): List<RootSourceEntity>
 
     @Query("SELECT * FROM root_sources WHERE id = :id LIMIT 1")
     suspend fun getRootSourceById(id: String): RootSourceEntity?
@@ -30,6 +39,9 @@ interface CollectionDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertRootSource(rootSource: RootSourceEntity): Long
+
+    @Query("UPDATE root_sources SET treeUri = :treeUri, isAvailable = 1 WHERE id = :sourceId")
+    suspend fun reselectRootSource(sourceId: String, treeUri: String): Int
 
     @Query("UPDATE root_sources SET isAvailable = :isAvailable WHERE id = :sourceId")
     suspend fun updateRootSourceAvailability(sourceId: String, isAvailable: Boolean)

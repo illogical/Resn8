@@ -74,6 +74,7 @@ fun PlaylistDetailScreen(
     onPlayAll: () -> Unit,
     currentMediaId: String? = null,
     isCurrentTrackPlaying: Boolean = false,
+    showMusicMetadata: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val playlist by viewModel.playlist.collectAsState()
@@ -268,6 +269,7 @@ fun PlaylistDetailScreen(
                             isSearchActive = searchQuery.isNotEmpty(),
                             isCurrent = item.mediaFile.id == currentMediaId,
                             isPlaying = isCurrentTrackPlaying,
+                            showMusicMetadata = showMusicMetadata,
                             onTrackClick = {
                                 if (item.mediaFile.isAvailable) {
                                     onTrackClick(item.mediaFile)
@@ -336,6 +338,7 @@ private fun PlaylistItemRow(
     isSearchActive: Boolean,
     isCurrent: Boolean,
     isPlaying: Boolean,
+    showMusicMetadata: Boolean,
     onTrackClick: () -> Unit,
     onMoveToTop: () -> Unit,
     onMoveUp: () -> Unit,
@@ -408,7 +411,11 @@ private fun PlaylistItemRow(
                     )
                 }
             }
-            val subtitle = listOfNotNull(mediaFile.artist, mediaFile.album).joinToString(" • ")
+            val subtitle = if (showMusicMetadata) {
+                listOfNotNull(mediaFile.artist, mediaFile.album).joinToString(" • ")
+            } else {
+                mediaFile.filename
+            }
             if (subtitle.isNotEmpty()) {
                 Text(
                     text = subtitle,

@@ -1,5 +1,7 @@
 package com.app.resn8.domain.model
 
+import java.util.Locale
+
 enum class CollectionProfile {
     MUSIC,
     CONTEXTUAL,
@@ -11,8 +13,16 @@ data class Collection(
     val name: String,
     val profile: CollectionProfile = CollectionProfile.MUSIC,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val normalizedName: String = normalizeCollectionName(name)
 )
+
+fun normalizeCollectionName(name: String): String = name.trim().lowercase(Locale.ROOT)
+
+class CollectionNameConflictException(name: String) :
+    IllegalArgumentException("A collection named '$name' already exists")
+
+class CollectionSourceConflictException(message: String) : IllegalArgumentException(message)
 
 data class RootSource(
     val id: String,

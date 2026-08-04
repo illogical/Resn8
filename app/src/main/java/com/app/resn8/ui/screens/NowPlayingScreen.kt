@@ -62,6 +62,7 @@ fun formatTimeMs(ms: Long): String {
 fun NowPlayingScreen(
     title: String = "No Track Playing",
     artist: String = "Unknown Artist",
+    showUnknownArtist: Boolean = true,
     album: String = "",
     artworkUri: String? = null,
     likeScore: Int = 0,
@@ -186,14 +187,16 @@ fun NowPlayingScreen(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = artist.ifEmpty { "Unknown Artist" },
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (artist.isNotBlank() || showUnknownArtist) {
+                Text(
+                    text = artist.ifEmpty { "Unknown Artist" },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             if (album.isNotEmpty()) {
                 Text(
                     text = album,

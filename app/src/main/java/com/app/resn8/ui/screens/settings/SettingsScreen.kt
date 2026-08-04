@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -18,24 +19,46 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.app.resn8.domain.model.CollectionProfile
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    onCollectionCreated: (CollectionProfile) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    var newCollectionName by remember { mutableStateOf("") }
+    var newCollectionProfile by remember { mutableStateOf(CollectionProfile.MUSIC) }
+    var renameValue by remember(state.activeCollection?.id, state.activeCollection?.name) {
+        mutableStateOf(state.activeCollection?.name.orEmpty())
+    }
 
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri != null) {
             viewModel.onFolderReselected(uri)
+        }
+    }
+    val newCollectionFolderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null && newCollectionName.isNotBlank()) {
+            viewModel.createCollection(newCollectionName, newCollectionProfile, uri) { profile ->
+                newCollectionName = ""
+                onCollectionCreated(profile)
+            }
         }
     }
 
@@ -57,14 +80,18 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Collection: ${state.collectionName}",
+                    text = "Collection: ${state.activeCollection?.name ?: "None"}",
                     style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = if (state.activeCollection?.profile == CollectionProfile.FLAT) "Type: Audio Files" else "Type: Music",
+                    style = MaterialTheme.typography.bodySmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
                 val source = state.activeSource
                 if (source != null) {
-                    Text(text = "Root Folder: ${source.displayName}", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "Collection folder: ${source.displayName}", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         text = "Status: ${if (source.isAvailable) "Available" else "Unavailable / Permission Needed"}",
                         style = MaterialTheme.typography.bodySmall,
@@ -80,9 +107,60 @@ fun SettingsScreen(
                         )
                     }
                 } else {
-                    Text(text = "No active root folder configured.", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "No collection folder configured.", style = MaterialTheme.typography.bodyMedium)
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(text = "Collection Management", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedTextField(
+            value = renameValue,
+            onValueChange = { renameValue = it },
+            label = { Text("Collection name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { viewModel.renameActiveCollection(renameValue) },
+            enabled = renameValue.isNotBlank() && renameValue.trim() != state.activeCollection?.name,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Rename Collection") }
+
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(text = "Add Collection", style = MaterialTheme.typography.titleSmall)
+        OutlinedTextField(
+            value = newCollectionName,
+            onValueChange = { newCollectionName = it },
+            label = { Text("New collection name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FilterChip(
+                selected = newCollectionProfile == CollectionProfile.MUSIC,
+                onClick = { newCollectionProfile = CollectionProfile.MUSIC },
+                label = { Text("Music") }
+            )
+            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+            FilterChip(
+                selected = newCollectionProfile == CollectionProfile.FLAT,
+                onClick = { newCollectionProfile = CollectionProfile.FLAT },
+                label = { Text("Audio Files") }
+            )
+        }
+        Button(
+            onClick = { newCollectionFolderPicker.launch(null) },
+            enabled = newCollectionName.isNotBlank() && !state.isIndexing,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Select Collection Folder") }
+
+        if (state.errorMessage != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(state.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -110,7 +188,7 @@ fun SettingsScreen(
             enabled = !state.isIndexing,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Reselect Root Folder (SAF Permission)")
+            Text("Reselect Collection Folder (SAF Permission)")
         }
 
         Spacer(modifier = Modifier.height(32.dp))

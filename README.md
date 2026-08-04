@@ -19,13 +19,14 @@ Large personal libraries have a discovery problem: familiar tracks keep resurfac
 
 ## Planned MVP
 
-The first usable release is focused on one organized music collection beneath one selected root folder.
+The first usable release supports multiple named collections, each beneath one selected folder. Music collections keep metadata-oriented Library browsing; Audio Files collections provide a filename-oriented Folders experience.
 
 ### Browse and index
 
 - Recursively index playable audio from internal shared storage or removable SD cards.
 - Read embedded metadata such as MP3 ID3 tags, with sensible `Artist/Album/Track` path and filename fallbacks.
 - Browse by artist, album, folder, or all tracks.
+- Switch between Music and folder-first Audio Files collections without mixing their playlists or indexed media.
 - Re-index safely while preserving ratings, play counts, history, and playlist membership.
 - Keep missing or temporarily unavailable files represented instead of silently discarding their data.
 
@@ -112,10 +113,10 @@ Implementation is organized into dependency-ordered milestones:
 7. [x] **Milestone 6**: manual playlists
 8. [x] **Milestone 7**: full queue, playback-position, and browsing-context restoration
 9. [x] **Milestone 8**: startup restoration and index-completion feedback corrections
-10. [ ] **Milestone 9**: smart randomized queues
+10. [ ] **Milestone 9**: multiple single-folder collections and folder-first audio
 11. [ ] **Milestone 10**: accessibility, adaptive-layout, acceptance, and release polish
 
-Post-MVP goals include multiple collections and source roots, contextual and flat-folder library profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore. The Milestone 7 Settings shell is intended to become the home for these later user-configurable capabilities.
+Post-MVP goals include smart randomized queues, multiple source roots within a collection, contextual-folder profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore. Settings is the home for collection management and later user-configurable capabilities.
 
 For the complete product decisions and acceptance criteria, see:
 

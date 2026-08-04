@@ -6,7 +6,7 @@ This document defines user stories and manual UX verification workflows for Resn
 
 ## 1. Library Selection & Indexing (Milestones 0 – 2)
 
-### US1.1 — Select a Music Root Folder
+### US1.1 — Select a Music Collection Folder
 - **As a** user opening Resn8 for the first time,
 - **I want to** select my music folder using Android's system document picker (`ACTION_OPEN_DOCUMENT_TREE`),
 - **So that** Resn8 receives persistent access to my audio without requesting broad file system permissions.
@@ -305,49 +305,48 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ---
 
-## 7. Smart Queue Generation (Milestone 9 — Planned)
+## 7. Multiple Collections and Folder-First Audio (Milestone 9)
 
-### US7.1 — Generate Smart Queues
-- **As a** user,
-- **I want to** generate Random Eligible, Unplayed, Least Played, Most Played, Most Liked, Most Recently Played, and Least Recently Played queues from the currently visible scope,
-- **So that** I can rediscover hidden music in my library.
+### US7.1 — Create and Maintain Collections
+- **As a** user with different kinds of local audio,
+- **I want to** create uniquely named Music or Audio Files collections from separate folders,
+- **So that** each library can be indexed and maintained independently.
 - **Verification**:
-  1. Apply a collection/folder, artist, album, search, and filter combination -> open generation and confirm the preview describes that exact scope and eligible count.
-  2. Change the visible UI after opening the preview -> confirm the pending request uses the immutable reviewed snapshot rather than silently adopting later changes.
-  3. Generate each of the seven modes -> confirm the resulting Queue screen shows an explicit order and starts through the normal playback connection.
-  4. Confirm Least/Most Played group by play count and randomize only equal-count peers.
-  5. Confirm Most Recently Played puts played tracks newest-first with unplayed tracks randomized last; Least Recently Played puts unplayed tracks randomized first, followed by oldest-played groups.
-  6. Confirm generation does not block navigation or the main thread for a representative large library.
+  1. In Settings, create a Music collection and an Audio Files collection; confirm each accepts exactly one SAF folder and persists across restart.
+  2. Attempt a blank or case-insensitive duplicate name and confirm creation/rename remains open with an actionable error.
+  3. Attempt to assign the same selected folder to another collection and confirm it is rejected without cross-linking sources.
+  4. Rename, re-index, and repair permission for each collection independently; confirm scan state and indexed media never leak to the other collection.
 
-### US7.2 — Disliked File Exclusion
-- **As a** user,
-- **I want** disliked tracks (`likeScore < 0`) excluded from smart queues by default,
-- **So that** tracks I dislike aren't suggested automatically.
+### US7.2 — Browse Filename-Oriented Audio
+- **As a** user with downloaded non-music MP3 files,
+- **I want** a folder-first view that does not pretend folders are artists or albums,
+- **So that** the files are presented using the information they actually contain.
 - **Verification**:
-  1. Prepare scores `3, 3, 1, 0, 0, -1`, generate Most Liked, and confirm `[3s randomized] -> [1] -> [0s randomized]` with the negative item absent.
-  2. Generate every other mode -> confirm negative-score and unavailable tracks are absent by default and the preview states both exclusions.
-  3. Use a scope containing only disliked/unavailable tracks -> confirm a specific zero-eligible state appears and no empty queue replaces the active queue.
+  1. Index an untagged flat MP3 folder as Audio Files and confirm cleaned filenames are displayed without invented artist, album, disc, or track metadata.
+  2. Confirm Audio Files opens in Folders, uses the collection name as the top breadcrumb, and does not expose Library, Artists, or Albums.
+  3. Play an Audio Files item and confirm the row, mini-player, Now Playing, queue, and system metadata do not show synthetic `Unknown Artist` or `Unknown Album` labels.
+  4. Confirm Music retains its existing tag/path/filename fallback and metadata-oriented Library surfaces.
 
-### US7.3 — Reproducible Explicit Snapshots
-- **As a** user,
-- **I want** a generated queue to remain stable until I explicitly regenerate it,
-- **So that** ratings, re-indexing, or new files do not unexpectedly reorder what I am listening to.
+### US7.3 — Switch Collections Safely
+- **As a** user moving between collections,
+- **I want** the active collection selector to reset browsing and playback predictably,
+- **So that** content and playlists from separate collections never become confused.
 - **Verification**:
-  1. Generate twice from identical fixture data with the same injected seed -> confirm identical explicit media order and distinct queue-item identities per saved queue.
-  2. Generate with a different seed -> confirm eligible membership remains equal while at least one randomized peer group can differ.
-  3. After generation, change ratings/play counts, add a file, and re-index -> confirm the active saved queue order does not change.
-  4. Tap **Regenerate** -> confirm a new request/seed is reviewed and a new explicit queue replaces the active queue only after successful persistence.
-  5. Relaunch the app/database process -> confirm the saved mode, normalized filter snapshot, seed, and explicit order can be inspected unchanged through Milestone 7 restoration.
+  1. Choose another collection from the app bar and confirm the selected collection/source IDs persist and the destination becomes Library for Music or Folders for Audio Files.
+  2. Switch while playing and confirm playback checkpoints and stops, the mini-player clears, and `activeQueueId` detaches.
+  3. Confirm the prior saved queue row, ratings, play counts, history, playlists, and indexed media remain stored.
+  4. Relaunch after switching and confirm the chosen collection and valid profile home restore without showing a stale artist, album, folder, playlist, search, filter, or sort state.
 
-### US7.4 — Smart Queue Errors, Cancellation & Manual Save
-- **As a** user,
-- **I want** generation failures and edge cases to preserve my current listening context,
-- **So that** experimenting with smart modes is safe.
+### US7.4 — Select All Available Audio
+- **As a** user building playlists from folders or albums,
+- **I want** Select All to operate on the complete applicable set,
+- **So that** paging and subfolders do not produce surprising playlist contents.
 - **Verification**:
-  1. Cancel generation during a large request -> confirm no partial queue becomes active.
-  2. Simulate query/persistence failure -> confirm the current queue remains active and a retryable error explains which phase failed.
-  3. Generate empty and single-item scopes -> confirm empty produces no replacement and a single item persists/plays normally.
-  4. From a generated queue, choose **Save as Playlist** -> confirm the Milestone 6 selector creates unique manual membership in visible queue order without turning the playlist into a dynamic rule.
+  1. In a folder containing available files, unavailable files, and subfolders, choose Select All and confirm only available files directly inside the current folder are selected.
+  2. Confirm unloaded paging rows are included while subfolders and every descendant file remain excluded.
+  3. Explicitly select a folder checkbox and confirm the established descendant-expansion behavior still works independently.
+  4. In Album Detail, choose Select All and confirm every available song across paging is selected while unavailable memberships are skipped.
+  5. Toggle Select All again to deselect the applicable set, then add the selection through the shared collection-scoped playlist selector.
 
 ---
 
@@ -358,6 +357,22 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 - **I want** clear content descriptions, minimum 48dp touch targets, font scaling support, and high contrast,
 - **So that** the app is fully usable with TalkBack or hardware switches.
 - **Verification**:
-  1. Complete the core first-run, browse, playback, rating, playlist, restoration, and smart-queue flows with TalkBack or switch/keyboard navigation.
+  1. Complete the core first-run, collection management, browse, playback, rating, playlist, restoration, and Select All flows with TalkBack or switch/keyboard navigation.
   2. Repeat core surfaces in portrait, landscape, and supported large-font settings -> confirm controls remain reachable and state survives configuration changes.
   3. Review loading, empty, success, and recoverable error feedback -> confirm long-running actions never appear inert and no essential action relies on gesture or color alone.
+
+---
+
+## Post-MVP — Smart Queue Generation
+
+### PM1 — Generate Explainable Smart Queues
+- Generate Random Eligible, Unplayed, Least/Most Played, Most Liked, and Least/Most Recently Played queues from an immutable reviewed collection/filter snapshot.
+- Verify each mode's eligibility, equal-key randomization, dislike/unavailable exclusion, zero-result explanation, and responsive 25,000-item behavior.
+
+### PM2 — Preserve Reproducible Explicit Snapshots
+- Persist the mode, normalized filter, seed, stable queue-item identities, and explicit order before playback.
+- Verify same-seed reproducibility, different-seed variability, restart restoration, and isolation from later rating, scan, or metadata changes.
+
+### PM3 — Handle Generation Failure Safely
+- Cancellation, query failure, persistence failure, and empty results must leave the current queue unchanged and provide an actionable explanation.
+- Saving a generated queue as a playlist creates unique manual membership in visible order rather than a dynamic rule.

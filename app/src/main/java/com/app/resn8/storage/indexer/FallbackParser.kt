@@ -1,6 +1,7 @@
 package com.app.resn8.storage.indexer
 
 import com.app.resn8.domain.model.MetadataValueSource
+import com.app.resn8.domain.model.CollectionProfile
 
 data class ExtractedTags(
     val title: String? = null,
@@ -50,7 +51,8 @@ object FallbackParser {
     fun normalize(
         relativePath: String,
         filename: String,
-        tags: ExtractedTags
+        tags: ExtractedTags,
+        profile: CollectionProfile = CollectionProfile.MUSIC
     ): NormalizedMetadata {
         val cleanName = cleanFilename(filename)
         var title: String? = tags.title?.takeIf { it.isNotBlank() }
@@ -67,7 +69,31 @@ object FallbackParser {
         var discNumberSource: MetadataValueSource? = if (discNumber != null) MetadataValueSource.TAG else null
         var trackNumberSource: MetadataValueSource? = if (trackNumber != null) MetadataValueSource.TAG else null
 
-        // 1. Path inference for Artist/Album from directory hierarchy (excluding filename)
+        if (profile == CollectionProfile.FLAT) {
+            val finalTitle = title ?: cleanName
+            return NormalizedMetadata(
+                displayTitle = finalTitle,
+                title = finalTitle,
+                artist = artist,
+                albumArtist = albumArtist,
+                album = album,
+                discNumber = discNumber,
+                trackNumber = trackNumber,
+                year = tags.year,
+                genre = tags.genre?.takeIf { it.isNotBlank() },
+                durationMs = tags.durationMs?.takeIf { it > 0 },
+                artworkUri = tags.artworkUri,
+                titleSource = titleSource ?: MetadataValueSource.FILENAME,
+                artistSource = artistSource,
+                albumArtistSource = albumArtistSource,
+                albumSource = albumSource,
+                discNumberSource = discNumberSource,
+                trackNumberSource = trackNumberSource,
+                isPatternRecognized = true
+            )
+        }
+
+        // 1. Music-only path inference for Artist/Album from directory hierarchy (excluding filename)
         val pathSegments = relativePath.split('/').filter { it.isNotBlank() }
         val folderSegments = if (pathSegments.isNotEmpty() && pathSegments.last() == filename) {
             pathSegments.dropLast(1)

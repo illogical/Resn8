@@ -41,5 +41,6 @@ data class PlaybackUiState(
     val queueItems: List<PlaybackQueueItemState> = emptyList(),
     val queueTitle: String? = null,
     val sourcePlaylistId: String? = null,
+    val isFlatCollection: Boolean = false,
     val notice: PlaybackNotice? = null
 )

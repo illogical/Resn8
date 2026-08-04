@@ -43,6 +43,7 @@ fun TrackListItemRow(
     onSelectToggle: () -> Unit,
     onClick: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
+    showMusicMetadata: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -91,11 +92,19 @@ fun TrackListItemRow(
                     text = mediaFile.displayTitle,
                     style = MaterialTheme.typography.bodyLarge
                 )
-                Text(
-                    text = "${mediaFile.artist ?: "Unknown Artist"} • ${mediaFile.album ?: "Unknown Album"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (showMusicMetadata) {
+                    Text(
+                        text = "${mediaFile.artist ?: "Unknown Artist"} • ${mediaFile.album ?: "Unknown Album"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        text = mediaFile.filename,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (!mediaFile.isAvailable) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(

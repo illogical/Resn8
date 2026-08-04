@@ -1,6 +1,7 @@
 package com.app.resn8.storage
 
 import com.app.resn8.domain.model.MetadataValueSource
+import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.storage.indexer.ExtractedTags
 import com.app.resn8.storage.indexer.FallbackParser
 import org.junit.Assert.assertEquals
@@ -87,6 +88,24 @@ class FallbackParserTest {
         assertEquals("My Random Recording", result.title)
         assertNull(result.artist)
         assertNull(result.album)
+        assertNull(result.trackNumber)
+        assertEquals(MetadataValueSource.FILENAME, result.titleSource)
+    }
+
+    @Test
+    fun normalize_flatCollection_doesNotInventMusicMetadataFromPathOrPrefix() {
+        val result = FallbackParser.normalize(
+            relativePath = "Downloaded/Interviews/01 - Session_Notes.mp3",
+            filename = "01 - Session_Notes.mp3",
+            tags = ExtractedTags(),
+            profile = CollectionProfile.FLAT
+        )
+
+        assertEquals("01 - Session Notes", result.displayTitle)
+        assertEquals("01 - Session Notes", result.title)
+        assertNull(result.artist)
+        assertNull(result.album)
+        assertNull(result.discNumber)
         assertNull(result.trackNumber)
         assertEquals(MetadataValueSource.FILENAME, result.titleSource)
     }

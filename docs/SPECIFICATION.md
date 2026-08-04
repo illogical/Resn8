@@ -4,12 +4,12 @@
 
 Resn8 is an offline-first Android audio player for audio files stored in user-selected folders on internal shared storage or removable SD cards. Its distinguishing feature is durable listening and rating data that can generate queues which surface unheard or least-played files, prioritize liked files, and exclude disliked files.
 
-The first usable release focuses on one organized music collection under one user-selected root folder. The data model must also support later contextual-folder collections (for example, `Podcasts/AI`) and flat folders without requiring a database redesign.
+The first usable release supports multiple named collections, each under one user-selected folder. A collection is either organized music or filename-oriented audio files. The shared data model also supports later contextual-folder collections (for example, `Podcasts/AI`) and multiple source folders without requiring a database redesign.
 
 ### Goals
 
 - Select a folder through Android's system picker and recursively index supported audio files.
-- Browse an organized music library by artist, album, track, and source folder.
+- Switch between multiple local collections and browse organized music by artist, album, track, and source folder or browse general audio by filename and folder.
 - Play audio reliably in the foreground and background with Android system controls.
 - Track meaningful plays, last-played time, current position, and a signed like score.
 - Create ordered manual playlists and add one file, many files, or a folder's descendants.
@@ -19,9 +19,9 @@ The first usable release focuses on one organized music collection under one use
 
 ### MVP Boundaries
 
-The MVP includes one `MUSIC` collection with one root folder, recursive manual re-indexing, library browsing, background playback, rating, manual playlists, and playback-state restoration. The schema and domain interfaces support multiple roots and collection profiles, but their management UI is post-MVP.
+The MVP includes multiple uniquely named collections with one selected folder each. User-facing profiles are `MUSIC` and `FLAT` (shown as Audio Files), with recursive manual re-indexing, profile-appropriate browsing, background playback, rating, manual playlists, and playback-state restoration. The schema and domain interfaces retain room for multiple roots and contextual collections, but those management experiences are post-MVP.
 
-Scheduled indexing, advanced search, playback-speed control, multiple collections, generic contextual/flat collection UI, moving or deleting disliked source files, tag editing, cloud playback, casting, lyrics, equalization, and Android Auto-specific browsing are post-MVP.
+Scheduled indexing, smart randomized queues, advanced search, playback-speed control, multiple roots per collection, contextual collection UI, collection deletion, moving or deleting disliked source files, tag editing, cloud playback, casting, lyrics, equalization, and Android Auto-specific browsing are post-MVP.
 
 Images and videos mentioned in the brainstorm are out of scope. Resn8 indexes playable audio only.
 
@@ -29,9 +29,9 @@ Images and videos mentioned in the brainstorm are out of scope. Resn8 indexes pl
 
 ### 2.1 Collection and Source Access
 
-- A **Collection** is a logical audio library with a name and profile: `MUSIC`, `CONTEXTUAL`, or `FLAT`.
+- A **Collection** is a logical audio library with a stable ID, normalized-unique display name, and profile: `MUSIC`, `CONTEXTUAL`, or `FLAT`. The MVP creation UI exposes Music and Audio Files (`FLAT`) only.
 - A **Root Source** is a folder selected with `ACTION_OPEN_DOCUMENT_TREE`. Resn8 takes and stores persistent read permission for its tree URI.
-- The MVP allows one collection and one root source. APIs and tables use collection/source identifiers so later releases can add more without migration of the conceptual model.
+- The MVP allows multiple collections with exactly one root source per collection. A persisted tree URI may belong to only one collection. APIs and tables continue to use collection/source identifiers so later releases can add multiple roots without migration of the conceptual model.
 - Resn8 never requires broad storage permission and never modifies source audio during normal indexing or playback.
 - If permission is revoked or an SD card is unavailable, the source and its affected files are shown as unavailable. Statistics and playlist membership are retained.
 
@@ -41,7 +41,7 @@ All audio types use one `MediaFile` entity. Common fields are required; music-sp
 
 | Entity | Required fields and behavior |
 | --- | --- |
-| `Collection` | Stable ID, name, profile, created/updated timestamps |
+| `Collection` | Stable ID, name, normalized unique name, profile, created/updated timestamps |
 | `RootSource` | Stable ID, collection ID, persisted tree URI, display name, availability, last scan status/timestamps |
 | `FolderNode` | Stable ID, source ID, parent ID, relative path, display name; represents the indexed hierarchy |
 | `MediaFile` | Stable ID, source ID, folder ID, document URI/ID, relative path, filename, display title, MIME type, size, duration, modified time, first-indexed time, availability, metadata scan status |
@@ -57,7 +57,7 @@ Room is the source of truth for indexed metadata, relationships, statistics, pla
 
 ### 2.3 Metadata Resolution
 
-During indexing, Resn8 reads supported embedded metadata, including MP3 ID3 tags when present. Display values use this precedence:
+During indexing, Resn8 reads supported embedded metadata, including MP3 ID3 tags when present. `MUSIC` display values use this precedence:
 
 1. Valid embedded title, artist/album artist, album, disc, and track fields.
 2. For a `MUSIC` collection, relative folder structure interpreted as `Artist/Album/...` and a leading filename track number where the tag is absent.
@@ -66,7 +66,7 @@ During indexing, Resn8 reads supported embedded metadata, including MP3 ID3 tags
 
 The parser accepts common track prefixes such as `01 Title`, `01 - Title`, and `1-01 Title`. It must not overwrite valid embedded tags. A scan summary records counts of tag-derived, path-derived, unrecognized, unreadable, and unsupported files so real sample libraries can inform later parser improvements.
 
-For `CONTEXTUAL` collections, relative folders are the category hierarchy and music fields are optional. For `FLAT` collections, files use display title/filename without invented artist or album values.
+For `FLAT` collections, valid embedded common metadata may remain in nullable shared fields, but path and filename parsing must not invent artist, album, disc, or track metadata. The folder-first UI uses tag title or cleaned filename and does not show synthetic `Unknown Artist` or `Unknown Album` labels. For future `CONTEXTUAL` collections, relative folders become a category hierarchy and music fields remain optional.
 
 ### 2.4 Re-indexing and File Identity
 
@@ -127,15 +127,17 @@ Manual library sorts support artist, album, disc/track, filename/title, recently
 
 ### 3.1 First Run and Library
 
-1. Explain that Resn8 is local-only and request a music root through the system folder picker.
+1. Explain that Resn8 is local-only and request a Music collection folder through the system folder picker.
 2. Ask for a collection name, defaulting to the selected folder name, and start recursive indexing.
 3. Show progress, discovered/unsupported/error counts, and a usable empty/error state.
 4. Open the library with top-level Artist, Album, Folder, and All Tracks views.
 5. Artist selection shows that artist's albums and tracks; album selection shows tracks ordered by disc and track number, falling back to title/filename.
 
-The folder browser mirrors indexed relative paths, shows file availability, supports file/folder multi-selection, and expands selected folders to all currently indexed descendant audio for bulk playlist operations.
+The folder browser mirrors indexed relative paths, uses the collection name for its top breadcrumb, shows file availability, supports file/folder multi-selection, and expands explicitly selected folders to all currently indexed descendant audio for bulk playlist operations. Its Select All action selects every available direct audio file in the current folder across paging, excluding unavailable files, subfolders, and all descendants of those subfolders. Album Select All similarly selects every available song in that album across paging.
 
-Onboarding is a conditional first-run/recovery flow, not a permanent destination once a usable collection and source exist. After setup, its top-level navigation slot becomes Settings. The MVP Settings surface provides collection/source status, manual re-indexing, and permission-reselection entry points; later collection management and user-configurable preferences extend that surface post-MVP.
+Onboarding is a conditional first-run/recovery flow, not a permanent destination once a usable collection and source exist. After setup, its top-level navigation slot becomes Settings. Settings provides collection creation, rename, collection-folder status, manual re-indexing, and permission reselection. Collection deletion and multiple-root management remain post-MVP.
+
+The active collection name is an app-bar selector. `MUSIC` exposes Library, Folders, and Playlists. `FLAT` opens in Folders and omits Library/artist/album destinations while retaining collection-scoped playlists. Switching collections checkpoints and stops playback, clears the active queue association and collection-specific browsing state, and opens the target profile's home. The detached saved queue row, ratings, listening statistics, and history remain stored.
 
 ### 3.2 Player and Queue
 
@@ -162,7 +164,7 @@ Resn8 checkpoints the active saved queue, index, media ID, position, play/pause 
 
 Cold-start restoration waits for persisted session state before choosing a destination or installing media. It resolves the active queue only from `UiSessionState.activeQueueId`, rebuilds the stored explicit queue without minting replacement queue-item IDs, validates the saved index/media pair, bounds the seek position to the known duration when possible, and applies repeat/speed state before preparation. A newly selected queue always supersedes an in-flight restoration attempt.
 
-UI restoration persists typed destination state rather than an opaque back stack or display strings. It restores the last meaningful library surface, folder, artist, album, playlist, queue, or Now Playing destination together with the applicable collection, search, filter, and sort values. Transient dialogs, sheets, selection mode, and onboarding progress are not restored. If a destination no longer exists, Resn8 falls back deterministically through its valid parent (detail to list, folder to root, then Library) and updates persisted session state to that valid destination.
+UI restoration persists typed destination state rather than an opaque back stack or display strings. It restores the last meaningful library surface, folder, artist, album, playlist, queue, or Now Playing destination together with the applicable collection, search, filter, and sort values. Transient dialogs, sheets, selection mode, and onboarding progress are not restored. If a destination no longer exists, Resn8 falls back deterministically through its valid parent and updates persisted session state. `MUSIC` ultimately falls back to Library; `FLAT` falls back to its collection-name root in Folders and never restores Library, artist, or album UI.
 
 If the current item or source is unavailable, Resn8 keeps the queue and history context, identifies whether permission, storage, media, or saved state is missing, and offers reselect, retry, Settings, or skip-to-next-available actions as applicable. Merely detecting an unavailable item does not destructively rewrite the saved queue.
 
@@ -201,26 +203,28 @@ The UI distinguishes an empty folder, no matching filter results, revoked permis
 
 The MVP is complete when all of the following are demonstrated on an API 34+ device/emulator and, for removable-storage behavior, a suitable physical device or test provider:
 
-- A selected root retains access across app and device restart and indexes nested MP3/audio files without broad storage permission.
+- Every collection folder retains access across app and device restart and indexes supported MP3/audio files without broad storage permission.
+- Multiple normalized-unique Music and Audio Files collections can be created, renamed, switched, re-indexed, and permission-repaired independently without cross-collection media or playlist leakage.
+- A filename-only `FLAT` MP3 is browsable and playable without invented artist/album values or a Library tab.
 - Embedded MP3 tags win over path/filename fallbacks; untagged `Artist/Album/01 - Song.mp3` appears in the correct hierarchy and order.
 - Re-index adds new files, refreshes changed metadata, marks missing files unavailable, and preserves ratings, play counts, history, and playlist membership.
 - Artist, album, folder, and all-track browsing return correct filtered results for a representative library.
 - Audio plays through Media3 in foreground/background, responds to notification and hardware controls, handles audio focus/headphone removal, and has only one active player.
 - Like/Dislike updates are durable and atomic. Scores can cross zero in either direction.
 - A play increments exactly once per playback traversal occurrence at the meaningful-listen threshold, cannot be earned by seeking, pause/buffer/interruption time, or wall-clock changes, and remains correct during background playback and UI/controller recreation. Automatic and final-item natural completion use the same occurrence-correct atomic commit.
-- Manual playlists enforce unique membership, preserve user order, support single/bulk/folder addition, and survive restart.
-- Smart-mode unit tests verify eligibility, dislike exclusion, primary ordering, randomized ties, neutral placement, seeded reproducibility, empty/single-item inputs, and unavailable items.
-- The most-liked normative example produces grouped order `[3s randomized] -> [1s randomized] -> [0s randomized]`, excluding all negative scores.
+- Manual playlists enforce unique membership, preserve user order, support single/bulk/folder addition, remain collection-scoped, and survive restart.
+- Folder and album Select All resolve the complete available-only database set rather than only loaded pages; folder Select All excludes subfolders and their descendants.
 - Killing and reopening the app restores the explicit queue, item, position, and screen in a non-autoplaying state; explicit Android media resumption remains functional.
-- Core UI tests cover first run, indexing states, library drill-down, player controls, playlist selector mixed state, queue generation, and recovery from unavailable media.
+- Core UI tests cover first run, indexing states, collection switching, profile-aware browsing, library drill-down, player controls, playlist selector mixed state, Select All, and recovery from unavailable media.
 
 ## 6. Post-MVP Roadmap
 
-1. Multiple collections and roots, plus `CONTEXTUAL` and `FLAT` collection creation/browsing.
+1. Multiple roots per collection and user-facing `CONTEXTUAL` category-folder creation/browsing.
 2. Full smart-playlist editor with saved dynamic rule definitions and compound filters.
 3. Scheduled re-indexing with charging/storage constraints and change summaries.
 4. Playback speed presets and per-collection/per-file speed memory for long-form audio.
 5. Raycast/Alfred-style global search across metadata, folders, playlists, and history.
-6. Rating/history maintenance, including confirmed move/delete workflows for disliked files.
-7. Export/import backup for playlists, ratings, history, and settings without bundling source audio.
-8. Extend the existing player artwork seam with cached album artwork throughout library, album, artist, track, queue, and playlist surfaces when the current index exposes a usable artwork reference, with a stable placeholder when it does not.
+6. Smart randomized queue generation from immutable scoped snapshots.
+7. Rating/history maintenance, including confirmed move/delete workflows for disliked files.
+8. Export/import backup for playlists, ratings, history, and settings without bundling source audio.
+9. Extend the existing player artwork seam with cached album artwork throughout library, album, artist, track, queue, and playlist surfaces when the current index exposes a usable artwork reference, with a stable placeholder when it does not.
