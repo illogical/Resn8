@@ -114,6 +114,7 @@ class LibraryViewModel(
     }.cachedIn(viewModelScope)
 
     fun setSurface(surface: LibrarySurface) {
+        if (surface != LibrarySurface.ALL_TRACKS) clearSelection()
         _surface.value = surface
         saveSessionState()
     }

@@ -152,7 +152,7 @@ fun QueueScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = item.title,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

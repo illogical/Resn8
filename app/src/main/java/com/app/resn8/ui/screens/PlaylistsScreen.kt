@@ -233,7 +233,7 @@ private fun PlaylistItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = playlist.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(

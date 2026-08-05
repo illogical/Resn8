@@ -21,7 +21,7 @@ The first usable release supports multiple named collections, each under one use
 
 The MVP includes multiple uniquely named collections with one selected folder each. User-facing profiles are `MUSIC` and `FLAT` (shown as Audio Files), with recursive manual re-indexing, profile-appropriate browsing, background playback, rating, manual playlists, and playback-state restoration. The schema and domain interfaces retain room for multiple roots and contextual collections, but those management experiences are post-MVP.
 
-Scheduled indexing, smart randomized queues, advanced search, playback-speed control, multiple roots per collection, contextual collection UI, collection deletion, moving or deleting disliked source files, tag editing, cloud playback, casting, lyrics, equalization, and Android Auto-specific browsing are post-MVP.
+Scheduled indexing, smart randomized queues, advanced search, playback-speed control, multiple roots per collection, contextual collection UI, moving or deleting disliked source files, tag editing, cloud playback, casting, lyrics, equalization, and Android Auto-specific browsing are post-MVP.
 
 Images and videos mentioned in the brainstorm are out of scope. Resn8 indexes playable audio only.
 
@@ -135,9 +135,11 @@ Manual library sorts support artist, album, disc/track, filename/title, recently
 
 The folder browser mirrors indexed relative paths, uses the collection name for its top breadcrumb, shows file availability, supports file/folder multi-selection, and expands explicitly selected folders to all currently indexed descendant audio for bulk playlist operations. Its Select All action selects every available direct audio file in the current folder across paging, excluding unavailable files, subfolders, and all descendants of those subfolders. Album Select All similarly selects every available song in that album across paging.
 
-Onboarding is a conditional first-run/recovery flow, not a permanent destination once a usable collection and source exist. After setup, its top-level navigation slot becomes Settings. Settings provides collection creation, rename, collection-folder status, manual re-indexing, and permission reselection. Collection deletion and multiple-root management remain post-MVP.
+Onboarding is a conditional first-run/recovery flow, not a permanent destination once a usable collection and source exist. After setup, its top-level navigation slot becomes Settings. Settings contains Collections and About subpages. Collections provides a list/detail editor for creation, rename, collection-folder status, manual re-indexing, permission reselection, live indexing progress, and confirmed deletion. Collection type is chosen during creation and remains read-only afterward. Deleting a collection removes only its Resn8 index, ratings, history, playlists, saved queues, session mapping, and persisted folder grant; source audio remains untouched. Deleting the final collection returns to onboarding. Multiple-root management remains post-MVP.
 
-The active collection name is an app-bar selector and the app shell is the sole owner of system-bar insets. Nested page toolbars begin directly beneath it without reserving a second status-bar inset. `MUSIC` exposes Library, Folders, and Playlists. `FLAT` opens in Folders and omits Library/artist/album destinations while retaining collection-scoped playlists. Switching collections checkpoints and stops playback, clears the active queue association and collection-specific browsing state, and opens the target profile's home. The detached saved queue row, ratings, listening statistics, and history remain stored.
+The active collection name is an app-bar selector and the app shell is the sole owner of system-bar insets. Nested page toolbars begin directly beneath it without reserving a second status-bar inset. `MUSIC` exposes Library, Folders, and Playlists; its Library tabs are Artists, Albums, and All Tracks. `FLAT` opens in Folders and omits Library/artist/album destinations while retaining collection-scoped playlists. Switching collections checkpoints and stops playback, clears transient browse/search/filter/selection state, and resolves the target collection's own last-queue pointer. A valid target queue is prepared at its saved item and position without autoplay and opens Now Playing; a collection without a restorable queue opens its profile home. The selected collection's pointer is mirrored into `UiSessionState.activeQueueId`; queue selection never falls back to update time.
+
+Selectable folder, album, and all-track rows use checkboxes plus one fixed bottom action tray above the mini-player. The tray does not shift list content, reports concise file/folder counts, and supplies Add to Playlist and Clear. A row with a selection checkbox does not also expose a redundant single-item Add overflow action. List content includes sufficient bottom padding to remain reachable behind the tray.
 
 ### 3.2 Player and Queue
 
@@ -163,6 +165,8 @@ Resn8 checkpoints the active saved queue, index, media ID, position, play/pause 
 `Resn8MediaService`, as the sole player owner, is authoritative for playback checkpoints. Position is saved periodically while playing and immediately on pause, completed seek, item transition, task/background lifecycle events, and service shutdown. Writes are serialized and coalesced so a delayed older checkpoint cannot overwrite newer state. A checkpoint retains the stable queue-item ID and playback occurrence ID separately, together with the occurrence's accumulated active-listening duration and qualification state; restoring controller or Activity state does not create a new traversal occurrence or discard already accumulated listening.
 
 Cold-start restoration waits for persisted session state before choosing a destination or installing media. It resolves the active queue only from `UiSessionState.activeQueueId`, rebuilds the stored explicit queue without minting replacement queue-item IDs, validates the saved index/media pair, bounds the seek position to the known duration when possible, and applies repeat/speed state before preparation. A newly selected queue always supersedes an in-flight restoration attempt.
+
+Each collection also stores its own nullable last-queue pointer. Starting a queue updates that collection pointer and the selected collection's global active pointer. Collection switching checkpoints the outgoing queue before changing global session ownership, validates the incoming pointer against collection identity and non-empty occurrence data, and restores it paused. Missing or structurally invalid pointers are cleared without deleting unrelated saved data; unavailable items continue through the normal recovery path.
 
 UI restoration persists typed destination state rather than an opaque back stack or display strings. It restores the last meaningful library surface, folder, artist, album, playlist, queue, or Now Playing destination together with the applicable collection, search, filter, and sort values. Transient dialogs, sheets, selection mode, and onboarding progress are not restored. If a destination no longer exists, Resn8 falls back deterministically through its valid parent and updates persisted session state. `MUSIC` ultimately falls back to Library; `FLAT` falls back to its collection-name root in Folders and never restores Library, artist, or album UI.
 
@@ -204,7 +208,7 @@ The UI distinguishes an empty folder, no matching filter results, revoked permis
 The MVP is complete when all of the following are demonstrated on an API 34+ device/emulator and, for removable-storage behavior, a suitable physical device or test provider:
 
 - Every collection folder retains access across app and device restart and indexes supported MP3/audio files without broad storage permission.
-- Multiple normalized-unique Music and Audio Files collections can be created, renamed, switched, re-indexed, and permission-repaired independently without cross-collection media or playlist leakage.
+- Multiple normalized-unique Music and Audio Files collections can be created, renamed, switched, re-indexed, permission-repaired, and confirmation-deleted independently without cross-collection media or playlist leakage or modification of source audio.
 - A filename-only `FLAT` MP3 is browsable and playable without invented artist/album values or a Library tab.
 - Embedded MP3 tags win over path/filename fallbacks; untagged `Artist/Album/01 - Song.mp3` appears in the correct hierarchy and order.
 - Re-index adds new files, refreshes changed metadata, marks missing files unavailable, and preserves ratings, play counts, history, and playlist membership.
@@ -215,6 +219,7 @@ The MVP is complete when all of the following are demonstrated on an API 34+ dev
 - Manual playlists enforce unique membership, preserve user order, support single/bulk/folder addition, remain collection-scoped, and survive restart.
 - Folder and album Select All resolve the complete available-only database set rather than only loaded pages; folder Select All excludes subfolders and their descendants.
 - Killing and reopening the app restores the explicit queue, item, position, and screen in a non-autoplaying state; explicit Android media resumption remains functional.
+- Switching repeatedly between collections restores each collection's own last queue, item, and position in a paused state; a never-played collection opens its profile home.
 - Core UI tests cover first run, indexing states, collection switching, profile-aware browsing, library drill-down, player controls, playlist selector mixed state, Select All, and recovery from unavailable media.
 
 ## 6. Post-MVP Roadmap

@@ -112,4 +112,41 @@ class MigrationTest {
         indexes.close()
         assertEquals(true, foundUnique)
     }
+
+    @Test
+    fun migrate4To5SeedsOnlyTheSelectedCollectionsMatchingQueue() {
+        db.execSQL(
+            """
+            CREATE TABLE collections (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                profile TEXT NOT NULL,
+                createdAt INTEGER NOT NULL,
+                updatedAt INTEGER NOT NULL,
+                normalizedName TEXT NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE saved_queues (
+                id TEXT NOT NULL PRIMARY KEY,
+                collectionId TEXT NOT NULL,
+                updatedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL("INSERT INTO collections VALUES ('col_1', 'Music', 'MUSIC', 1, 1, 'music')")
+        db.execSQL("INSERT INTO saved_queues VALUES ('queue_1', 'col_1', 42)")
+        db.execSQL("INSERT INTO ui_session_state (id, currentRoute, selectedCollectionId, selectedFolderId, selectedArtist, selectedAlbum, selectedPlaylistId, activeQueueId, activeSearchQuery, activeSort, activeFilterSnapshot) VALUES (1, 'now_playing', 'col_1', NULL, NULL, NULL, NULL, 'queue_1', NULL, 'ARTIST', NULL)")
+
+        Resn8Database.MIGRATION_4_5.migrate(db)
+
+        val cursor = db.query("SELECT collectionId, activeQueueId, updatedAt FROM collection_playback_state")
+        cursor.moveToFirst()
+        assertEquals("col_1", cursor.getString(0))
+        assertEquals("queue_1", cursor.getString(1))
+        assertEquals(42L, cursor.getLong(2))
+        cursor.close()
+    }
 }

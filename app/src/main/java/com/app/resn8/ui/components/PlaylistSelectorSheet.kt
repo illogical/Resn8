@@ -154,7 +154,7 @@ fun PlaylistSelectorSheet(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = item.playlist.name,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = if (isSavingThisRow) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(

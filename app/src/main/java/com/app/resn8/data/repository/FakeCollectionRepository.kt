@@ -2,6 +2,8 @@ package com.app.resn8.data.repository
 
 import com.app.resn8.domain.model.Collection
 import com.app.resn8.domain.model.CollectionProfile
+import com.app.resn8.domain.model.CollectionPlaybackState
+import com.app.resn8.domain.model.CollectionSummary
 import com.app.resn8.domain.model.CollectionNameConflictException
 import com.app.resn8.domain.model.CollectionSourceConflictException
 import com.app.resn8.domain.model.RootSource
@@ -20,8 +22,13 @@ class FakeCollectionRepository(
 
     private val _collections = MutableStateFlow(initialCollections)
     private val _rootSources = MutableStateFlow(initialRootSources)
+    private val _playbackStates = MutableStateFlow<Map<String, CollectionPlaybackState>>(emptyMap())
 
     override fun getCollectionsFlow(): Flow<List<Collection>> = _collections
+
+    override fun getCollectionSummariesFlow(): Flow<List<CollectionSummary>> = _collections.map { collections ->
+        collections.map { CollectionSummary(it, totalTrackCount = 0, unavailableTrackCount = 0) }
+    }
 
     override suspend fun getCollectionById(id: String): Collection? {
         return _collections.value.find { it.id == id }
@@ -73,6 +80,26 @@ class FakeCollectionRepository(
         val updated = existing.copy(name = trimmed, normalizedName = normalized, updatedAt = System.currentTimeMillis())
         _collections.value = _collections.value.map { if (it.id == collectionId) updated else it }
         return updated
+    }
+
+    override fun getCollectionPlaybackStateFlow(collectionId: String): Flow<CollectionPlaybackState?> =
+        _playbackStates.map { it[collectionId] }
+
+    override suspend fun getCollectionPlaybackState(collectionId: String): CollectionPlaybackState? =
+        _playbackStates.value[collectionId]
+
+    override suspend fun setCollectionActiveQueue(collectionId: String, queueId: String?) {
+        require(_collections.value.any { it.id == collectionId }) { "Collection does not exist" }
+        _playbackStates.value = _playbackStates.value + (
+            collectionId to CollectionPlaybackState(collectionId, queueId, System.currentTimeMillis())
+        )
+    }
+
+    override suspend fun deleteCollection(collectionId: String) {
+        require(_collections.value.any { it.id == collectionId }) { "Collection does not exist" }
+        _collections.value = _collections.value.filterNot { it.id == collectionId }
+        _rootSources.value = _rootSources.value.filterNot { it.collectionId == collectionId }
+        _playbackStates.value = _playbackStates.value - collectionId
     }
 
     override fun getRootSourcesFlow(collectionId: String): Flow<List<RootSource>> {

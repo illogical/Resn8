@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -53,6 +54,7 @@ import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.LibraryFilterSnapshot
 import com.app.resn8.domain.model.SortOrder
+import com.app.resn8.domain.model.restorableQueueIdForCollection
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -133,6 +135,7 @@ private fun Resn8AppContent(
     val activeProfile = activeCollection?.profile ?: CollectionProfile.MUSIC
     val hasCollections = collections.isNotEmpty()
     var collectionMenuExpanded by remember { mutableStateOf(false) }
+    var collectionSwitchGeneration by remember { mutableIntStateOf(0) }
 
     val topLevelDestinations = remember(hasCollections, activeProfile) {
         buildTopLevelDestinations(hasCollections, activeProfile)
@@ -148,7 +151,7 @@ private fun Resn8AppContent(
             val route = destination.route ?: return@addOnDestinationChangedListener
             val simpleName = route.substringAfterLast('.').substringBefore('?')
             val mappedRoute = when {
-                simpleName.contains("SettingsRoute") -> "settings"
+                simpleName.contains("Settings") || simpleName.contains("CollectionDetailRoute") -> "settings"
                 simpleName.contains("NowPlayingRoute") -> "now_playing"
                 simpleName.contains("QueueRoute") -> "queue"
                 simpleName.contains("PlaylistsRoute") -> "playlists"
@@ -196,14 +199,35 @@ private fun Resn8AppContent(
                                     onClick = {
                                         collectionMenuExpanded = false
                                         if (collection.id != activeCollection?.id) {
+                                            collectionSwitchGeneration += 1
+                                            val requestedGeneration = collectionSwitchGeneration
                                             scope.launch {
-                                                playbackConnection?.stopForCollectionSwitch()
+                                                playbackConnection?.checkpointAndStopForCollectionSwitch()
+                                                if (requestedGeneration != collectionSwitchGeneration) return@launch
                                                 val source = container.collectionRepository
                                                     .getRootSourcesFlow(collection.id).firstOrNull()
                                                     ?.singleOrNull()
+                                                val storedQueueId = container.collectionRepository
+                                                    .getCollectionPlaybackState(collection.id)
+                                                    ?.activeQueueId
+                                                val storedQueue = storedQueueId?.let { queueId ->
+                                                    container.queueRepository.getQueueByIdFlow(queueId).firstOrNull()
+                                                }
+                                                val restorableQueueId = restorableQueueIdForCollection(
+                                                    collection.id,
+                                                    storedQueueId,
+                                                    storedQueue
+                                                )
+                                                if (storedQueueId != null && restorableQueueId == null) {
+                                                    container.collectionRepository.setCollectionActiveQueue(collection.id, null)
+                                                }
                                                 val current = container.uiSessionRepository.getUiSessionStateFlow().firstOrNull()
                                                     ?: com.app.resn8.domain.model.UiSessionState()
-                                                val targetRoute = if (collection.profile == CollectionProfile.FLAT) "folders" else "library"
+                                                val targetRoute = when {
+                                                    restorableQueueId != null -> "now_playing"
+                                                    collection.profile == CollectionProfile.FLAT -> "folders"
+                                                    else -> "library"
+                                                }
                                                 container.uiSessionRepository.saveUiSessionState(
                                                     current.copy(
                                                         currentRoute = targetRoute,
@@ -214,7 +238,7 @@ private fun Resn8AppContent(
                                                         selectedAlbumKey = null,
                                                         selectedAlbumArtistKey = null,
                                                         selectedPlaylistId = null,
-                                                        activeQueueId = null,
+                                                        activeQueueId = restorableQueueId,
                                                         activeSearchQuery = null,
                                                         activeSort = if (collection.profile == CollectionProfile.FLAT) SortOrder.TITLE else SortOrder.ARTIST,
                                                         activeSurface = if (collection.profile == CollectionProfile.FLAT) LibrarySurface.FOLDERS else LibrarySurface.ARTISTS,
@@ -222,7 +246,11 @@ private fun Resn8AppContent(
                                                         activeFilterSnapshot = null
                                                     )
                                                 )
-                                                val route = if (collection.profile == CollectionProfile.FLAT) FoldersRoute() else LibraryRoute()
+                                                val route = when {
+                                                    restorableQueueId != null -> NowPlayingRoute
+                                                    collection.profile == CollectionProfile.FLAT -> FoldersRoute()
+                                                    else -> LibraryRoute()
+                                                }
                                                 navController.navigate(route) {
                                                     popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                                                     launchSingleTop = true
@@ -239,30 +267,32 @@ private fun Resn8AppContent(
         },
         bottomBar = {
             Column {
-                MiniPlayer(
-                    title = playbackUiState.title,
-                    artist = playbackUiState.artist,
-                    showUnknownArtist = !playbackUiState.isFlatCollection,
-                    isPlaying = playbackUiState.isPlaying,
-                    likeScore = playbackUiState.likeScore,
-                    canPlayPause = playbackUiState.canPlayPause,
-                    canSkipNext = playbackUiState.canSkipNext,
-                    onMiniPlayerClick = {
-                        navController.navigate(NowPlayingRoute)
-                    },
-                    onPlayPauseClick = {
-                        playbackConnection?.togglePlayPause()
-                    },
-                    onNextClick = {
-                        playbackConnection?.skipToNext()
-                    },
-                    onAddToPlaylistClick = {
-                        val currentMediaId = playbackUiState.queueItems.find { it.queueItemId == playbackUiState.currentQueueItemId }?.mediaId
-                        if (currentMediaId != null) {
-                            openSelectorHandler?.invoke(listOf(currentMediaId), "Add Currently Playing Track", null)
+                if (currentDestination?.route?.contains("NowPlayingRoute") != true) {
+                    MiniPlayer(
+                        title = playbackUiState.title,
+                        artist = playbackUiState.artist,
+                        showUnknownArtist = !playbackUiState.isFlatCollection,
+                        isPlaying = playbackUiState.isPlaying,
+                        likeScore = playbackUiState.likeScore,
+                        canPlayPause = playbackUiState.canPlayPause,
+                        canSkipNext = playbackUiState.canSkipNext,
+                        onMiniPlayerClick = {
+                            navController.navigate(NowPlayingRoute)
+                        },
+                        onPlayPauseClick = {
+                            playbackConnection?.togglePlayPause()
+                        },
+                        onNextClick = {
+                            playbackConnection?.skipToNext()
+                        },
+                        onAddToPlaylistClick = {
+                            val currentMediaId = playbackUiState.queueItems.find { it.queueItemId == playbackUiState.currentQueueItemId }?.mediaId
+                            if (currentMediaId != null) {
+                                openSelectorHandler?.invoke(listOf(currentMediaId), "Add Currently Playing Track", null)
+                            }
                         }
-                    }
-                )
+                    )
+                }
                 NavigationBar {
                     topLevelDestinations.forEach { destination ->
                         val routeName = destination.route::class.simpleName ?: ""
@@ -272,6 +302,7 @@ private fun Resn8AppContent(
                             "PlaylistsRoute" -> currentRoute.contains("PlaylistsRoute") || currentRoute.contains("PlaylistDetailRoute")
                             "FoldersRoute" -> currentRoute.contains("FoldersRoute") || currentRoute.contains("FolderRoute")
                             "LibraryRoute" -> currentRoute.contains("LibraryRoute") || currentRoute.contains("ArtistDetailRoute") || currentRoute.contains("AlbumDetailRoute")
+                            "SettingsRoute" -> currentRoute.contains("Settings") || currentRoute.contains("CollectionDetailRoute")
                             else -> currentRoute.contains(routeName)
                         }
 

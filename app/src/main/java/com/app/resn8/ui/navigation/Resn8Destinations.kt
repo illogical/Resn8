@@ -25,7 +25,10 @@ data class FoldersRoute(val folderId: String? = null)
 object PlaylistsRoute
 
 @Serializable
-data class PlaylistDetailRoute(val playlistId: String)
+data class PlaylistDetailRoute(
+    val playlistId: String,
+    val revealCurrentTrack: Boolean = false
+)
 
 @Serializable
 object QueueRoute
@@ -36,3 +39,11 @@ object NowPlayingRoute
 @Serializable
 object SettingsRoute
 
+@Serializable
+object SettingsCollectionsRoute
+
+@Serializable
+data class CollectionDetailRoute(val collectionId: String? = null)
+
+@Serializable
+object SettingsAboutRoute

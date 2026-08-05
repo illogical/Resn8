@@ -15,6 +15,7 @@ import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.model.QueueStartRequest
 import com.app.resn8.domain.model.SavedQueue
 import com.app.resn8.domain.model.CollectionProfile
+import com.app.resn8.domain.model.RepeatMode
 import com.app.resn8.domain.usecase.StartQueueUseCase
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
@@ -418,6 +419,10 @@ class PlaybackConnection(
             )
             val result = useCase(request)
             result.onSuccess { savedQueue ->
+                container.collectionRepository.setCollectionActiveQueue(
+                    savedQueue.collectionId,
+                    savedQueue.id
+                )
                 val ctrl = controller
                 if (ctrl != null) {
                     val mediaFiles = container.mediaRepository.getMediaFilesByIdsPreservingOrder(savedQueue.orderedMediaIds)
@@ -469,14 +474,39 @@ class PlaybackConnection(
         _uiState.update { it.copy(notice = null) }
     }
 
-    fun stopForCollectionSwitch() {
+    suspend fun checkpointAndStopForCollectionSwitch() {
         attemptedFailedItems.clear()
         controller?.let { ctrl ->
             ctrl.pause()
+            val queue = activeQueue
+            val currentItem = ctrl.currentMediaItem
+            if (queue != null && currentItem != null && ctrl.currentMediaItemIndex >= 0) {
+                val currentMediaId = currentItem.requestMetadata.extras
+                    ?.getString(RESN8_MEDIA_FILE_ID)
+                    ?: queue.currentMediaId
+                container.queueRepository.updatePlaybackCheckpoint(
+                    queueId = queue.id,
+                    currentIndex = ctrl.currentMediaItemIndex,
+                    currentMediaId = currentMediaId,
+                    currentOccurrenceId = queue.currentOccurrenceId,
+                    positionMs = ctrl.currentPosition.coerceAtLeast(0L),
+                    playWhenReadyIntent = false,
+                    playbackSpeed = ctrl.playbackParameters.speed,
+                    repeatMode = when (ctrl.repeatMode) {
+                        Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+                        Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+                        else -> RepeatMode.OFF
+                    }
+                )
+            }
             ctrl.stop()
             ctrl.clearMediaItems()
         }
         stopPollingPosition()
+    }
+
+    fun stopForCollectionSwitch() {
+        scope.launch { checkpointAndStopForCollectionSwitch() }
     }
 
     fun release() {

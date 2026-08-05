@@ -101,6 +101,7 @@ fun ArtistDetailScreen(
                         isSelected = false,
                         onSelectToggle = {},
                         onClick = { onTrackClick(mediaFile) },
+                        showSelectionToggle = false,
                         onAddToPlaylist = {
                             onAddToPlaylist(listOf(mediaFile.id), "Add '${mediaFile.displayTitle}' to Playlist")
                         }

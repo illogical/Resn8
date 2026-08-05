@@ -2,10 +2,13 @@ package com.app.resn8.data.repository
 
 import com.app.resn8.data.database.Resn8Database
 import com.app.resn8.data.database.entity.CollectionEntity
+import com.app.resn8.data.database.entity.CollectionPlaybackStateEntity
 import com.app.resn8.data.database.entity.RootSourceEntity
 import com.app.resn8.data.database.entity.toDomain
 import com.app.resn8.domain.model.Collection
 import com.app.resn8.domain.model.CollectionProfile
+import com.app.resn8.domain.model.CollectionPlaybackState
+import com.app.resn8.domain.model.CollectionSummary
 import com.app.resn8.domain.model.CollectionNameConflictException
 import com.app.resn8.domain.model.CollectionSourceConflictException
 import com.app.resn8.domain.model.RootSource
@@ -31,6 +34,17 @@ class RoomCollectionRepository(
             entities.map { it.toDomain() }
         }
     }
+
+    override fun getCollectionSummariesFlow(): Flow<List<CollectionSummary>> =
+        collectionDao.getCollectionSummariesFlow().map { rows ->
+            rows.map { row ->
+                CollectionSummary(
+                    collection = row.collection.toDomain(),
+                    totalTrackCount = row.totalTrackCount,
+                    unavailableTrackCount = row.unavailableTrackCount
+                )
+            }
+        }
 
     override suspend fun getCollectionById(id: String): Collection? {
         return collectionDao.getCollectionById(id)?.toDomain()
@@ -102,6 +116,42 @@ class RoomCollectionRepository(
             throw CollectionNameConflictException(trimmed)
         }
         return existing.copy(name = trimmed, normalizedName = normalizedName, updatedAt = updatedAt).toDomain()
+    }
+
+    override fun getCollectionPlaybackStateFlow(collectionId: String): Flow<CollectionPlaybackState?> =
+        collectionDao.getCollectionPlaybackStateFlow(collectionId).map { it?.toDomain() }
+
+    override suspend fun getCollectionPlaybackState(collectionId: String): CollectionPlaybackState? =
+        collectionDao.getCollectionPlaybackState(collectionId)?.toDomain()
+
+    override suspend fun setCollectionActiveQueue(collectionId: String, queueId: String?) {
+        require(collectionDao.getCollectionById(collectionId) != null) { "Collection does not exist" }
+        if (queueId != null) {
+            val queue = db.savedQueueDao().getSavedQueueById(queueId)
+            require(queue?.collectionId == collectionId) { "Queue does not belong to collection" }
+        }
+        collectionDao.upsertCollectionPlaybackState(
+            CollectionPlaybackStateEntity(collectionId, queueId, System.currentTimeMillis())
+        )
+    }
+
+    override suspend fun deleteCollection(collectionId: String) {
+        db.withTransaction {
+            require(collectionDao.getCollectionById(collectionId) != null) { "Collection does not exist" }
+            val sql = db.openHelper.writableDatabase
+            val args = arrayOf<Any>(collectionId)
+            sql.execSQL("DELETE FROM playback_history WHERE mediaId IN (SELECT mf.id FROM media_files mf INNER JOIN root_sources rs ON rs.id = mf.sourceId WHERE rs.collectionId = ?)", args)
+            sql.execSQL("DELETE FROM playlists WHERE collectionId = ?", args)
+            sql.execSQL("DELETE FROM saved_queues WHERE collectionId = ?", args)
+            sql.execSQL("DELETE FROM media_files WHERE sourceId IN (SELECT id FROM root_sources WHERE collectionId = ?)", args)
+            collectionDao.getFolderIdsForCollectionDeletion(collectionId).forEach { folderId ->
+                collectionDao.deleteFolderById(folderId)
+            }
+            sql.execSQL("DELETE FROM scan_runs WHERE sourceId IN (SELECT id FROM root_sources WHERE collectionId = ?)", args)
+            sql.execSQL("DELETE FROM root_sources WHERE collectionId = ?", args)
+            collectionDao.deleteCollectionPlaybackState(collectionId)
+            check(collectionDao.deleteCollection(collectionId) == 1) { "Collection deletion failed" }
+        }
     }
 
     override fun getRootSourcesFlow(collectionId: String): Flow<List<RootSource>> {

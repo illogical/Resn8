@@ -2,6 +2,8 @@ package com.app.resn8.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,11 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +31,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.app.resn8.ui.folders.BreadcrumbBar
 import com.app.resn8.ui.folders.FoldersViewModel
 import com.app.resn8.ui.library.TrackListItemRow
+import com.app.resn8.ui.components.SelectionActionTray
 
 @Composable
 fun FoldersScreen(
@@ -66,48 +66,9 @@ fun FoldersScreen(
             }
         }
 
-        if (selectedFileIds.isNotEmpty() || selectedFolderIds.isNotEmpty()) {
-            val resolvedIds = selectionResolution?.uniqueMediaIds ?: emptyList()
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(12.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Selected: ${selectedFileIds.size} files, ${selectedFolderIds.size} folders",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "${resolvedIds.size} unique audio files",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            if (resolvedIds.isNotEmpty()) {
-                                onAddToPlaylist(resolvedIds, "Add ${resolvedIds.size} selected audio files")
-                            }
-                        },
-                        enabled = resolvedIds.isNotEmpty()
-                    ) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add to Playlist")
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    TextButton(onClick = { viewModel.clearSelection() }) {
-                        Text("Clear")
-                    }
-                }
-            }
-        }
-
+        val hasSelection = selectedFileIds.isNotEmpty() || selectedFolderIds.isNotEmpty()
+        val resolvedIds = selectionResolution?.uniqueMediaIds ?: emptyList()
+        Box(modifier = Modifier.weight(1f)) {
         if (childFolders.isEmpty() && mediaFiles.itemCount == 0) {
             Text(
                 text = "Folder is empty",
@@ -115,7 +76,10 @@ fun FoldersScreen(
                 modifier = Modifier.padding(16.dp)
             )
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = if (hasSelection) 128.dp else 0.dp)
+            ) {
                 items(childFolders.size) { index ->
                     val child = childFolders[index]
                     val isSelected = selectedFolderIds.contains(child.folder.id)
@@ -143,7 +107,7 @@ fun FoldersScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = child.folder.displayName,
-                                    style = MaterialTheme.typography.bodyLarge
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
                                     text = "${child.childFolderCount} folders • ${child.directMediaCount} files",
@@ -162,14 +126,26 @@ fun FoldersScreen(
                             isSelected = selectedFileIds.contains(mediaFile.id),
                             onSelectToggle = { viewModel.toggleFileSelection(mediaFile.id) },
                             onClick = { onTrackClick(mediaFile) },
-                            onAddToPlaylist = {
-                                onAddToPlaylist(listOf(mediaFile.id), "Add '${mediaFile.displayTitle}' to Playlist")
-                            },
                             showMusicMetadata = viewModel.collectionProfile == com.app.resn8.domain.model.CollectionProfile.MUSIC
                         )
                     }
                 }
             }
+        }
+        if (hasSelection) {
+            SelectionActionTray(
+                selectedFileCount = selectedFileIds.size,
+                selectedFolderCount = selectedFolderIds.size,
+                resolvedMediaCount = resolvedIds.size,
+                onAddToPlaylist = {
+                    if (resolvedIds.isNotEmpty()) {
+                        onAddToPlaylist(resolvedIds, "Add ${resolvedIds.size} selected audio files")
+                    }
+                },
+                onClear = viewModel::clearSelection,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
         }
     }
 }

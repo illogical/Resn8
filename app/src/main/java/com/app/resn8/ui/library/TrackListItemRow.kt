@@ -44,6 +44,7 @@ fun TrackListItemRow(
     onSelectToggle: () -> Unit,
     onClick: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
+    showSelectionToggle: Boolean = true,
     showMusicMetadata: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -68,15 +69,17 @@ fun TrackListItemRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onSelectToggle() }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
+            if (showSelectionToggle) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onSelectToggle() }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
             if (resolvedArtworkUri != null) {
                 AsyncImage(
                     model = resolvedArtworkUri,
-                    contentDescription = "Track artwork",
+                    contentDescription = "Artwork for ${mediaFile.displayTitle}",
                     modifier = Modifier.size(40.dp)
                 )
             } else {
@@ -91,7 +94,7 @@ fun TrackListItemRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = mediaFile.displayTitle,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = if (showMusicMetadata) 1 else 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -126,7 +129,7 @@ fun TrackListItemRow(
                     color = MaterialTheme.colorScheme.outline
                 )
             }
-            if (onAddToPlaylist != null) {
+            if (!showSelectionToggle && onAddToPlaylist != null) {
                 Box {
                     IconButton(onClick = { showMenu = true }) {
                         Icon(

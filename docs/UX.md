@@ -343,13 +343,14 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ### US7.3 — Switch Collections Safely
 - **As a** user moving between collections,
-- **I want** the active collection selector to reset browsing and playback predictably,
+- **I want** each collection to remember where its playback stopped,
 - **So that** content and playlists from separate collections never become confused.
 - **Verification**:
-  1. Choose another collection from the app bar and confirm the selected collection/source IDs persist and the destination becomes Library for Music or Folders for Audio Files.
-  2. Switch while playing and confirm playback checkpoints and stops, the mini-player clears, and `activeQueueId` detaches.
-  3. Confirm the prior saved queue row, ratings, play counts, history, playlists, and indexed media remain stored.
-  4. Relaunch after switching and confirm the chosen collection and valid profile home restore without showing a stale artist, album, folder, playlist, search, filter, or sort state.
+  1. Start different queues in two collections, seek to distinct positions, and switch between them from the app bar.
+  2. Confirm the outgoing queue checkpoints and stops, then the target collection opens Now Playing with its own item and position prepared but paused.
+  3. Confirm switching never autoplays and never chooses a queue merely because it was updated most recently.
+  4. Switch to a collection that has never played anything and confirm Music opens Library while Audio Files opens Folders with no stale mini-player.
+  5. Relaunch and confirm the selected collection and its active queue restore while stale browse, search, filter, sort, selection, and scroll context do not cross collections.
 
 ### US7.4 — Select All Available Audio
 - **As a** user building playlists from folders or albums,
@@ -374,6 +375,20 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   1. Complete the core first-run, collection management, browse, playback, rating, playlist, restoration, and Select All flows with TalkBack or switch/keyboard navigation.
   2. Repeat core surfaces in portrait, landscape, and supported large-font settings -> confirm controls remain reachable and state survives configuration changes.
   3. Review loading, empty, success, and recoverable error feedback -> confirm long-running actions never appear inert and no essential action relies on gesture or color alone.
+
+### US8.2 — Collection Settings and Playback-Surface Polish
+- **As a** daily listener managing multiple libraries,
+- **I want** predictable collection tools and space-efficient playback/browse screens,
+- **So that** common maintenance and listening actions remain clear on a phone.
+- **Verification**:
+  1. Open Settings, enter Collections, create a collection through the editor, and confirm indexing progress and the final scan summary occupy the same detail-page area. Confirm type is read-only after creation.
+  2. From both a collection card overflow and its detail page, rename, re-index, and reselect its folder. Confirm the concise action label and recoverable error feedback.
+  3. Delete a non-active collection and cancel once before confirming. Verify the confirmation names all removed Resn8 data, source files remain present, and playlist deletion still requires confirmation.
+  4. Delete the active collection and confirm the next collection restores paused or opens its profile home. Delete the final collection and confirm onboarding returns.
+  5. Start a track and Play All from Playlist Detail and confirm both remain on the playlist while the mini-player updates. Open Now Playing, tap its playlist link, and confirm Playlist Detail reveals the current row with upcoming tracks below it.
+  6. Confirm Now Playing has no redundant mini-player, no instructional subtitle, visible artwork/fallback, and reachable full-size controls in portrait, landscape, and large text.
+  7. In Folders, Album Detail, and All Tracks, select items and confirm the list does not jump, the bottom action tray stacks above the mini-player, the last row remains reachable, counts stay concise, and checkbox rows have no redundant Add overflow.
+  8. Confirm Library offers Artists, Albums, and All Tracks only, and long row titles use compact accessible typography while Audio Files titles remain single-instance and at most two lines.
 
 ---
 

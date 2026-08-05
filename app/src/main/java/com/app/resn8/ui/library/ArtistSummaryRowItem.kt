@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
 import com.app.resn8.domain.model.ArtistSummary
 
@@ -55,7 +56,9 @@ fun ArtistSummaryRowItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = artistSummary.displayName,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${artistSummary.albumCount} albums • ${artistSummary.availableTrackCount}/${artistSummary.totalTrackCount} tracks",

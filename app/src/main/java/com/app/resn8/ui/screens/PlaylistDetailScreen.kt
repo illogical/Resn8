@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +77,7 @@ fun PlaylistDetailScreen(
     currentMediaId: String? = null,
     isCurrentTrackPlaying: Boolean = false,
     showMusicMetadata: Boolean = true,
+    revealCurrentTrack: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val playlist by viewModel.playlist.collectAsState()
@@ -91,6 +93,30 @@ fun PlaylistDetailScreen(
     var renameError by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPlaylistMenu by remember { mutableStateOf(false) }
+    var revealConsumed by remember(revealCurrentTrack) { mutableStateOf(false) }
+
+    suspend fun revealCurrentMedia(targetMediaId: String) {
+        if (viewModel.searchQuery.value.isNotEmpty()) {
+            viewModel.searchQuery.value = ""
+            snapshotFlow { Triple(searchQuery, filteredTracks, tracks) }
+                .first { (query, visibleItems, allItems) ->
+                    query.isEmpty() && (
+                        visibleItems.any { it.mediaFile.id == targetMediaId } ||
+                            allItems.none { it.mediaFile.id == targetMediaId }
+                        )
+                }
+        }
+        val targetIndex = filteredTracks.indexOfFirst { it.mediaFile.id == targetMediaId }
+        if (targetIndex >= 0) listState.scrollToItem(targetIndex)
+    }
+
+    LaunchedEffect(revealCurrentTrack, currentMediaId, tracks.size) {
+        val targetMediaId = currentMediaId
+        if (revealCurrentTrack && !revealConsumed && targetMediaId != null && tracks.isNotEmpty()) {
+            revealConsumed = true
+            revealCurrentMedia(targetMediaId)
+        }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -206,25 +232,7 @@ fun PlaylistDetailScreen(
                         IconButton(
                             onClick = {
                                 val targetMediaId = currentMediaId
-                                scope.launch {
-                                    if (viewModel.searchQuery.value.isNotEmpty()) {
-                                        viewModel.searchQuery.value = ""
-                                        snapshotFlow { Triple(searchQuery, filteredTracks, tracks) }
-                                            .first { (query, visibleItems, allItems) ->
-                                                query.isEmpty() && (
-                                                    visibleItems.any { it.mediaFile.id == targetMediaId } ||
-                                                        allItems.none { it.mediaFile.id == targetMediaId }
-                                                    )
-                                            }
-                                    }
-
-                                    val targetIndex = filteredTracks.indexOfFirst {
-                                        it.mediaFile.id == targetMediaId
-                                    }
-                                    if (targetIndex >= 0) {
-                                        listState.animateScrollToItem(targetIndex)
-                                    }
-                                }
+                                scope.launch { revealCurrentMedia(targetMediaId) }
                             }
                         ) {
                             Icon(
@@ -392,7 +400,7 @@ internal fun PlaylistItemRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = mediaFile.displayTitle,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = if (showMusicMetadata) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                     color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,

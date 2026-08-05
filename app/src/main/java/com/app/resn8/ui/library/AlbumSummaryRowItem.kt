@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
 import com.app.resn8.domain.model.AlbumSummary
 
@@ -55,12 +56,16 @@ fun AlbumSummaryRowItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = albumSummary.albumDisplayName,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${albumSummary.effectiveAlbumArtistDisplayName}${if (albumSummary.minYear != null) " • ${albumSummary.minYear}" else ""}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${albumSummary.availableTrackCount}/${albumSummary.totalTrackCount} tracks",

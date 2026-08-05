@@ -47,6 +47,12 @@ import com.app.resn8.ui.screens.PlaylistDetailScreen
 import com.app.resn8.ui.screens.PlaylistsScreen
 import com.app.resn8.ui.screens.QueueScreen
 import com.app.resn8.ui.screens.onboarding.OnboardingViewModel
+import com.app.resn8.ui.screens.settings.AboutSettingsScreen
+import com.app.resn8.ui.screens.settings.CollectionDetailScreen
+import com.app.resn8.ui.screens.settings.CollectionDeletionResult
+import com.app.resn8.ui.screens.settings.CollectionsScreen
+import com.app.resn8.ui.screens.settings.SettingsScreen
+import com.app.resn8.ui.screens.settings.SettingsViewModel
 import com.app.resn8.ui.session.ActiveCollectionState
 import com.app.resn8.ui.session.ActiveCollectionViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -362,7 +368,6 @@ fun Resn8NavHost(
                                 startingMediaId = mediaFile.id
                             )
                         )
-                        navController.navigate(NowPlayingRoute)
                     },
                     onPlayAll = {
                         val firstAvailableId = tracks.find { it.mediaFile.isAvailable }?.mediaFile?.id
@@ -373,9 +378,9 @@ fun Resn8NavHost(
                                     startingMediaId = firstAvailableId
                                 )
                             )
-                            navController.navigate(NowPlayingRoute)
                         }
                     },
+                    revealCurrentTrack = route.revealCurrentTrack,
                     currentMediaId = currentPlaylistMediaId,
                     isCurrentTrackPlaying = playbackUiState.isPlaying,
                     showMusicMetadata = activeSelection?.collection?.profile != com.app.resn8.domain.model.CollectionProfile.FLAT
@@ -388,7 +393,7 @@ fun Resn8NavHost(
                     currentQueueItemId = playbackUiState.currentQueueItemId,
                     queueTitle = playbackUiState.queueTitle,
                     sourcePlaylistId = playbackUiState.sourcePlaylistId,
-                    onOpenPlaylist = { playlistId -> navController.navigate(PlaylistDetailRoute(playlistId)) },
+                    onOpenPlaylist = { playlistId -> navController.navigate(PlaylistDetailRoute(playlistId, revealCurrentTrack = true)) },
                     onItemClick = { queueItemId ->
                         playbackConnection?.skipToQueueItem(queueItemId)
                     },
@@ -434,20 +439,57 @@ fun Resn8NavHost(
             }
 
             composable<SettingsRoute> {
-                val context = LocalContext.current
-                val settingsViewModel: com.app.resn8.ui.screens.settings.SettingsViewModel = viewModel(
-                    factory = com.app.resn8.ui.screens.settings.SettingsViewModel.Factory(context.applicationContext, container)
+                SettingsScreen(
+                    onCollectionsClick = { navController.navigate(SettingsCollectionsRoute) },
+                    onAboutClick = { navController.navigate(SettingsAboutRoute) }
                 )
-                com.app.resn8.ui.screens.settings.SettingsScreen(
+            }
+
+            composable<SettingsCollectionsRoute> {
+                val context = LocalContext.current
+                val settingsViewModel: SettingsViewModel = viewModel(
+                    factory = SettingsViewModel.Factory(context.applicationContext, container)
+                )
+                CollectionsScreen(
                     viewModel = settingsViewModel,
-                    onCollectionCreated = { profile ->
-                        val route = if (profile == com.app.resn8.domain.model.CollectionProfile.FLAT) FoldersRoute() else LibraryRoute()
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
-                            launchSingleTop = true
+                    onBack = { navController.popBackStack() },
+                    onCreate = { navController.navigate(CollectionDetailRoute()) },
+                    onCollectionClick = { navController.navigate(CollectionDetailRoute(it)) },
+                    onCollectionDeleted = { result ->
+                        navigateAfterActiveCollectionDeletion(navController, result)
+                    }
+                )
+            }
+
+            composable<CollectionDetailRoute> { backStackEntry ->
+                val route: CollectionDetailRoute = backStackEntry.toRoute()
+                val context = LocalContext.current
+                val settingsViewModel: SettingsViewModel = viewModel(
+                    factory = SettingsViewModel.Factory(context.applicationContext, container)
+                )
+                CollectionDetailScreen(
+                    collectionId = route.collectionId,
+                    viewModel = settingsViewModel,
+                    onBack = { navController.popBackStack() },
+                    onCreated = { collectionId ->
+                        navController.navigate(CollectionDetailRoute(collectionId)) {
+                            popUpTo(route) { inclusive = true }
+                        }
+                    },
+                    onCollectionDeleted = { result ->
+                        if (result.nextCollectionProfile == null && result.hasCollections) {
+                            navController.navigate(SettingsCollectionsRoute) {
+                                popUpTo(SettingsCollectionsRoute) { inclusive = false }
+                            }
+                        } else {
+                            navigateAfterActiveCollectionDeletion(navController, result)
                         }
                     }
                 )
+            }
+
+            composable<SettingsAboutRoute> {
+                AboutSettingsScreen(onBack = { navController.popBackStack() })
             }
         }
 
@@ -482,6 +524,23 @@ fun Resn8NavHost(
                 }
             )
         }
+    }
+}
+
+private fun navigateAfterActiveCollectionDeletion(
+    navController: NavHostController,
+    result: CollectionDeletionResult
+) {
+    val destination: Any = when {
+        !result.hasCollections -> OnboardingRoute
+        result.restoredQueue -> NowPlayingRoute
+        result.nextCollectionProfile == com.app.resn8.domain.model.CollectionProfile.FLAT -> FoldersRoute()
+        result.nextCollectionProfile != null -> LibraryRoute()
+        else -> return
+    }
+    navController.navigate(destination) {
+        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+        launchSingleTop = true
     }
 }
 

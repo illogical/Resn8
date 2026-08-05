@@ -14,6 +14,7 @@ import com.app.resn8.data.database.dao.SavedQueueDao
 import com.app.resn8.data.database.dao.ScanDao
 import com.app.resn8.data.database.dao.UiSessionDao
 import com.app.resn8.data.database.entity.CollectionEntity
+import com.app.resn8.data.database.entity.CollectionPlaybackStateEntity
 import com.app.resn8.data.database.entity.FolderNodeEntity
 import com.app.resn8.data.database.entity.MediaFileEntity
 import com.app.resn8.data.database.entity.PlaybackHistoryEntity
@@ -44,9 +45,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PlaybackHistoryEntity::class,
         SavedQueueEntity::class,
         SavedQueueItemEntity::class,
-        UiSessionStateEntity::class
+        UiSessionStateEntity::class,
+        CollectionPlaybackStateEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -88,12 +90,40 @@ abstract class Resn8Database : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS collection_playback_state (
+                        collectionId TEXT NOT NULL,
+                        activeQueueId TEXT,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(collectionId),
+                        FOREIGN KEY(collectionId) REFERENCES collections(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(activeQueueId) REFERENCES saved_queues(id) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_collection_playback_state_activeQueueId ON collection_playback_state(activeQueueId)")
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO collection_playback_state(collectionId, activeQueueId, updatedAt)
+                    SELECT ui.selectedCollectionId, ui.activeQueueId, queue.updatedAt
+                    FROM ui_session_state ui
+                    INNER JOIN saved_queues queue ON queue.id = ui.activeQueueId
+                    WHERE ui.selectedCollectionId IS NOT NULL
+                      AND queue.collectionId = ui.selectedCollectionId
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun buildDatabase(context: Context): Resn8Database {
             return Room.databaseBuilder(
                 context.applicationContext,
                 Resn8Database::class.java,
                 DB_NAME
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
         }
 

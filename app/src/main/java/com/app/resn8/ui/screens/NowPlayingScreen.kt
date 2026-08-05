@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -45,9 +49,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import java.util.Locale
 
 fun formatTimeMs(ms: Long): String {
@@ -106,9 +112,10 @@ fun NowPlayingScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.Top
     ) {
         if (queueTitle != null) {
             Column(
@@ -123,11 +130,6 @@ fun NowPlayingScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable { onOpenPlaylist(sourcePlaylistId) }
-                    )
-                    Text(
-                        text = "Tap to open playlist detail",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary
                     )
                 } else {
                     Text(
@@ -163,17 +165,28 @@ fun NowPlayingScreen(
 
         Surface(
             modifier = Modifier
-                .size(240.dp)
+                .fillMaxWidth()
+                .widthIn(max = 300.dp)
+                .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp)),
             color = MaterialTheme.colorScheme.surfaceContainerHigh
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = "Artwork Fallback",
-                    modifier = Modifier.size(96.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (!artworkUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = artworkUri,
+                        contentDescription = "Artwork for ${title.ifEmpty { "current track" }}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Artwork unavailable",
+                        modifier = Modifier.size(96.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
@@ -241,6 +254,8 @@ fun NowPlayingScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -285,6 +300,8 @@ fun NowPlayingScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -336,6 +353,9 @@ fun NowPlayingScreen(
                 )
             }
         }
+
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedButton(
             onClick = onQueueClicked,
