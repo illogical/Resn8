@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Folder
@@ -34,6 +35,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -46,6 +50,7 @@ import com.app.resn8.ui.navigation.LibraryRoute
 import com.app.resn8.ui.navigation.NowPlayingRoute
 import com.app.resn8.ui.navigation.OnboardingRoute
 import com.app.resn8.ui.navigation.PlaylistsRoute
+import com.app.resn8.ui.navigation.PlaylistDetailRoute
 import com.app.resn8.ui.navigation.Resn8NavHost
 import com.app.resn8.ui.navigation.SettingsRoute
 import com.app.resn8.ui.startup.AppStartupCoordinator
@@ -57,6 +62,33 @@ import com.app.resn8.domain.model.SortOrder
 import com.app.resn8.domain.model.restorableQueueIdForCollection
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+
+internal fun nowPlayingPlaylistRoute(playlistId: String) = PlaylistDetailRoute(
+    playlistId = playlistId,
+    revealCurrentTrack = true
+)
+
+@Composable
+internal fun NowPlayingPlaylistAction(
+    isNowPlaying: Boolean,
+    queueTitle: String?,
+    sourcePlaylistId: String?,
+    onOpenPlaylist: (String) -> Unit
+) {
+    if (!isNowPlaying || sourcePlaylistId == null) return
+
+    TextButton(
+        onClick = { onOpenPlaylist(sourcePlaylistId) },
+        modifier = Modifier.testTag("now-playing-playlist-link")
+    ) {
+        Text(
+            text = queueTitle ?: "Playlist",
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 168.dp)
+        )
+    }
+}
 
 data class TopLevelDestination(
     val label: String,
@@ -143,6 +175,7 @@ private fun Resn8AppContent(
 
     val playbackConnection = container.playbackConnection
     val playbackUiState by (playbackConnection?.uiState ?: remember { kotlinx.coroutines.flow.MutableStateFlow(com.app.resn8.playback.PlaybackUiState()) }).collectAsState()
+    val isNowPlaying = currentDestination?.route?.contains("NowPlayingRoute") == true
 
     var openSelectorHandler by remember { mutableStateOf<((List<String>, String, String?) -> Unit)?>(null) }
 
@@ -262,12 +295,22 @@ private fun Resn8AppContent(
                             }
                         }
                     }
+                },
+                actions = {
+                    NowPlayingPlaylistAction(
+                        isNowPlaying = isNowPlaying,
+                        queueTitle = playbackUiState.queueTitle,
+                        sourcePlaylistId = playbackUiState.sourcePlaylistId,
+                        onOpenPlaylist = { playlistId ->
+                            navController.navigate(nowPlayingPlaylistRoute(playlistId))
+                        }
+                    )
                 }
             )
         },
         bottomBar = {
             Column {
-                if (currentDestination?.route?.contains("NowPlayingRoute") != true) {
+                if (!isNowPlaying) {
                     MiniPlayer(
                         title = playbackUiState.title,
                         artist = playbackUiState.artist,

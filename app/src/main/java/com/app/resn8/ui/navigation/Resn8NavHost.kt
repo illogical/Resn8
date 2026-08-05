@@ -405,8 +405,8 @@ fun Resn8NavHost(
                 NowPlayingScreen(
                     title = playbackUiState.title,
                     artist = playbackUiState.artist,
-                    showUnknownArtist = !playbackUiState.isFlatCollection,
                     album = playbackUiState.album,
+                    showMusicMetadata = !playbackUiState.isFlatCollection,
                     artworkUri = playbackUiState.artworkUri,
                     likeScore = playbackUiState.likeScore,
                     isPlaying = playbackUiState.isPlaying,
@@ -417,9 +417,6 @@ fun Resn8NavHost(
                     canSeek = playbackUiState.canSeek,
                     canSkipPrevious = playbackUiState.canSkipPrevious,
                     canSkipNext = playbackUiState.canSkipNext,
-                    queueTitle = playbackUiState.queueTitle,
-                    sourcePlaylistId = playbackUiState.sourcePlaylistId,
-                    onOpenPlaylist = { playlistId -> navController.navigate(PlaylistDetailRoute(playlistId)) },
                     noticeMessage = playbackUiState.notice?.message,
                     onPlayPauseToggle = { playbackConnection?.togglePlayPause() },
                     onSeek = { pos -> playbackConnection?.seekTo(pos) },
@@ -433,7 +430,6 @@ fun Resn8NavHost(
                             openSelector(listOf(currentMediaId), "Add Currently Playing Track", null)
                         }
                     },
-                    onQueueClicked = { navController.navigate(QueueRoute) },
                     onDismissNotice = { playbackConnection?.clearNotice() }
                 )
             }

@@ -103,24 +103,28 @@ This document defines user stories and manual UX verification workflows for Resn
 
 ### US3.3 — Now Playing Screen & Seek Bar
 - **As a** listener on the Now Playing screen,
-- **I want to** view artwork, metadata, seek position slider, transport controls, and numeric rating score,
+- **I want to** view profile-appropriate metadata, seek position, transport controls, and numeric rating actions without scrolling,
 - **So that** I have full control over playback.
 - **Verification**:
-  1. Open Now Playing screen.
+  1. Open Now Playing in portrait at default and increased font scale. Confirm the page has no vertical scroll and Previous, Play/Pause, Next, seek, Like, Dislike, score, and Add to Playlist are all visible above bottom navigation.
   2. Drag position slider -> confirm smooth seek to target `mm:ss` timestamp.
   3. Tap Previous / Next -> confirm track skipping.
-  4. View Like, Dislike, and Add to Playlist buttons.
+  4. Repeat on a compact-height phone and in landscape. Confirm artwork shrinks, moves into the landscape artwork/metadata region, or disappears before any control is clipped; all actions retain usable touch targets.
+  5. Trigger a recoverable playback notice and confirm its dismissible overlay does not move or hide the control layout.
+  6. Play a Music item and confirm the emphasized title plus available artist/album remain visible. Play an Audio Files item with a sentence-length filename and confirm a smaller two-line title appears without artist or album.
+  7. Start playback from a playlist and confirm `Playlist: <name>` appears opposite the collection selector, truncates visually when long while TalkBack announces the full label, and opens Playlist Detail with the current membership revealed near the top.
+  8. Start playback from Library or Folders and confirm no playlist action appears. Confirm Now Playing never displays **View Queue**.
 
 Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 makes Like/Dislike durable and reactive; Milestone 6 implements Add to Playlist.
 
-### US3.4 — Queue Inspection & Item Jump
+### US3.4 — Queue Compatibility & Item Jump
 - **As a** user,
-- **I want to** view the active queue list and jump to any queued track,
-- **So that** I can preview what plays next and change tracks directly.
+- **I want** an already-restored Queue destination to remain compatible,
+- **So that** removing the redundant Now Playing entry does not invalidate saved navigation or queue behavior.
 - **Verification**:
-  1. Open Queue screen from Now Playing.
-  2. Confirm current playing track is highlighted.
-  3. Tap another row in the queue -> confirm player skips directly to that item occurrence.
+  1. Restore a previously persisted Queue destination and confirm the Queue screen still opens; confirm there is no **View Queue** entry on Now Playing.
+  2. Confirm the current playing occurrence is highlighted.
+  3. Tap another row in the queue -> confirm the player skips directly to that item occurrence.
 
 ### US3.5 — Background Playback & Notification Controls
 - **As a** user,
@@ -336,7 +340,7 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 - **Verification**:
   1. Index an untagged flat MP3 folder as Audio Files and confirm cleaned filenames are displayed without invented artist, album, disc, or track metadata.
   2. Confirm Audio Files opens in Folders, uses the collection name as the top breadcrumb, and does not expose Library, Artists, or Albums.
-  3. Play an Audio Files item and confirm the row, mini-player, Now Playing, queue, and system metadata do not show synthetic `Unknown Artist` or `Unknown Album` labels.
+  3. Play an Audio Files item and confirm the row, mini-player, Now Playing, queue, and system metadata do not show synthetic `Unknown Artist` or `Unknown Album` labels. On Now Playing, confirm artist and album are omitted even if those strings reach presentation state.
   4. Confirm Music retains its existing tag/path/filename fallback and metadata-oriented Library surfaces.
   5. Open Folders and a playlist containing sentence-length Audio Files names; confirm each cleaned title appears once, wraps to no more than two lines, and then uses end ellipsis instead of repeating the raw filename below it.
   6. At default and increased font scale, open Playlists and its detail view; confirm each page toolbar begins directly below the persistent collection selector without a second status-bar-sized gap, all controls remain reachable, and TalkBack announces the complete untruncated title.
@@ -386,7 +390,7 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   3. Delete a non-active collection and cancel once before confirming. Verify the confirmation names all removed Resn8 data, source files remain present, and playlist deletion still requires confirmation.
   4. Delete the active collection and confirm the next collection restores paused or opens its profile home. Delete the final collection and confirm onboarding returns.
   5. Start a track and Play All from Playlist Detail and confirm both remain on the playlist while the mini-player updates. Open Now Playing, tap its playlist link, and confirm Playlist Detail reveals the current row with upcoming tracks below it.
-  6. Confirm Now Playing has no redundant mini-player, no instructional subtitle, visible artwork/fallback, and reachable full-size controls in portrait, landscape, and large text.
+  6. Confirm Now Playing has no redundant mini-player, instructional subtitle, or **View Queue** action. Verify every full-size control remains simultaneously reachable without scrolling in portrait, compact height, landscape, and large text while artwork shrinks or disappears as needed.
   7. In Folders, Album Detail, and All Tracks, select items and confirm the list does not jump, the bottom action tray stacks above the mini-player, the last row remains reachable, counts stay concise, and checkbox rows have no redundant Add overflow.
   8. Confirm Library offers Artists, Albums, and All Tracks only, and long row titles use compact accessible typography while Audio Files titles remain single-instance and at most two lines.
 

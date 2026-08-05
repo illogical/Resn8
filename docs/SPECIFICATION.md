@@ -143,7 +143,7 @@ Selectable folder, album, and all-track rows use checkboxes plus one fixed botto
 
 ### 3.2 Player and Queue
 
-The now-playing surface always exposes title, artist/album when available, elapsed/duration position, seek control, Previous, Play/Pause, Next, Like, Dislike, current score, queue access, and Add to Playlist. Album art is shown when available with a stable placeholder fallback.
+The now-playing surface is non-scrollable and always exposes title, profile-appropriate artist/album when available, elapsed/duration position, seek control, Previous, Play/Pause, Next, Like, Dislike, current score, and Add to Playlist. Controls claim layout space before artwork and retain at least 48dp targets; artwork uses a stable placeholder, shrinks within the remaining portrait or landscape region, and may be omitted when the available square would be smaller than 72dp. Audio Files use a compact two-line title and never show artist or album. Playlist-origin playback exposes a single-line `Playlist: <name>` app-bar action opposite the collection selector; it opens that exact playlist and reveals the current membership. Now Playing does not expose a separate View Queue action, though saved-queue playback and the compatibility Queue route remain intact.
 
 Add to Playlist must remain available through a visible button or overflow action. Double-tap on unused space or a two-finger tap may be offered later as an optional shortcut, never as the only path because it is difficult to discover and use with accessibility services.
 
