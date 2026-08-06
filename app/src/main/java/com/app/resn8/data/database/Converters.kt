@@ -6,6 +6,7 @@ import com.app.resn8.domain.model.MetadataScanStatus
 import com.app.resn8.domain.model.MetadataValueSource
 import com.app.resn8.domain.model.PlaybackHistoryResult
 import com.app.resn8.domain.model.QueueFilterSnapshot
+import com.app.resn8.domain.model.LibrarySortPreferences
 import com.app.resn8.domain.model.RepeatMode
 import com.app.resn8.domain.model.SavedQueueKind
 import com.app.resn8.domain.model.ScanResult
@@ -120,4 +121,12 @@ class Converters {
     @TypeConverter
     fun toLibraryFilterSnapshot(value: String?): com.app.resn8.domain.model.LibraryFilterSnapshot? =
         value?.let { runCatching { json.decodeFromString<com.app.resn8.domain.model.LibraryFilterSnapshot>(it) }.getOrNull() }
+
+    @TypeConverter
+    fun fromLibrarySortPreferences(preferences: LibrarySortPreferences?): String? =
+        preferences?.let { json.encodeToString(it) }
+
+    @TypeConverter
+    fun toLibrarySortPreferences(value: String?): LibrarySortPreferences? =
+        value?.let { runCatching { json.decodeFromString<LibrarySortPreferences>(it) }.getOrNull() }
 }

@@ -44,7 +44,7 @@ import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.ui.library.AlbumSummaryRowItem
 import com.app.resn8.ui.library.ArtistSummaryRowItem
-import com.app.resn8.ui.library.LibraryFilterSheet
+import com.app.resn8.ui.library.LibrarySortSheet
 import com.app.resn8.ui.library.LibraryViewModel
 import com.app.resn8.ui.library.TrackListItemRow
 import com.app.resn8.ui.components.SelectionActionTray
@@ -63,7 +63,6 @@ fun LibraryScreen(
     val currentSurface by viewModel.surface.collectAsState()
     val searchText by viewModel.searchText.collectAsState()
     val currentSort by viewModel.sort.collectAsState()
-    val currentFilters by viewModel.filters.collectAsState()
     val selectedFileIds by viewModel.selectedFileIds.collectAsState()
     val selectedFolderIds by viewModel.selectedFolderIds.collectAsState()
     val selectionResolution by viewModel.selectionResolution.collectAsState()
@@ -213,18 +212,11 @@ fun LibraryScreen(
     }
 
     if (showFilterSheet) {
-        LibraryFilterSheet(
+        LibrarySortSheet(
+            currentSurface = currentSurface,
             currentSort = currentSort,
-            currentFilters = currentFilters,
-            onSortSelected = {
-                viewModel.setSortOrder(it)
-            },
-            onAvailabilitySelected = {
-                viewModel.setAvailabilityFilter(it)
-            },
-            onToggleExcludeDisliked = {
-                viewModel.toggleExcludeDisliked()
-            },
+            onFieldSelected = viewModel::setSortField,
+            onDirectionSelected = viewModel::setSortDirection,
             onDismiss = { showFilterSheet = false }
         )
     }

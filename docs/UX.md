@@ -59,22 +59,23 @@ This document defines user stories and manual UX verification workflows for Resn
   3. Tap an Album -> drill down to its Track list ordered by disc and track number.
   4. Tap a Folder -> navigate child subfolders with breadcrumb path navigation.
 
-### US2.2 — Instant Search & Filter
+### US2.2 — Instant Search
 - **As a** user looking for a specific track,
-- **I want to** type in the search bar and apply availability/rating filters,
+- **I want to** type in the search bar,
 - **So that** the visible list filters instantly without lagging.
 - **Verification**:
   1. Enter text in the search box (matches title, artist, album, filename).
-  2. Open Filter Sheet: toggle Availability (All, Available Only, Unavailable Only) and Exclude Disliked (`likeScore >= 0`).
-  3. Verify list updates reactively.
+  2. Verify the list updates reactively and clearing the query restores all indexed rows.
 
 ### US2.3 — Library Sorting
 - **As a** user,
-- **I want to** sort my tracks by Artist, Album, Title, Track Number, Recently Added, Most Played, Least Played, Unplayed, Most Recent, Least Recent, or Most Liked,
-- **So that** I can organize my view for discovery.
+- **I want to** use context-appropriate sort fields and direction in Artists, Albums, and All Tracks,
+- **So that** each Library section stays understandable and restores my preferred order.
 - **Verification**:
-  1. Select different sort options in the filter sheet.
-  2. Confirm list order updates deterministically.
+  1. Open Artists and Albums -> confirm each sort sheet contains only Alphabetical plus Ascending/Descending and remains scrollable at large font scale.
+  2. Open All Tracks -> confirm it contains Alphabetical, Artist, Album, Date Added, Play Count, Last Played, and Rating plus direction, with no Track, Unplayed, Availability, or Exclude Disliked controls.
+  3. Exercise both directions for every field. Confirm unknown artist/album and never-played values remain last and ties stay deterministic.
+  4. Choose different sort settings in all three tabs, switch among them, recreate the Activity, and relaunch -> confirm each tab restores its own selection and direction.
 
 ---
 
@@ -220,7 +221,7 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 - **Verification**:
   1. Open a playlist with multiple tracks -> verify items are rendered in manual position order (`1`, `2`, `3`...).
   2. Type text in the playlist search bar -> verify visible items filter instantly, retain their original manual row numbers, and do not mutate rank positions.
-  3. While filtered, confirm reorder actions are unavailable. Clear the filter, then use drag reorder and overflow options ("Move to Top", "Move Up", "Move Down", "Move to Bottom") -> verify both paths produce the same order.
+  3. While filtered, confirm reorder actions are unavailable. Clear the filter, then long-press a track number and drag it upward/downward, including across a viewport edge. Confirm lifted-row feedback and autoscroll, then use overflow options ("Move to Top", "Move Up", "Move Down", "Move to Bottom") and verify both paths produce the same persisted order.
   4. Tap "Remove from Playlist" on a track -> verify track is removed from playlist while source file remains intact.
   5. Restart after repeated reorders -> confirm the exact order persists without duplicate/missing rows or lost added timestamps.
   6. Tap an available filtered result -> confirm playback starts the full available-only playlist in manual order at that track. Confirm **Play All** also means the full playlist, not only filtered rows.

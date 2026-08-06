@@ -13,6 +13,7 @@ data class UiSessionState(
     val activeSearchQuery: String? = null,
     val activeSort: SortOrder = SortOrder.ARTIST,
     val activeSurface: LibrarySurface = LibrarySurface.ARTISTS,
+    val librarySortPreferences: LibrarySortPreferences = LibrarySortPreferences(),
     val libraryFilterSnapshot: LibraryFilterSnapshot = LibraryFilterSnapshot(),
     val activeFilterSnapshot: QueueFilterSnapshot? = null
 )

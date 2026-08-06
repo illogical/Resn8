@@ -34,6 +34,59 @@ sealed interface MetadataGroupKey {
 enum class AvailabilityFilter { ALL, AVAILABLE_ONLY, UNAVAILABLE_ONLY }
 
 @Serializable
+enum class LibrarySortField {
+    ALPHABETICAL,
+    ARTIST,
+    ALBUM,
+    DATE_ADDED,
+    PLAY_COUNT,
+    LAST_PLAYED,
+    RATING
+}
+
+@Serializable
+enum class SortDirection { ASCENDING, DESCENDING }
+
+@Serializable
+data class LibrarySortSelection(
+    val field: LibrarySortField = LibrarySortField.ALPHABETICAL,
+    val direction: SortDirection = SortDirection.ASCENDING
+)
+
+@Serializable
+data class LibrarySortPreferences(
+    val version: Int = 1,
+    val artists: LibrarySortSelection = LibrarySortSelection(),
+    val albums: LibrarySortSelection = LibrarySortSelection(),
+    val allTracks: LibrarySortSelection = LibrarySortSelection()
+) {
+    fun selectionFor(surface: LibrarySurface): LibrarySortSelection = when (surface) {
+        LibrarySurface.ARTISTS -> artists.copy(field = LibrarySortField.ALPHABETICAL)
+        LibrarySurface.ALBUMS -> albums.copy(field = LibrarySortField.ALPHABETICAL)
+        LibrarySurface.ALL_TRACKS -> allTracks
+        LibrarySurface.FOLDERS -> LibrarySortSelection()
+    }
+
+    fun withSelection(surface: LibrarySurface, selection: LibrarySortSelection): LibrarySortPreferences = when (surface) {
+        LibrarySurface.ARTISTS -> copy(artists = selection.copy(field = LibrarySortField.ALPHABETICAL))
+        LibrarySurface.ALBUMS -> copy(albums = selection.copy(field = LibrarySortField.ALPHABETICAL))
+        LibrarySurface.ALL_TRACKS -> copy(allTracks = selection)
+        LibrarySurface.FOLDERS -> this
+    }
+
+    companion object {
+        fun fromLegacy(surface: LibrarySurface, sortOrder: SortOrder): LibrarySortPreferences {
+            val defaults = LibrarySortPreferences()
+            return if (surface == LibrarySurface.ALL_TRACKS) {
+                defaults.copy(allTracks = sortOrder.toLibrarySortSelection())
+            } else {
+                defaults
+            }
+        }
+    }
+}
+
+@Serializable
 data class LibraryFilterSnapshot(
     val version: Int = 1,
     val availability: AvailabilityFilter = AvailabilityFilter.ALL,
@@ -50,6 +103,7 @@ data class LibraryQuery(
     val albumArtist: MetadataGroupKey? = null,
     val searchText: String = "",
     val sort: SortOrder = SortOrder.ARTIST,
+    val sortDirection: SortDirection = sort.defaultDirection(),
     val filters: LibraryFilterSnapshot = LibraryFilterSnapshot(),
 ) {
     fun normalizedSearchText(): String? {

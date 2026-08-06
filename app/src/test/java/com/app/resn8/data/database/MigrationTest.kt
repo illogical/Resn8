@@ -149,4 +149,42 @@ class MigrationTest {
         assertEquals(42L, cursor.getLong(2))
         cursor.close()
     }
+
+    @Test
+    fun migrate5To6AddsSortPreferencesAndClearsHiddenLibraryFilters() {
+        val columns = db.query("PRAGMA table_info('ui_session_state')")
+        var hasLibraryFilters = false
+        while (columns.moveToNext()) {
+            if (columns.getString(columns.getColumnIndexOrThrow("name")) == "libraryFilterSnapshot") {
+                hasLibraryFilters = true
+            }
+        }
+        columns.close()
+        if (!hasLibraryFilters) {
+            db.execSQL("ALTER TABLE ui_session_state ADD COLUMN libraryFilterSnapshot TEXT DEFAULT NULL")
+        }
+        db.execSQL(
+            """
+            INSERT OR REPLACE INTO ui_session_state (
+                id, currentRoute, selectedCollectionId, selectedFolderId, selectedArtist, selectedAlbum,
+                selectedPlaylistId, activeQueueId, activeSearchQuery, activeSort, activeFilterSnapshot,
+                libraryFilterSnapshot
+            ) VALUES (
+                1, 'library', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'LEAST_PLAYED', NULL,
+                '{"availability":"UNAVAILABLE_ONLY","excludeDisliked":true}'
+            )
+            """.trimIndent()
+        )
+
+        Resn8Database.MIGRATION_5_6.migrate(db)
+
+        val cursor = db.query(
+            "SELECT activeSort, librarySortPreferences, libraryFilterSnapshot FROM ui_session_state WHERE id = 1"
+        )
+        cursor.moveToFirst()
+        assertEquals("LEAST_PLAYED", cursor.getString(0))
+        assertEquals(null, cursor.getString(1))
+        assertEquals(null, cursor.getString(2))
+        cursor.close()
+    }
 }

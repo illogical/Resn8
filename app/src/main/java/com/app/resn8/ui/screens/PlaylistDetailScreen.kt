@@ -2,6 +2,8 @@ package com.app.resn8.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,6 +57,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -85,6 +92,7 @@ fun PlaylistDetailScreen(
     val filteredTracks by viewModel.filteredTracks.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
     val listState = rememberLazyListState()
     val currentTrackIndex = currentPlaylistItemIndex(tracks, currentMediaId)
 
@@ -94,6 +102,67 @@ fun PlaylistDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPlaylistMenu by remember { mutableStateOf(false) }
     var revealConsumed by remember(revealCurrentTrack) { mutableStateOf(false) }
+    var optimisticTracks by remember { mutableStateOf<List<PlaylistItemUiModel>?>(null) }
+    var draggedMediaId by remember { mutableStateOf<String?>(null) }
+    var draggedCenterY by remember { mutableStateOf(0f) }
+    var reorderPending by remember { mutableStateOf(false) }
+    var reorderError by remember { mutableStateOf<String?>(null) }
+
+    val reorderEnabled = searchQuery.isEmpty() && !reorderPending
+    val displayedTracks = if (searchQuery.isEmpty()) optimisticTracks ?: tracks else filteredTracks
+
+    fun cancelDrag() {
+        optimisticTracks = null
+        draggedMediaId = null
+        draggedCenterY = 0f
+    }
+
+    fun updateDrag(dragAmountY: Float) {
+        val mediaId = draggedMediaId ?: return
+        val currentItems = optimisticTracks ?: return
+        draggedCenterY += dragAmountY
+
+        val layoutInfo = listState.layoutInfo
+        val edgeSize = with(density) { 56.dp.toPx() }
+        when {
+            draggedCenterY < layoutInfo.viewportStartOffset + edgeSize -> scope.launch {
+                listState.scrollBy(-edgeSize / 2f)
+            }
+            draggedCenterY > layoutInfo.viewportEndOffset - edgeSize -> scope.launch {
+                listState.scrollBy(edgeSize / 2f)
+            }
+        }
+
+        val target = layoutInfo.visibleItemsInfo.minByOrNull { item ->
+            kotlin.math.abs((item.offset + item.size / 2f) - draggedCenterY)
+        } ?: return
+        val fromIndex = currentItems.indexOfFirst { it.mediaFile.id == mediaId }
+        val toIndex = target.index.coerceIn(0, currentItems.lastIndex)
+        if (fromIndex >= 0 && fromIndex != toIndex) {
+            optimisticTracks = currentItems.toMutableList().apply {
+                add(toIndex, removeAt(fromIndex))
+            }
+        }
+    }
+
+    fun finishDrag() {
+        val mediaId = draggedMediaId ?: return
+        val targetIndex = optimisticTracks?.indexOfFirst { it.mediaFile.id == mediaId } ?: -1
+        draggedMediaId = null
+        draggedCenterY = 0f
+        if (targetIndex < 0) {
+            optimisticTracks = null
+            return
+        }
+        reorderPending = true
+        reorderError = null
+        scope.launch {
+            val result = viewModel.reorderTrack(mediaId, targetIndex)
+            if (result.isFailure) reorderError = "Playlist order could not be saved"
+            optimisticTracks = null
+            reorderPending = false
+        }
+    }
 
     suspend fun revealCurrentMedia(targetMediaId: String) {
         if (viewModel.searchQuery.value.isNotEmpty()) {
@@ -225,6 +294,13 @@ fun PlaylistDetailScreen(
                             color = MaterialTheme.colorScheme.tertiary
                         )
                     }
+                    reorderError?.let { error ->
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
 
                 Row {
@@ -270,17 +346,19 @@ fun PlaylistDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     itemsIndexed(
-                        items = filteredTracks,
-                        key = { index, item -> "${item.originalIndex}_${index}_${item.mediaFile.id}" }
+                        items = displayedTracks,
+                        key = { _, item -> item.mediaFile.id }
                     ) { index, item ->
                         PlaylistItemRow(
-                            index = item.originalIndex,
+                            index = if (searchQuery.isEmpty()) index + 1 else item.originalIndex,
                             mediaFile = item.mediaFile,
                             isFirst = index == 0,
                             isLast = index == filteredTracks.size - 1,
                             isSearchActive = searchQuery.isNotEmpty(),
                             isCurrent = item.mediaFile.id == currentMediaId,
                             isPlaying = isCurrentTrackPlaying,
+                            isDragging = draggedMediaId == item.mediaFile.id,
+                            dragEnabled = reorderEnabled,
                             showMusicMetadata = showMusicMetadata,
                             onTrackClick = {
                                 if (item.mediaFile.isAvailable) {
@@ -291,7 +369,17 @@ fun PlaylistDetailScreen(
                             onMoveUp = { viewModel.moveTrackUp(item.mediaFile.id) },
                             onMoveDown = { viewModel.moveTrackDown(item.mediaFile.id) },
                             onMoveToBottom = { viewModel.moveTrackToBottom(item.mediaFile.id) },
-                            onRemove = { viewModel.removeTrack(item.mediaFile.id) }
+                            onRemove = { viewModel.removeTrack(item.mediaFile.id) },
+                            onDragStart = {
+                                optimisticTracks = tracks
+                                draggedMediaId = item.mediaFile.id
+                                val visibleItem = listState.layoutInfo.visibleItemsInfo
+                                    .firstOrNull { it.key == item.mediaFile.id }
+                                draggedCenterY = visibleItem?.let { it.offset + it.size / 2f } ?: 0f
+                            },
+                            onDrag = ::updateDrag,
+                            onDragEnd = ::finishDrag,
+                            onDragCancel = ::cancelDrag
                         )
                     }
                 }
@@ -350,6 +438,8 @@ internal fun PlaylistItemRow(
     isSearchActive: Boolean,
     isCurrent: Boolean,
     isPlaying: Boolean,
+    isDragging: Boolean = false,
+    dragEnabled: Boolean = false,
     showMusicMetadata: Boolean,
     onTrackClick: () -> Unit,
     onMoveToTop: () -> Unit,
@@ -357,6 +447,10 @@ internal fun PlaylistItemRow(
     onMoveDown: () -> Unit,
     onMoveToBottom: () -> Unit,
     onRemove: () -> Unit,
+    onDragStart: () -> Unit = {},
+    onDrag: (Float) -> Unit = {},
+    onDragEnd: () -> Unit = {},
+    onDragCancel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -371,6 +465,11 @@ internal fun PlaylistItemRow(
                     MaterialTheme.colorScheme.surface
                 }
             )
+            .graphicsLayer {
+                shadowElevation = if (isDragging) 12.dp.toPx() else 0f
+                scaleX = if (isDragging) 1.01f else 1f
+                scaleY = if (isDragging) 1.01f else 1f
+            }
             .then(
                 if (isCurrent) {
                     Modifier.semantics(mergeDescendants = true) {
@@ -388,13 +487,43 @@ internal fun PlaylistItemRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "$index",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline,
-            modifier = Modifier.width(28.dp)
-        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .width(48.dp)
+                .heightIn(min = 48.dp)
+                .semantics {
+                    contentDescription = if (dragEnabled) {
+                        "Reorder track $index: ${mediaFile.displayTitle}. Long press and drag."
+                    } else {
+                        "Track $index"
+                    }
+                }
+                .then(
+                    if (dragEnabled) {
+                        Modifier.pointerInput(mediaFile.id) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { onDragStart() },
+                                onDragEnd = onDragEnd,
+                                onDragCancel = onDragCancel,
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onDrag(dragAmount.y)
+                                }
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
+            Text(
+                text = "$index",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (mediaFile.isAvailable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
+            )
+        }
 
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

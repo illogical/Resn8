@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 import com.app.resn8.domain.model.LibraryFilterSnapshot
+import com.app.resn8.domain.model.LibrarySortPreferences
 import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.MetadataGroupKey
 import com.app.resn8.domain.model.QueueFilterSnapshot
@@ -62,6 +63,7 @@ data class UiSessionStateEntity(
     val activeSearchQuery: String?,
     val activeSort: SortOrder,
     val activeSurface: LibrarySurface = LibrarySurface.ARTISTS,
+    val librarySortPreferences: LibrarySortPreferences? = null,
     val libraryFilterSnapshot: LibraryFilterSnapshot? = LibraryFilterSnapshot(),
     val activeFilterSnapshot: QueueFilterSnapshot?
 )
@@ -79,7 +81,9 @@ fun UiSessionStateEntity.toDomain() = UiSessionState(
     activeSearchQuery = activeSearchQuery,
     activeSort = activeSort,
     activeSurface = activeSurface,
-    libraryFilterSnapshot = libraryFilterSnapshot ?: LibraryFilterSnapshot(),
+    librarySortPreferences = librarySortPreferences
+        ?: LibrarySortPreferences.fromLegacy(activeSurface, activeSort),
+    libraryFilterSnapshot = LibraryFilterSnapshot(),
     activeFilterSnapshot = activeFilterSnapshot
 )
 
@@ -100,6 +104,7 @@ fun UiSessionState.toEntity() = UiSessionStateEntity(
     activeSearchQuery = activeSearchQuery,
     activeSort = activeSort,
     activeSurface = activeSurface,
-    libraryFilterSnapshot = libraryFilterSnapshot,
+    librarySortPreferences = librarySortPreferences,
+    libraryFilterSnapshot = LibraryFilterSnapshot(),
     activeFilterSnapshot = activeFilterSnapshot
 )

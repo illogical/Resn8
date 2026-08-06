@@ -85,16 +85,18 @@ interface MediaFileDao {
             )
           )
         GROUP BY mf.artist
-        ORDER BY 
+        ORDER BY
           (mf.artist IS NULL) ASC,
-          LOWER(TRIM(mf.artist)) ASC
+          CASE WHEN :sortDirection = 'ASCENDING' THEN LOWER(TRIM(mf.artist)) END ASC,
+          CASE WHEN :sortDirection = 'DESCENDING' THEN LOWER(TRIM(mf.artist)) END DESC
         """
     )
     fun getArtistSummariesPaged(
         collectionId: String,
         availabilityFilter: String,
         excludeDisliked: Int,
-        searchPattern: String?
+        searchPattern: String?,
+        sortDirection: String = "ASCENDING"
     ): PagingSource<Int, ArtistSummaryRow>
 
     @Query(
@@ -128,9 +130,10 @@ interface MediaFileDao {
             )
           )
         GROUP BY mf.album, COALESCE(mf.albumArtist, mf.artist)
-        ORDER BY 
+        ORDER BY
           (mf.album IS NULL) ASC,
-          LOWER(TRIM(mf.album)) ASC,
+          CASE WHEN :sortDirection = 'ASCENDING' THEN LOWER(TRIM(mf.album)) END ASC,
+          CASE WHEN :sortDirection = 'DESCENDING' THEN LOWER(TRIM(mf.album)) END DESC,
           (COALESCE(mf.albumArtist, mf.artist) IS NULL) ASC,
           LOWER(TRIM(COALESCE(mf.albumArtist, mf.artist))) ASC
         """
@@ -142,7 +145,8 @@ interface MediaFileDao {
         artistKeyValue: String?,
         availabilityFilter: String,
         excludeDisliked: Int,
-        searchPattern: String?
+        searchPattern: String?,
+        sortDirection: String = "ASCENDING"
     ): PagingSource<Int, AlbumSummaryRow>
 
     @Query(
@@ -185,17 +189,19 @@ interface MediaFileDao {
           )
         ORDER BY
           CASE WHEN :sortOrder = 'ARTIST' THEN (mf.artist IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'ARTIST' THEN mf.artist END ASC,
+          CASE WHEN :sortOrder = 'ARTIST' AND :sortDirection = 'ASCENDING' THEN LOWER(TRIM(mf.artist)) END ASC,
+          CASE WHEN :sortOrder = 'ARTIST' AND :sortDirection = 'DESCENDING' THEN LOWER(TRIM(mf.artist)) END DESC,
           CASE WHEN :sortOrder = 'ARTIST' THEN COALESCE(mf.albumArtist, mf.artist) END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN (mf.album IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'ARTIST' THEN mf.album END ASC,
+          CASE WHEN :sortOrder = 'ARTIST' THEN LOWER(TRIM(mf.album)) END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN (mf.discNumber IS NULL) END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN mf.discNumber END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN (mf.trackNumber IS NULL) END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN mf.trackNumber END ASC,
 
           CASE WHEN :sortOrder = 'ALBUM' THEN (mf.album IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'ALBUM' THEN mf.album END ASC,
+          CASE WHEN :sortOrder = 'ALBUM' AND :sortDirection = 'ASCENDING' THEN LOWER(TRIM(mf.album)) END ASC,
+          CASE WHEN :sortOrder = 'ALBUM' AND :sortDirection = 'DESCENDING' THEN LOWER(TRIM(mf.album)) END DESC,
           CASE WHEN :sortOrder = 'ALBUM' THEN COALESCE(mf.albumArtist, mf.artist) END ASC,
           CASE WHEN :sortOrder = 'ALBUM' THEN (mf.discNumber IS NULL) END ASC,
           CASE WHEN :sortOrder = 'ALBUM' THEN mf.discNumber END ASC,
@@ -203,23 +209,28 @@ interface MediaFileDao {
           CASE WHEN :sortOrder = 'ALBUM' THEN mf.trackNumber END ASC,
 
           CASE WHEN :sortOrder = 'TRACK' THEN (mf.discNumber IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'TRACK' THEN mf.discNumber END ASC,
+          CASE WHEN :sortOrder = 'TRACK' AND :sortDirection = 'ASCENDING' THEN mf.discNumber END ASC,
+          CASE WHEN :sortOrder = 'TRACK' AND :sortDirection = 'DESCENDING' THEN mf.discNumber END DESC,
           CASE WHEN :sortOrder = 'TRACK' THEN (mf.trackNumber IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'TRACK' THEN mf.trackNumber END ASC,
+          CASE WHEN :sortOrder = 'TRACK' AND :sortDirection = 'ASCENDING' THEN mf.trackNumber END ASC,
+          CASE WHEN :sortOrder = 'TRACK' AND :sortDirection = 'DESCENDING' THEN mf.trackNumber END DESC,
 
-          CASE WHEN :sortOrder = 'RECENTLY_ADDED' THEN mf.firstIndexedAt END DESC,
-          CASE WHEN :sortOrder = 'MOST_PLAYED' THEN mf.playCount END DESC,
-          CASE WHEN :sortOrder = 'LEAST_PLAYED' THEN mf.playCount END ASC,
+          CASE WHEN :sortOrder = 'TITLE' AND :sortDirection = 'ASCENDING' THEN LOWER(TRIM(COALESCE(NULLIF(mf.displayTitle, ''), mf.filename))) END ASC,
+          CASE WHEN :sortOrder = 'TITLE' AND :sortDirection = 'DESCENDING' THEN LOWER(TRIM(COALESCE(NULLIF(mf.displayTitle, ''), mf.filename))) END DESC,
+
+          CASE WHEN :sortOrder = 'RECENTLY_ADDED' AND :sortDirection = 'ASCENDING' THEN mf.firstIndexedAt END ASC,
+          CASE WHEN :sortOrder = 'RECENTLY_ADDED' AND :sortDirection = 'DESCENDING' THEN mf.firstIndexedAt END DESC,
+          CASE WHEN :sortOrder IN ('MOST_PLAYED', 'LEAST_PLAYED') AND :sortDirection = 'ASCENDING' THEN mf.playCount END ASC,
+          CASE WHEN :sortOrder IN ('MOST_PLAYED', 'LEAST_PLAYED') AND :sortDirection = 'DESCENDING' THEN mf.playCount END DESC,
 
           CASE WHEN :sortOrder = 'UNPLAYED' THEN (mf.playCount > 0) END ASC,
 
-          CASE WHEN :sortOrder = 'MOST_RECENT' THEN (mf.lastPlayedAt IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'MOST_RECENT' THEN mf.lastPlayedAt END DESC,
+          CASE WHEN :sortOrder IN ('MOST_RECENT', 'LEAST_RECENT') THEN (mf.lastPlayedAt IS NULL) END ASC,
+          CASE WHEN :sortOrder IN ('MOST_RECENT', 'LEAST_RECENT') AND :sortDirection = 'ASCENDING' THEN mf.lastPlayedAt END ASC,
+          CASE WHEN :sortOrder IN ('MOST_RECENT', 'LEAST_RECENT') AND :sortDirection = 'DESCENDING' THEN mf.lastPlayedAt END DESC,
 
-          CASE WHEN :sortOrder = 'LEAST_RECENT' THEN (mf.lastPlayedAt IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'LEAST_RECENT' THEN mf.lastPlayedAt END ASC,
-
-          CASE WHEN :sortOrder = 'MOST_LIKED' THEN mf.likeScore END DESC,
+          CASE WHEN :sortOrder = 'MOST_LIKED' AND :sortDirection = 'ASCENDING' THEN mf.likeScore END ASC,
+          CASE WHEN :sortOrder = 'MOST_LIKED' AND :sortDirection = 'DESCENDING' THEN mf.likeScore END DESC,
 
           LOWER(TRIM(COALESCE(NULLIF(mf.displayTitle, ''), mf.filename))) ASC,
           mf.id ASC
@@ -241,7 +252,8 @@ interface MediaFileDao {
         availabilityFilter: String,
         excludeDisliked: Int,
         searchPattern: String?,
-        sortOrder: String
+        sortOrder: String,
+        sortDirection: String = "ASCENDING"
     ): PagingSource<Int, MediaFileEntity>
 
     @Query(
@@ -284,17 +296,19 @@ interface MediaFileDao {
           )
         ORDER BY
           CASE WHEN :sortOrder = 'ARTIST' THEN (mf.artist IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'ARTIST' THEN mf.artist END ASC,
+          CASE WHEN :sortOrder = 'ARTIST' AND :sortDirection = 'ASCENDING' THEN LOWER(TRIM(mf.artist)) END ASC,
+          CASE WHEN :sortOrder = 'ARTIST' AND :sortDirection = 'DESCENDING' THEN LOWER(TRIM(mf.artist)) END DESC,
           CASE WHEN :sortOrder = 'ARTIST' THEN COALESCE(mf.albumArtist, mf.artist) END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN (mf.album IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'ARTIST' THEN mf.album END ASC,
+          CASE WHEN :sortOrder = 'ARTIST' THEN LOWER(TRIM(mf.album)) END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN (mf.discNumber IS NULL) END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN mf.discNumber END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN (mf.trackNumber IS NULL) END ASC,
           CASE WHEN :sortOrder = 'ARTIST' THEN mf.trackNumber END ASC,
 
           CASE WHEN :sortOrder = 'ALBUM' THEN (mf.album IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'ALBUM' THEN mf.album END ASC,
+          CASE WHEN :sortOrder = 'ALBUM' AND :sortDirection = 'ASCENDING' THEN LOWER(TRIM(mf.album)) END ASC,
+          CASE WHEN :sortOrder = 'ALBUM' AND :sortDirection = 'DESCENDING' THEN LOWER(TRIM(mf.album)) END DESC,
           CASE WHEN :sortOrder = 'ALBUM' THEN COALESCE(mf.albumArtist, mf.artist) END ASC,
           CASE WHEN :sortOrder = 'ALBUM' THEN (mf.discNumber IS NULL) END ASC,
           CASE WHEN :sortOrder = 'ALBUM' THEN mf.discNumber END ASC,
@@ -302,23 +316,28 @@ interface MediaFileDao {
           CASE WHEN :sortOrder = 'ALBUM' THEN mf.trackNumber END ASC,
 
           CASE WHEN :sortOrder = 'TRACK' THEN (mf.discNumber IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'TRACK' THEN mf.discNumber END ASC,
+          CASE WHEN :sortOrder = 'TRACK' AND :sortDirection = 'ASCENDING' THEN mf.discNumber END ASC,
+          CASE WHEN :sortOrder = 'TRACK' AND :sortDirection = 'DESCENDING' THEN mf.discNumber END DESC,
           CASE WHEN :sortOrder = 'TRACK' THEN (mf.trackNumber IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'TRACK' THEN mf.trackNumber END ASC,
+          CASE WHEN :sortOrder = 'TRACK' AND :sortDirection = 'ASCENDING' THEN mf.trackNumber END ASC,
+          CASE WHEN :sortOrder = 'TRACK' AND :sortDirection = 'DESCENDING' THEN mf.trackNumber END DESC,
 
-          CASE WHEN :sortOrder = 'RECENTLY_ADDED' THEN mf.firstIndexedAt END DESC,
-          CASE WHEN :sortOrder = 'MOST_PLAYED' THEN mf.playCount END DESC,
-          CASE WHEN :sortOrder = 'LEAST_PLAYED' THEN mf.playCount END ASC,
+          CASE WHEN :sortOrder = 'TITLE' AND :sortDirection = 'ASCENDING' THEN LOWER(TRIM(COALESCE(NULLIF(mf.displayTitle, ''), mf.filename))) END ASC,
+          CASE WHEN :sortOrder = 'TITLE' AND :sortDirection = 'DESCENDING' THEN LOWER(TRIM(COALESCE(NULLIF(mf.displayTitle, ''), mf.filename))) END DESC,
+
+          CASE WHEN :sortOrder = 'RECENTLY_ADDED' AND :sortDirection = 'ASCENDING' THEN mf.firstIndexedAt END ASC,
+          CASE WHEN :sortOrder = 'RECENTLY_ADDED' AND :sortDirection = 'DESCENDING' THEN mf.firstIndexedAt END DESC,
+          CASE WHEN :sortOrder IN ('MOST_PLAYED', 'LEAST_PLAYED') AND :sortDirection = 'ASCENDING' THEN mf.playCount END ASC,
+          CASE WHEN :sortOrder IN ('MOST_PLAYED', 'LEAST_PLAYED') AND :sortDirection = 'DESCENDING' THEN mf.playCount END DESC,
 
           CASE WHEN :sortOrder = 'UNPLAYED' THEN (mf.playCount > 0) END ASC,
 
-          CASE WHEN :sortOrder = 'MOST_RECENT' THEN (mf.lastPlayedAt IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'MOST_RECENT' THEN mf.lastPlayedAt END DESC,
+          CASE WHEN :sortOrder IN ('MOST_RECENT', 'LEAST_RECENT') THEN (mf.lastPlayedAt IS NULL) END ASC,
+          CASE WHEN :sortOrder IN ('MOST_RECENT', 'LEAST_RECENT') AND :sortDirection = 'ASCENDING' THEN mf.lastPlayedAt END ASC,
+          CASE WHEN :sortOrder IN ('MOST_RECENT', 'LEAST_RECENT') AND :sortDirection = 'DESCENDING' THEN mf.lastPlayedAt END DESC,
 
-          CASE WHEN :sortOrder = 'LEAST_RECENT' THEN (mf.lastPlayedAt IS NULL) END ASC,
-          CASE WHEN :sortOrder = 'LEAST_RECENT' THEN mf.lastPlayedAt END ASC,
-
-          CASE WHEN :sortOrder = 'MOST_LIKED' THEN mf.likeScore END DESC,
+          CASE WHEN :sortOrder = 'MOST_LIKED' AND :sortDirection = 'ASCENDING' THEN mf.likeScore END ASC,
+          CASE WHEN :sortOrder = 'MOST_LIKED' AND :sortDirection = 'DESCENDING' THEN mf.likeScore END DESC,
 
           LOWER(TRIM(COALESCE(NULLIF(mf.displayTitle, ''), mf.filename))) ASC,
           mf.id ASC
@@ -340,7 +359,8 @@ interface MediaFileDao {
         availabilityFilter: String,
         excludeDisliked: Int,
         searchPattern: String?,
-        sortOrder: String
+        sortOrder: String,
+        sortDirection: String = "ASCENDING"
     ): List<String>
 
     @Query(

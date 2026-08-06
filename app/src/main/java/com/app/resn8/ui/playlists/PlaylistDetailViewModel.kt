@@ -117,10 +117,8 @@ class PlaylistDetailViewModel(
         }
     }
 
-    fun reorderTrack(mediaId: String, targetIndex: Int) {
-        viewModelScope.launch {
+    suspend fun reorderTrack(mediaId: String, targetIndex: Int): Result<Unit> = runCatching {
             playlistRepository.movePlaylistItemToPosition(playlistId, mediaId, targetIndex)
-        }
     }
 
     suspend fun renamePlaylist(newName: String): Result<Unit> {

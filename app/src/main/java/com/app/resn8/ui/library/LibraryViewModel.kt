@@ -10,10 +10,14 @@ import com.app.resn8.domain.model.ArtistSummary
 import com.app.resn8.domain.model.AvailabilityFilter
 import com.app.resn8.domain.model.LibraryFilterSnapshot
 import com.app.resn8.domain.model.LibraryQuery
+import com.app.resn8.domain.model.LibrarySortField
+import com.app.resn8.domain.model.LibrarySortPreferences
+import com.app.resn8.domain.model.LibrarySortSelection
 import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.domain.model.SelectionResolutionResult
-import com.app.resn8.domain.model.SortOrder
+import com.app.resn8.domain.model.SortDirection
+import com.app.resn8.domain.model.toLegacySortOrder
 import com.app.resn8.domain.repository.MediaRepository
 import com.app.resn8.domain.repository.UiSessionRepository
 import kotlinx.coroutines.channels.Channel
@@ -21,12 +25,14 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 import kotlinx.coroutines.flow.first
@@ -53,11 +59,12 @@ class LibraryViewModel(
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
-    private val _sort = MutableStateFlow(SortOrder.ARTIST)
-    val sort: StateFlow<SortOrder> = _sort.asStateFlow()
+    private val _sortPreferences = MutableStateFlow(LibrarySortPreferences())
+    val sortPreferences: StateFlow<LibrarySortPreferences> = _sortPreferences.asStateFlow()
 
-    private val _filters = MutableStateFlow(LibraryFilterSnapshot())
-    val filters: StateFlow<LibraryFilterSnapshot> = _filters.asStateFlow()
+    val sort: StateFlow<LibrarySortSelection> = combine(_surface, _sortPreferences) { surface, preferences ->
+        preferences.selectionFor(surface)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, LibrarySortSelection())
 
     private val _selectedFileIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedFileIds: StateFlow<Set<String>> = _selectedFileIds.asStateFlow()
@@ -73,8 +80,7 @@ class LibraryViewModel(
             val session = uiSessionRepository.getUiSessionStateFlow().first()
             _surface.value = session.activeSurface
             _searchText.value = session.activeSearchQuery ?: ""
-            _sort.value = session.activeSort
-            _filters.value = session.libraryFilterSnapshot
+            _sortPreferences.value = session.librarySortPreferences
 
             for (signal in sessionSaveSignals) {
                 persistCurrentSession()
@@ -90,14 +96,14 @@ class LibraryViewModel(
         _collectionId,
         _surface,
         debouncedSearchText,
-        _sort,
-        _filters
-    ) { collId, surf, search, sortOrder, filterSnapshot ->
+        sort
+    ) { collId, surf, search, sortSelection ->
         LibraryQuery(
             collectionId = collId,
             searchText = search,
-            sort = sortOrder,
-            filters = filterSnapshot
+            sort = sortSelection.toLegacySortOrder(),
+            sortDirection = sortSelection.direction,
+            filters = LibraryFilterSnapshot()
         )
     }.distinctUntilChanged()
 
@@ -124,18 +130,21 @@ class LibraryViewModel(
         saveSessionState()
     }
 
-    fun setSortOrder(sortOrder: SortOrder) {
-        _sort.value = sortOrder
+    fun setSortField(field: LibrarySortField) {
+        val current = _sortPreferences.value.selectionFor(_surface.value)
+        _sortPreferences.value = _sortPreferences.value.withSelection(
+            _surface.value,
+            current.copy(field = field)
+        )
         saveSessionState()
     }
 
-    fun setAvailabilityFilter(availability: AvailabilityFilter) {
-        _filters.value = _filters.value.copy(availability = availability)
-        saveSessionState()
-    }
-
-    fun toggleExcludeDisliked() {
-        _filters.value = _filters.value.copy(excludeDisliked = !_filters.value.excludeDisliked)
+    fun setSortDirection(direction: SortDirection) {
+        val current = _sortPreferences.value.selectionFor(_surface.value)
+        _sortPreferences.value = _sortPreferences.value.withSelection(
+            _surface.value,
+            current.copy(direction = direction)
+        )
         saveSessionState()
     }
 
@@ -164,7 +173,7 @@ class LibraryViewModel(
             _selectionResolution.value = mediaRepository.resolveSelectionMediaIds(
                 selectedFileIds = _selectedFileIds.value,
                 selectedFolderIds = _selectedFolderIds.value,
-                availability = _filters.value.availability
+                availability = AvailabilityFilter.ALL
             )
         }
     }
@@ -182,8 +191,9 @@ class LibraryViewModel(
                     selectedCollectionId = _collectionId.value,
                     selectedSourceId = sourceId,
                     activeSearchQuery = _searchText.value.ifBlank { null },
-                    activeSort = _sort.value,
-                    libraryFilterSnapshot = _filters.value
+                    activeSort = _sortPreferences.value.selectionFor(_surface.value).toLegacySortOrder(),
+                    librarySortPreferences = _sortPreferences.value,
+                    libraryFilterSnapshot = LibraryFilterSnapshot()
                 )
             )
             _sessionError.value = null

@@ -28,6 +28,7 @@ import com.app.resn8.domain.model.LibraryQuery
 import com.app.resn8.domain.model.MetadataGroupKey
 import com.app.resn8.domain.model.PlaylistMembershipState
 import com.app.resn8.domain.model.QueueStartRequest
+import com.app.resn8.domain.model.toLegacySortOrder
 import com.app.resn8.playback.PlaybackUiState
 import com.app.resn8.ui.components.PlaylistSelectorSheet
 import com.app.resn8.ui.folders.FoldersViewModel
@@ -153,7 +154,6 @@ fun Resn8NavHost(
                         }
                     )
                     val currentSort by libraryViewModel.sort.collectAsState()
-                    val currentFilters by libraryViewModel.filters.collectAsState()
                     val searchText by libraryViewModel.searchText.collectAsState()
 
                     LibraryScreen(
@@ -173,8 +173,9 @@ fun Resn8NavHost(
                                 collectionId = selection.collectionId,
                                 sourceId = selection.sourceId,
                                 searchText = searchText,
-                                filters = currentFilters,
-                                sort = currentSort
+                                filters = com.app.resn8.domain.model.LibraryFilterSnapshot(),
+                                sort = currentSort.toLegacySortOrder(),
+                                sortDirection = currentSort.direction
                             )
                             playbackConnection?.startQueue(
                                 QueueStartRequest.Library(

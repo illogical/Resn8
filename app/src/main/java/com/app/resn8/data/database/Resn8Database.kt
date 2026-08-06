@@ -48,7 +48,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UiSessionStateEntity::class,
         CollectionPlaybackStateEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -118,12 +118,19 @@ abstract class Resn8Database : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE ui_session_state ADD COLUMN librarySortPreferences TEXT DEFAULT NULL")
+                db.execSQL("UPDATE ui_session_state SET libraryFilterSnapshot = NULL")
+            }
+        }
+
         fun buildDatabase(context: Context): Resn8Database {
             return Room.databaseBuilder(
                 context.applicationContext,
                 Resn8Database::class.java,
                 DB_NAME
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
         }
 

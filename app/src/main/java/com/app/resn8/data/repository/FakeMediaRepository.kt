@@ -15,6 +15,8 @@ import com.app.resn8.domain.model.PlaybackHistoryResult
 import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.domain.model.SelectionResolutionResult
 import com.app.resn8.domain.model.SortOrder
+import com.app.resn8.domain.model.SortDirection
+import com.app.resn8.domain.model.defaultDirection
 import com.app.resn8.domain.model.StagedFolder
 import com.app.resn8.domain.model.StagedMedia
 import com.app.resn8.domain.repository.MediaRepository
@@ -66,7 +68,7 @@ class FakeMediaRepository(
 
             matchesSource && matchesFolder && matchesArtist && matchesAlbum &&
                 matchesAvailability && matchesDislike && matchesSearch
-        }.sortedWith(getComparator(query.sort))
+        }.sortedWith(getComparator(query.sort, query.sortDirection))
     }
 
     override fun getArtistSummariesPaged(query: LibraryQuery): Flow<PagingData<ArtistSummary>> {
@@ -85,7 +87,11 @@ class FakeMediaRepository(
             }.sortedWith(
                 compareBy<ArtistSummary> { it.key is MetadataGroupKey.Unknown }
                     .thenBy { it.displayName.lowercase() }
-            )
+            ).let { summaries ->
+                if (query.sortDirection == SortDirection.ASCENDING) summaries
+                else summaries.filterNot { it.key is MetadataGroupKey.Unknown }.reversed() +
+                    summaries.filter { it.key is MetadataGroupKey.Unknown }
+            }
             PagingData.from(summaries)
         }
     }
@@ -111,7 +117,11 @@ class FakeMediaRepository(
             }.sortedWith(
                 compareBy<AlbumSummary> { it.albumKey is MetadataGroupKey.Unknown }
                     .thenBy { it.albumDisplayName.lowercase() }
-            )
+            ).let { summaries ->
+                if (query.sortDirection == SortDirection.ASCENDING) summaries
+                else summaries.filterNot { it.albumKey is MetadataGroupKey.Unknown }.reversed() +
+                    summaries.filter { it.albumKey is MetadataGroupKey.Unknown }
+            }
             PagingData.from(summaries)
         }
     }
@@ -203,43 +213,67 @@ class FakeMediaRepository(
                 (artist == null || item.artist?.equals(artist, ignoreCase = true) == true) &&
                 (album == null || item.album?.equals(album, ignoreCase = true) == true) &&
                 (searchQuery.isNullOrBlank() || item.displayTitle.contains(searchQuery, ignoreCase = true) || (item.artist?.contains(searchQuery, ignoreCase = true) == true))
-            }.sortedWith(getComparator(sortOrder))
+            }.sortedWith(getComparator(sortOrder, sortOrder.defaultDirection()))
         }
     }
 
-    private fun getComparator(sortOrder: SortOrder): Comparator<MediaFile> {
-        val finalTieBreaker = compareBy<MediaFile> { (it.displayTitle.ifEmpty { it.filename }).lowercase() }.thenBy { it.id }
+    private fun getComparator(
+        sortOrder: SortOrder,
+        direction: SortDirection
+    ): Comparator<MediaFile> {
+        fun directed(value: Int): Int = if (direction == SortDirection.ASCENDING) value else -value
+        fun compareText(left: String?, right: String?, selectedDirection: Boolean): Int {
+            if (left == null && right == null) return 0
+            if (left == null) return 1
+            if (right == null) return -1
+            val comparison = left.trim().lowercase().compareTo(right.trim().lowercase())
+            return if (selectedDirection) directed(comparison) else comparison
+        }
+        fun compareLong(left: Long?, right: Long?): Int {
+            if (left == null && right == null) return 0
+            if (left == null) return 1
+            if (right == null) return -1
+            return directed(left.compareTo(right))
+        }
+        val finalTieBreaker = compareBy<MediaFile> {
+            (it.displayTitle.ifEmpty { it.filename }).trim().lowercase()
+        }.thenBy { it.id }
         val primaryComparator: Comparator<MediaFile> = when (sortOrder) {
-            SortOrder.ARTIST -> compareBy<MediaFile> { it.artist == null }
-                .thenBy { it.artist?.lowercase() }
-                .thenBy { (it.albumArtist ?: it.artist)?.lowercase() }
+            SortOrder.ARTIST -> Comparator<MediaFile> { left, right ->
+                compareText(left.artist, right.artist, selectedDirection = true)
+            }.thenBy { (it.albumArtist ?: it.artist)?.lowercase() }
                 .thenBy { it.album == null }
                 .thenBy { it.album?.lowercase() }
                 .thenBy { it.discNumber == null }
                 .thenBy { it.discNumber ?: 0 }
                 .thenBy { it.trackNumber == null }
                 .thenBy { it.trackNumber ?: 0 }
-            SortOrder.ALBUM -> compareBy<MediaFile> { it.album == null }
-                .thenBy { it.album?.lowercase() }
+            SortOrder.ALBUM -> Comparator<MediaFile> { left, right ->
+                compareText(left.album, right.album, selectedDirection = true)
+            }
                 .thenBy { (it.albumArtist ?: it.artist)?.lowercase() }
                 .thenBy { it.discNumber == null }
                 .thenBy { it.discNumber ?: 0 }
                 .thenBy { it.trackNumber == null }
                 .thenBy { it.trackNumber ?: 0 }
-            SortOrder.TITLE -> finalTieBreaker
+            SortOrder.TITLE -> Comparator<MediaFile> { left, right ->
+                compareText(
+                    left.displayTitle.ifEmpty { left.filename },
+                    right.displayTitle.ifEmpty { right.filename },
+                    selectedDirection = true
+                )
+            }
             SortOrder.TRACK -> compareBy<MediaFile> { it.discNumber == null }
                 .thenBy { it.discNumber ?: 0 }
                 .thenBy { it.trackNumber == null }
                 .thenBy { it.trackNumber ?: 0 }
-            SortOrder.RECENTLY_ADDED -> compareByDescending { it.firstIndexedAt }
-            SortOrder.MOST_PLAYED -> compareByDescending { it.playCount }
-            SortOrder.LEAST_PLAYED -> compareBy { it.playCount }
+            SortOrder.RECENTLY_ADDED -> Comparator<MediaFile> { left, right -> directed(left.firstIndexedAt.compareTo(right.firstIndexedAt)) }
+            SortOrder.MOST_PLAYED,
+            SortOrder.LEAST_PLAYED -> Comparator<MediaFile> { left, right -> directed(left.playCount.compareTo(right.playCount)) }
             SortOrder.UNPLAYED -> compareBy { it.playCount != 0 }
-            SortOrder.MOST_RECENT -> compareBy<MediaFile> { it.lastPlayedAt == null }
-                .thenByDescending { it.lastPlayedAt ?: 0L }
-            SortOrder.LEAST_RECENT -> compareBy<MediaFile> { it.lastPlayedAt != null }
-                .thenBy { it.lastPlayedAt ?: Long.MAX_VALUE }
-            SortOrder.MOST_LIKED -> compareByDescending { it.likeScore }
+            SortOrder.MOST_RECENT,
+            SortOrder.LEAST_RECENT -> Comparator<MediaFile> { left, right -> compareLong(left.lastPlayedAt, right.lastPlayedAt) }
+            SortOrder.MOST_LIKED -> Comparator<MediaFile> { left, right -> directed(left.likeScore.compareTo(right.likeScore)) }
         }
         return primaryComparator.thenComparing(finalTieBreaker)
     }

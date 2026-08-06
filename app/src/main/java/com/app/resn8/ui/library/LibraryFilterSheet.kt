@@ -1,86 +1,114 @@
 package com.app.resn8.ui.library
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.app.resn8.domain.model.AvailabilityFilter
-import com.app.resn8.domain.model.LibraryFilterSnapshot
-import com.app.resn8.domain.model.SortOrder
+import com.app.resn8.domain.model.LibrarySortField
+import com.app.resn8.domain.model.LibrarySortSelection
+import com.app.resn8.domain.model.LibrarySurface
+import com.app.resn8.domain.model.SortDirection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryFilterSheet(
-    currentSort: SortOrder,
-    currentFilters: LibraryFilterSnapshot,
-    onSortSelected: (SortOrder) -> Unit,
-    onAvailabilitySelected: (AvailabilityFilter) -> Unit,
-    onToggleExcludeDisliked: () -> Unit,
+fun LibrarySortSheet(
+    currentSurface: LibrarySurface,
+    currentSort: LibrarySortSelection,
+    onFieldSelected: (LibrarySortField) -> Unit,
+    onDirectionSelected: (SortDirection) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val fields = when (currentSurface) {
+        LibrarySurface.ARTISTS,
+        LibrarySurface.ALBUMS -> listOf(LibrarySortField.ALPHABETICAL)
+        LibrarySurface.ALL_TRACKS -> listOf(
+            LibrarySortField.ALPHABETICAL,
+            LibrarySortField.ARTIST,
+            LibrarySortField.ALBUM,
+            LibrarySortField.DATE_ADDED,
+            LibrarySortField.PLAY_COUNT,
+            LibrarySortField.LAST_PLAYED,
+            LibrarySortField.RATING
+        )
+        LibrarySurface.FOLDERS -> emptyList()
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Sort By", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            Column {
-                SortOrder.entries.forEach { sort ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp)
-                    ) {
-                        RadioButton(
-                            selected = currentSort == sort,
-                            onClick = { onSortSelected(sort) }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 24.dp
+            )
+        ) {
+            item {
+                Text(
+                    text = "Sort By",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+            items(fields, key = { it.name }) { field ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    RadioButton(
+                        selected = currentSort.field == field,
+                        onClick = { onFieldSelected(field) }
+                    )
+                    Text(field.displayLabel())
+                }
+            }
+            item {
+                Text(
+                    text = "Direction",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SortDirection.entries.forEachIndexed { index, direction ->
+                        SegmentedButton(
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = SortDirection.entries.size
+                            ),
+                            selected = currentSort.direction == direction,
+                            onClick = { onDirectionSelected(direction) },
+                            label = { Text(direction.displayLabel()) }
                         )
-                        Text(sort.name.replace("_", " "))
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Availability", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                AvailabilityFilter.entries.forEach { filter ->
-                    FilterChip(
-                        selected = currentFilters.availability == filter,
-                        onClick = { onAvailabilitySelected(filter) },
-                        label = { Text(filter.name.replace("_", " ")) },
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Exclude Disliked Tracks", modifier = Modifier.weight(1f))
-                Switch(
-                    checked = currentFilters.excludeDisliked,
-                    onCheckedChange = { onToggleExcludeDisliked() }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                Text("Done")
-            }
         }
     }
+}
+
+private fun LibrarySortField.displayLabel(): String = when (this) {
+    LibrarySortField.ALPHABETICAL -> "Alphabetical"
+    LibrarySortField.ARTIST -> "Artist"
+    LibrarySortField.ALBUM -> "Album"
+    LibrarySortField.DATE_ADDED -> "Date Added"
+    LibrarySortField.PLAY_COUNT -> "Play Count"
+    LibrarySortField.LAST_PLAYED -> "Last Played"
+    LibrarySortField.RATING -> "Rating"
+}
+
+private fun SortDirection.displayLabel(): String = when (this) {
+    SortDirection.ASCENDING -> "Ascending"
+    SortDirection.DESCENDING -> "Descending"
 }

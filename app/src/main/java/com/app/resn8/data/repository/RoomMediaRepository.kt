@@ -50,7 +50,8 @@ class RoomMediaRepository(
                 collectionId = query.collectionId,
                 availabilityFilter = query.filters.availability.name,
                 excludeDisliked = if (query.filters.excludeDisliked) 1 else 0,
-                searchPattern = query.escapedSearchPattern()
+                searchPattern = query.escapedSearchPattern(),
+                sortDirection = query.sortDirection.name
             )
         }.flow.map { pagingData ->
             pagingData.map { row ->
@@ -78,7 +79,8 @@ class RoomMediaRepository(
                 artistKeyValue = artistValue,
                 availabilityFilter = query.filters.availability.name,
                 excludeDisliked = if (query.filters.excludeDisliked) 1 else 0,
-                searchPattern = query.escapedSearchPattern()
+                searchPattern = query.escapedSearchPattern(),
+                sortDirection = query.sortDirection.name
             )
         }.flow.map { pagingData ->
             pagingData.map { row ->
@@ -120,7 +122,8 @@ class RoomMediaRepository(
                 availabilityFilter = query.filters.availability.name,
                 excludeDisliked = if (query.filters.excludeDisliked) 1 else 0,
                 searchPattern = query.escapedSearchPattern(),
-                sortOrder = query.sort.name
+                sortOrder = query.sort.name,
+                sortDirection = query.sortDirection.name
             )
         }.flow.map { pagingData ->
             pagingData.map { it.toDomain() }
@@ -195,7 +198,8 @@ class RoomMediaRepository(
             availabilityFilter = query.filters.availability.name,
             excludeDisliked = if (query.filters.excludeDisliked) 1 else 0,
             searchPattern = query.escapedSearchPattern(),
-            sortOrder = query.sort.name
+            sortOrder = query.sort.name,
+            sortDirection = query.sortDirection.name
         )
     }
 
