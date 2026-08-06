@@ -397,16 +397,18 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ---
 
-## Post-MVP — Smart Queue Generation
+## Randomized Sorting
 
-### PM1 — Generate Explainable Smart Queues
-- Generate Random Eligible, Unplayed, Least/Most Played, Most Liked, and Least/Most Recently Played queues from an immutable reviewed collection/filter snapshot.
-- Verify each mode's eligibility, equal-key randomization, dislike/unavailable exclusion, zero-result explanation, and responsive 25,000-item behavior.
+### RS1 — Rewrite a Playlist from Current Metadata
+- Open Playlist Detail, choose each Randomized Sorting method, and confirm the complete playlist—not only search-visible rows—is reordered with equal metadata values randomized.
+- Confirm Least/Most Played order exact play-count groups, Most Liked orders non-negative score groups, and Recently Added groups only exactly equal `firstIndexedAt` timestamps.
 
-### PM2 — Preserve Reproducible Explicit Snapshots
-- Persist the mode, normalized filter, seed, stable queue-item identities, and explicit order before playback.
-- Verify same-seed reproducibility, different-seed variability, restart restoration, and isolation from later rating, scan, or metadata changes.
+### RS2 — Remove Disliked Memberships Safely
+- Include liked, neutral, disliked, and unavailable tracks. Apply a method and confirm the menu disclosed removal, every disliked membership was permanently deleted, unavailable non-disliked tracks remained, and success feedback reported the removed count.
+- Confirm a persistence failure leaves both membership and order unchanged and provides an actionable error.
 
-### PM3 — Handle Generation Failure Safely
-- Cancellation, query failure, persistence failure, and empty results must leave the current queue unchanged and provide an actionable explanation.
+### RS3 — Synchronize Only Matching Playback
+- While this playlist is playing, apply Randomized Sorting and confirm playback immediately restarts at its new first available track with a fresh traversal occurrence. Pause and repeat; confirm the new first track is prepared at zero while remaining paused.
+- Confirm a disliked current track skips immediately, an all-disliked/no-playable result stops and clears this playlist's queue, and playback from another playlist or Library/Folder source remains untouched.
+- Confirm the list refreshes and scrolls to the top, Play All and track taps use the persisted new order, and relaunch restoration observes the replacement explicit queue.
 - Saving a generated queue as a playlist creates unique manual membership in visible order rather than a dynamic rule.

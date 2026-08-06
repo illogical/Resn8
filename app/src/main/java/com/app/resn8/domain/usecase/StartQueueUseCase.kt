@@ -19,6 +19,7 @@ class StartQueueUseCase(
 ) {
     suspend operator fun invoke(request: QueueStartRequest): Result<SavedQueue> {
         var filterSnapshot: com.app.resn8.domain.model.QueueFilterSnapshot? = null
+        var playWhenReadyIntent = true
 
         val (orderedMediaIds, targetCollectionId) = when (request) {
             is QueueStartRequest.Library -> {
@@ -38,6 +39,7 @@ class StartQueueUseCase(
                 Pair(mediaIds, request.query.collectionId)
             }
             is QueueStartRequest.Playlist -> {
+                playWhenReadyIntent = request.playWhenReady
                 val items = playlistRepository.getPlaylistItems(request.playlistId)
                 val mediaIds = items.map { it.mediaId }
                 val mediaFiles = mediaRepository.getMediaFilesByIdsPreservingOrder(mediaIds)
@@ -72,7 +74,7 @@ class StartQueueUseCase(
             currentIndex = startingIndex,
             currentMediaId = request.startingMediaId,
             positionMs = 0L,
-            playWhenReadyIntent = true
+            playWhenReadyIntent = playWhenReadyIntent
         )
 
         val savedQueue = queueRepository.replaceQueueSnapshot(queueToSave, orderedMediaIds)

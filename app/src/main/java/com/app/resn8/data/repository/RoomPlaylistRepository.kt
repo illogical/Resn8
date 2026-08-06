@@ -10,6 +10,9 @@ import com.app.resn8.domain.model.AddItemsResult
 import com.app.resn8.domain.model.MoveDirection
 import com.app.resn8.domain.model.Playlist
 import com.app.resn8.domain.model.PlaylistItem
+import com.app.resn8.domain.model.PlaylistRandomizationResult
+import com.app.resn8.domain.model.PlaylistRandomizedSortMethod
+import com.app.resn8.domain.model.PlaylistRandomizedSorter
 import com.app.resn8.domain.model.PlaylistMembershipState
 import com.app.resn8.domain.model.PlaylistWithItemCount
 import com.app.resn8.domain.model.PlaylistWithMembership
@@ -20,10 +23,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 import java.util.UUID
+import kotlin.random.Random
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RoomPlaylistRepository(
-    private val db: Resn8Database
+    private val db: Resn8Database,
+    private val randomFactory: () -> Random = { Random.Default }
 ) : PlaylistRepository {
     private val playlistDao = db.playlistDao()
 
@@ -255,6 +260,40 @@ class RoomPlaylistRepository(
             playlistDao.getPlaylistById(playlistId)?.let { playlist ->
                 playlistDao.updatePlaylist(playlist.copy(updatedAt = System.currentTimeMillis()))
             }
+        }
+    }
+
+    override suspend fun applyRandomizedSorting(
+        playlistId: String,
+        method: PlaylistRandomizedSortMethod
+    ): Result<PlaylistRandomizationResult> = runCatching {
+        db.withTransaction {
+            val playlist = playlistDao.getPlaylistById(playlistId)
+                ?: throw IllegalArgumentException("Playlist not found")
+            val items = playlistDao.getPlaylistItems(playlistId)
+            val mediaById = items.map { it.mediaId }
+                .chunked(500)
+                .flatMap { ids -> db.mediaFileDao().getMediaFilesByIds(ids) }
+                .associateBy { it.id }
+            val mediaFiles = items.mapNotNull { item -> mediaById[item.mediaId]?.toDomain() }
+            if (mediaFiles.size != items.size) {
+                throw IllegalStateException("Playlist metadata changed while randomized sorting was applied")
+            }
+
+            val order = PlaylistRandomizedSorter.sort(mediaFiles, method, randomFactory())
+            if (order.removedDislikedMediaIds.isNotEmpty()) {
+                playlistDao.deletePlaylistItems(playlistId, order.removedDislikedMediaIds)
+            }
+            val retainedById = items.associateBy { it.mediaId }
+            val orderedEntities = order.orderedMedia.map { media -> retainedById.getValue(media.id) }
+            executeTwoPhaseCompaction(playlistId, orderedEntities)
+            playlistDao.updatePlaylist(playlist.copy(updatedAt = System.currentTimeMillis()))
+
+            PlaylistRandomizationResult(
+                orderedMediaIds = order.orderedMedia.map { it.id },
+                availableOrderedMediaIds = order.orderedMedia.filter { it.isAvailable }.map { it.id },
+                removedDislikedCount = order.removedDislikedMediaIds.size
+            )
         }
     }
 

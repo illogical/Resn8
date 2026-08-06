@@ -31,10 +31,12 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +45,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -67,6 +71,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.domain.model.PlaylistRandomizationResult
+import com.app.resn8.domain.model.PlaylistRandomizedSortMethod
 import com.app.resn8.ui.components.RenamePlaylistDialog
 import com.app.resn8.ui.playlists.PlaylistDetailViewModel
 import com.app.resn8.ui.playlists.PlaylistItemUiModel
@@ -81,6 +87,7 @@ fun PlaylistDetailScreen(
     onBack: () -> Unit,
     onTrackClick: (MediaFile) -> Unit,
     onPlayAll: () -> Unit,
+    onRandomizedSortingApplied: (PlaylistRandomizationResult) -> Unit,
     currentMediaId: String? = null,
     isCurrentTrackPlaying: Boolean = false,
     showMusicMetadata: Boolean = true,
@@ -91,9 +98,11 @@ fun PlaylistDetailScreen(
     val tracks by viewModel.tracks.collectAsState()
     val filteredTracks by viewModel.filteredTracks.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val randomizedSortingState by viewModel.randomizedSortingState.collectAsState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
     val currentTrackIndex = currentPlaylistItemIndex(tracks, currentMediaId)
 
     var isSearchActive by remember { mutableStateOf(false) }
@@ -101,6 +110,7 @@ fun PlaylistDetailScreen(
     var renameError by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPlaylistMenu by remember { mutableStateOf(false) }
+    var showRandomizedSortingMenu by remember { mutableStateOf(false) }
     var revealConsumed by remember(revealCurrentTrack) { mutableStateOf(false) }
     var optimisticTracks by remember { mutableStateOf<List<PlaylistItemUiModel>?>(null) }
     var draggedMediaId by remember { mutableStateOf<String?>(null) }
@@ -187,8 +197,24 @@ fun PlaylistDetailScreen(
         }
     }
 
+    LaunchedEffect(randomizedSortingState.feedbackId) {
+        randomizedSortingState.feedbackMessage?.let { snackbarHostState.showSnackbar(it) }
+    }
+
+    LaunchedEffect(randomizedSortingState.scrollRequestId) {
+        if (randomizedSortingState.scrollRequestId > 0L) listState.scrollToItem(0)
+    }
+
+    fun applyRandomizedSorting(method: PlaylistRandomizedSortMethod) {
+        showRandomizedSortingMenu = false
+        viewModel.applyRandomizedSorting(method) { result ->
+            result.onSuccess(onRandomizedSortingApplied)
+        }
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (isSearchActive) {
                 TopAppBar(
@@ -235,6 +261,50 @@ fun PlaylistDetailScreen(
                     actions = {
                         IconButton(onClick = { isSearchActive = true }) {
                             Icon(imageVector = Icons.Default.Search, contentDescription = "Search Playlist")
+                        }
+                        Box {
+                            IconButton(
+                                onClick = { showRandomizedSortingMenu = true },
+                                enabled = !randomizedSortingState.isApplying
+                            ) {
+                                if (randomizedSortingState.isApplying) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Shuffle,
+                                        contentDescription = "Randomized Sorting"
+                                    )
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = showRandomizedSortingMenu,
+                                onDismissRequest = { showRandomizedSortingMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Disliked tracks will be removed") },
+                                    enabled = false,
+                                    onClick = {}
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Least Played") },
+                                    onClick = { applyRandomizedSorting(PlaylistRandomizedSortMethod.LEAST_PLAYED) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Most Played") },
+                                    onClick = { applyRandomizedSorting(PlaylistRandomizedSortMethod.MOST_PLAYED) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Most Liked") },
+                                    onClick = { applyRandomizedSorting(PlaylistRandomizedSortMethod.MOST_LIKED) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Recently Added") },
+                                    onClick = { applyRandomizedSorting(PlaylistRandomizedSortMethod.RECENTLY_ADDED) }
+                                )
+                            }
                         }
                         Box {
                             IconButton(onClick = { showPlaylistMenu = true }) {

@@ -381,6 +381,14 @@ fun Resn8NavHost(
                             )
                         }
                     },
+                    onRandomizedSortingApplied = { result ->
+                        playbackConnection?.synchronizeRandomizedPlaylist(
+                            playlistId = route.playlistId,
+                            result = result
+                        ) { playbackResult ->
+                            if (playbackResult.isFailure) viewModel.reportPlaybackRefreshFailure()
+                        }
+                    },
                     revealCurrentTrack = route.revealCurrentTrack,
                     currentMediaId = currentPlaylistMediaId,
                     isCurrentTrackPlaying = playbackUiState.isPlaying,

@@ -13,15 +13,15 @@ The first usable release supports multiple named collections, each under one use
 - Play audio reliably in the foreground and background with Android system controls.
 - Track meaningful plays, last-played time, current position, and a signed like score.
 - Create ordered manual playlists and add one file, many files, or a folder's descendants.
-- Generate and persist randomized queues from the current collection or filtered result set.
+- Destructively reorder playlists with user-selected randomized metadata grouping.
 - Restore the exact queue, item, position, and browsing context after process death or restart.
 - Keep all library data local; Resn8 does not upload audio, metadata, or listening history.
 
 ### MVP Boundaries
 
-The MVP includes multiple uniquely named collections with one selected folder each. User-facing profiles are `MUSIC` and `FLAT` (shown as Audio Files), with recursive manual re-indexing, profile-appropriate browsing, background playback, rating, manual playlists, and playback-state restoration. The schema and domain interfaces retain room for multiple roots and contextual collections, but those management experiences are post-MVP.
+The MVP includes multiple uniquely named collections with one selected folder each. User-facing profiles are `MUSIC` and `FLAT` (shown as Audio Files), with recursive manual re-indexing, profile-appropriate browsing, background playback, rating, manual playlists, playlist Randomized Sorting, and playback-state restoration. The schema and domain interfaces retain room for multiple roots and contextual collections, but those management experiences are post-MVP.
 
-Scheduled indexing, smart randomized queues, advanced search, playback-speed control, multiple roots per collection, contextual collection UI, moving or deleting disliked source files, tag editing, cloud playback, casting, lyrics, equalization, and Android Auto-specific browsing are post-MVP.
+Scheduled indexing, advanced search, playback-speed control, multiple roots per collection, contextual collection UI, moving or deleting disliked source files, tag editing, cloud playback, casting, lyrics, equalization, and Android Auto-specific browsing are post-MVP.
 
 Images and videos mentioned in the brainstorm are out of scope. Resn8 indexes playable audio only.
 
@@ -50,7 +50,7 @@ All audio types use one `MediaFile` entity. Common fields are required; music-sp
 | `Playlist` | Stable ID, collection ID, unique name within collection, created/updated timestamps |
 | `PlaylistItem` | Playlist ID, media ID, unique membership, stable manual position, added timestamp |
 | `PlaybackHistory` | Media ID, playback traversal occurrence ID (`sessionOccurrenceId`), start/qualification or end times, accumulated listened duration, completion/counting result |
-| `SavedQueue` | Queue ID, collection ID, kind, optional generation rule/filter/seed, explicit ordered items with stable `queueItemId` values, current index/media and distinct `currentOccurrenceId`, position, playback state, timestamps |
+| `SavedQueue` | Queue ID, collection ID, source-context snapshot, explicit ordered items with stable `queueItemId` values, current index/media and distinct `currentOccurrenceId`, position, playback state, timestamps; nullable legacy generation columns remain persistence-compatible but do not define Randomized Sorting |
 | `UiSessionState` | Last route plus selected collection, folder, artist, album, playlist, and active filter/sort identifiers |
 
 Room is the source of truth for indexed metadata, relationships, statistics, playlists, saved queues, and session state. Source audio remains addressed through content URIs. Foreign keys and indexes cover collection/source/folder membership, artist, album, track/disc number, first-indexed time, play count, last played, like score, playlist position, and availability.
@@ -83,7 +83,7 @@ For `FLAT` collections, valid embedded common metadata may remain in nullable sh
 - Every explicit Like action atomically adds `1`; every explicit Dislike action atomically subtracts `1`.
 - A score greater than zero is liked, zero is neutral, and less than zero is disliked.
 - The UI displays the current numeric score and provides both actions; pressing the opposite action is how a user adjusts the score back toward neutral.
-- Rating a playing item does not automatically skip it or remove it from a manual playlist. Negative items are excluded from newly generated smart queues by default.
+- Rating a playing item does not automatically skip it or remove it from a manual playlist. A later explicit Randomized Sorting action removes negative-score memberships from the selected playlist before rewriting its order.
 
 ### 2.6 Meaningful Play Semantics
 
@@ -101,25 +101,22 @@ For `FLAT` collections, valid embedded common metadata may remain in nullable sh
 - Finalize/qualify the prior occurrence before initializing the next one on a transition. Interrupted or failed playback cannot manufacture a count, and repeated commit attempts for one occurrence are idempotent.
 - On qualification, `playCount`, `lastPlayedAt`, and the history record are committed atomically. Position and process-death restoration state are checkpointed separately and more frequently in Milestone 7.
 
-### 2.7 Filters, Sorts, and Smart Queue Generation
+### 2.7 Filters, Sorts, and Playlist Randomized Sorting
 
-A generation request operates on an immutable snapshot of currently visible, available media after collection, folder/descendant, artist, album, search, and other active filters are applied. Disliked files (`likeScore < 0`) are excluded by default from every smart mode.
+Randomized Sorting operates on the entire current playlist, not a visible Library/filter result and not only search-visible playlist rows. Choosing a method is an immediate destructive action: every membership whose current `likeScore < 0` is deleted, and the remaining memberships receive new durable positions.
 
-Supported modes are:
+Supported methods are:
 
-| Mode | Ordering rule |
+| Method | Ordering rule |
 | --- | --- |
-| Random eligible | Uniform shuffle of all eligible files |
-| Unplayed | Keep `playCount == 0`, then shuffle |
-| Least played | Ascending `playCount`; shuffle independently within each equal-count group |
-| Most played | Descending `playCount`; shuffle independently within each equal-count group |
-| Most liked | Positive `likeScore` groups descending, shuffled within each equal-score group; neutral files shuffled as the final group |
-| Most recently played | Descending `lastPlayedAt`; unplayed files form a shuffled final group |
-| Least recently played | Unplayed files shuffled first, then ascending `lastPlayedAt` with ties shuffled |
+| Least Played | Ascending `playCount`; shuffle independently within each exact-count group |
+| Most Played | Descending `playCount`; shuffle independently within each exact-count group |
+| Most Liked | Descending non-negative `likeScore`; shuffle independently within each exact-score group |
+| Recently Added | Descending `firstIndexedAt`; shuffle independently only within groups whose timestamps are exactly equal |
 
-The user's target most-liked example is normative: scores `3, 3, 1, 0, 0, -1` produce the two score-3 files in random order, then score 1, then the two neutral files in random order; score -1 is absent.
+The most-liked example is normative: scores `3, 3, 1, 0, 0, -1` delete the negative membership, place the two score-3 tracks in random order, then score 1, then the two neutral tracks in random order. Unavailable tracks remain playlist members unless disliked and participate in ordering, while playback continues to skip unavailable media.
 
-Generation uses an injectable seeded random source. It saves the mode, normalized filter snapshot, seed, and explicit ordered media IDs. The explicit order is authoritative: ratings, statistics, filters, or new scans do not reshuffle an active queue. The user regenerates to incorporate changes. Unavailable items are skipped with a visible explanation, while the saved queue remains recoverable.
+Disliked deletion and positional replacement are one Room transaction. Each invocation reads current metadata, uses fresh randomness, overwrites previous manual or randomized order, and stores neither the method nor a seed. If the active explicit queue originated from that exact playlist, it is replaced at the first available track and position zero with a fresh traversal occurrence; active playback restarts and paused playback remains paused. Other playback sources are unchanged. No playable result stops and clears the matching active queue.
 
 Top-level Music Library sorts are context-specific and field-based. Artists and Albums expose Alphabetical ordering; All Tracks exposes Alphabetical, Artist, Album, Date Added, Play Count, Last Played, and Rating. Every surface has an independently persisted Ascending/Descending choice. Unknown artist, album, and last-played values remain last in either direction. Normal sorts are deterministic, using normalized title and stable media ID as final tie-breakers. Disc/track ordering remains an internal canonical order for album, artist, folder, and playback snapshots rather than an All Tracks menu option.
 
@@ -217,6 +214,7 @@ The MVP is complete when all of the following are demonstrated on an API 34+ dev
 - Like/Dislike updates are durable and atomic. Scores can cross zero in either direction.
 - A play increments exactly once per playback traversal occurrence at the meaningful-listen threshold, cannot be earned by seeking, pause/buffer/interruption time, or wall-clock changes, and remains correct during background playback and UI/controller recreation. Automatic and final-item natural completion use the same occurrence-correct atomic commit.
 - Manual playlists enforce unique membership, preserve user order, support single/bulk/folder addition, remain collection-scoped, and survive restart.
+- Randomized Sorting atomically removes disliked playlist memberships and durably rewrites the remaining order for all four metadata methods; matching active playback resets safely while unrelated playback is unchanged.
 - Folder and album Select All resolve the complete available-only database set rather than only loaded pages; folder Select All excludes subfolders and their descendants.
 - Killing and reopening the app restores the explicit queue, item, position, and screen in a non-autoplaying state; explicit Android media resumption remains functional.
 - Switching repeatedly between collections restores each collection's own last queue, item, and position in a paused state; a never-played collection opens its profile home.
@@ -229,7 +227,6 @@ The MVP is complete when all of the following are demonstrated on an API 34+ dev
 3. Scheduled re-indexing with charging/storage constraints and change summaries.
 4. Playback speed presets and per-collection/per-file speed memory for long-form audio.
 5. Raycast/Alfred-style global search across metadata, folders, playlists, and history.
-6. Smart randomized queue generation from immutable scoped snapshots.
-7. Rating/history maintenance, including confirmed move/delete workflows for disliked files.
-8. Export/import backup for playlists, ratings, history, and settings without bundling source audio.
-9. Extend the existing player artwork seam with cached album artwork throughout library, album, artist, track, queue, and playlist surfaces when the current index exposes a usable artwork reference, with a stable placeholder when it does not.
+6. Rating/history maintenance, including confirmed move/delete workflows for disliked source files.
+7. Export/import backup for playlists, ratings, history, and settings without bundling source audio.
+8. Extend the existing player artwork seam with cached album artwork throughout library, album, artist, track, queue, and playlist surfaces when the current index exposes a usable artwork reference, with a stable placeholder when it does not.

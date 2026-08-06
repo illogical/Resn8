@@ -14,6 +14,7 @@ import androidx.media3.session.SessionToken
 import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.model.QueueStartRequest
 import com.app.resn8.domain.model.SavedQueue
+import com.app.resn8.domain.model.PlaylistRandomizationResult
 import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.domain.model.RepeatMode
 import com.app.resn8.domain.usecase.StartQueueUseCase
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -455,6 +457,8 @@ class PlaybackConnection(
                     ctrl.prepare()
                     if (savedQueue.playWhenReadyIntent) {
                         ctrl.play()
+                    } else {
+                        ctrl.pause()
                     }
                 }
             }.onFailure { ex ->
@@ -467,6 +471,49 @@ class PlaybackConnection(
                 }
             }
             onComplete(result)
+        }
+    }
+
+    fun synchronizeRandomizedPlaylist(
+        playlistId: String,
+        result: PlaylistRandomizationResult,
+        onComplete: (Result<Unit>) -> Unit = {}
+    ) {
+        scope.launch {
+            val matchingQueue = activeQueue?.takeIf { shouldSynchronizeRandomizedPlaylist(it, playlistId) }
+            if (matchingQueue == null) {
+                onComplete(Result.success(Unit))
+                return@launch
+            }
+            val wasPlaying = controller?.isPlaying == true
+            val firstAvailableId = result.availableOrderedMediaIds.firstOrNull()
+            if (firstAvailableId == null) {
+                val clearResult = runCatching {
+                    controller?.pause()
+                    controller?.stop()
+                    controller?.clearMediaItems()
+                    container.collectionRepository.setCollectionActiveQueue(matchingQueue.collectionId, null)
+                    val session = container.uiSessionRepository.getUiSessionStateFlow().first()
+                    if (session.activeQueueId == matchingQueue.id) {
+                        container.uiSessionRepository.saveUiSessionState(session.copy(activeQueueId = null))
+                    }
+                    activeQueue = null
+                    updateQueueUiState(null)
+                    stopPollingPosition()
+                }
+                onComplete(clearResult)
+                return@launch
+            }
+
+            startQueue(
+                QueueStartRequest.Playlist(
+                    playlistId = playlistId,
+                    startingMediaId = firstAvailableId,
+                    playWhenReady = wasPlaying
+                )
+            ) { queueResult ->
+                onComplete(queueResult.map { Unit })
+            }
         }
     }
 
@@ -518,3 +565,6 @@ class PlaybackConnection(
         controllerFuture = null
     }
 }
+
+internal fun shouldSynchronizeRandomizedPlaylist(queue: SavedQueue, playlistId: String): Boolean =
+    queue.filterSnapshot?.playlistId == playlistId

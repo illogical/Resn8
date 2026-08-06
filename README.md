@@ -5,7 +5,7 @@
 Resn8 is an offline-first Android audio player for people who keep their own music and audio files. Point it at a folder on internal storage or an SD card, and Resn8 will turn that library into something easy to browse, play, rate, organize, and rediscover without uploading your media or listening history.
 
 > [!IMPORTANT]
-> Resn8 is a working early-stage Android application through Milestone 7: local indexing and browsing, persisted explicit queues, Media3 background playback, ratings/meaningful-play accounting, manual playlists, and full playback/browsing context restoration are implemented. Smart queue generation and final MVP polish remain incomplete, so the feature lists below describe the intended finished MVP rather than the current release.
+> Resn8 is a working early-stage Android application with local indexing and browsing, persisted explicit queues, Media3 background playback, ratings/meaningful-play accounting, manual playlists, full playback/browsing context restoration, and playlist Randomized Sorting implemented. Final MVP acceptance and release polish remain incomplete.
 
 ## Why Resn8?
 
@@ -13,8 +13,8 @@ Large personal libraries have a discovery problem: familiar tracks keep resurfac
 
 - **Bring your own library.** Select an organized music folder with Android's system picker—no broad storage permission required.
 - **Keep everything local.** Audio, metadata, ratings, playlists, and listening history stay on your device.
-- **Rediscover what you own.** Generate queues that surface unplayed or least-played tracks, prioritize favorites, or simply shuffle eligible files.
-- **Shape recommendations directly.** Like and Dislike actions adjust a durable signed score; disliked tracks are excluded from newly generated smart queues by default.
+- **Rediscover what you own.** Randomize a playlist by least played, most played, most liked, or recently added while retaining variety among tracks with equal metadata.
+- **Shape playback directly.** Like and Dislike actions adjust a durable signed score; applying Randomized Sorting permanently removes disliked tracks from that playlist.
 - **Resume without rebuilding context.** Restore the exact queue, track, position, filters, and screen after the app or process restarts.
 
 ## Planned MVP
@@ -41,21 +41,15 @@ The first usable release supports multiple named collections, each beneath one s
 
 - Create durable, manually ordered playlists.
 - Add one track, multiple selected tracks, or every indexed track beneath a folder through one reusable playlist selector.
-- Generate reproducible smart queues from the currently visible library scope:
-  - random eligible tracks;
-  - unplayed tracks;
-  - least- or most-played tracks;
-  - most-liked tracks;
-  - recent-listening modes.
-
-Generated queues are saved as explicit snapshots, so a re-index or rating change will not unexpectedly reshuffle what is already playing.
+- Apply Randomized Sorting to a playlist using Least Played, Most Played, Most Liked, or Recently Added. Equal-value tracks are shuffled, disliked memberships are removed, and the resulting order becomes the playlist's durable order.
+- If that playlist is currently loaded, replace its explicit playback snapshot at the new first playable track without affecting playback from another source.
 
 ## Product principles
 
 1. **Local first.** Source audio and personal listening data remain on the device.
 2. **Your files are the source.** Resn8 reads through Android's Storage Access Framework and does not modify source audio during normal indexing or playback.
 3. **Listening data should be trustworthy.** Ratings are atomic, plays have a clear qualification rule, and seeking cannot manufacture play counts.
-4. **Queues should be explainable.** Smart modes have deterministic eligibility and ordering rules, with seeded randomization for ties.
+4. **Randomization should be explainable.** Playlist modes have explicit metadata-group ordering rules with fresh randomization inside exact-value ties.
 5. **Accessibility is foundational.** Core actions remain visible and usable without relying on hidden gestures, color alone, or one screen orientation.
 
 ## Technical direction
@@ -116,7 +110,7 @@ Implementation is organized into dependency-ordered milestones:
 10. [ ] **Milestone 9**: multiple single-folder collections and folder-first audio
 11. [ ] **Milestone 10**: accessibility, adaptive-layout, acceptance, and release polish
 
-Post-MVP goals include smart randomized queues, multiple source roots within a collection, contextual-folder profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore. Settings is the home for collection management and later user-configurable capabilities.
+Post-MVP goals include multiple source roots within a collection, contextual-folder profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore. Settings is the home for collection management and later user-configurable capabilities.
 
 For the complete product decisions and acceptance criteria, see:
 

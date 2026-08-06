@@ -4,6 +4,8 @@ import com.app.resn8.domain.model.AddItemsResult
 import com.app.resn8.domain.model.MoveDirection
 import com.app.resn8.domain.model.Playlist
 import com.app.resn8.domain.model.PlaylistItem
+import com.app.resn8.domain.model.PlaylistRandomizationResult
+import com.app.resn8.domain.model.PlaylistRandomizedSortMethod
 import com.app.resn8.domain.model.PlaylistWithItemCount
 import com.app.resn8.domain.model.PlaylistWithMembership
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +25,9 @@ interface PlaylistRepository {
     suspend fun movePlaylistItem(playlistId: String, mediaId: String, direction: MoveDirection)
     suspend fun movePlaylistItemToPosition(playlistId: String, mediaId: String, targetIndex: Int)
     suspend fun compactPlaylistRanks(playlistId: String)
+    suspend fun applyRandomizedSorting(
+        playlistId: String,
+        method: PlaylistRandomizedSortMethod
+    ): Result<PlaylistRandomizationResult>
     fun getPlaylistsWithMembershipFlow(collectionId: String, mediaIds: List<String>): Flow<List<PlaylistWithMembership>>
 }
-

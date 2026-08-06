@@ -13,6 +13,9 @@ import com.app.resn8.domain.model.FolderNode
 import com.app.resn8.domain.model.MediaFile
 import com.app.resn8.domain.model.MoveDirection
 import com.app.resn8.domain.model.PlaylistMembershipState
+import com.app.resn8.domain.model.Playlist
+import com.app.resn8.domain.model.PlaylistItem
+import com.app.resn8.domain.model.PlaylistRandomizedSortMethod
 import com.app.resn8.domain.model.QueueStartRequest
 import com.app.resn8.domain.model.ScanResult
 import com.app.resn8.domain.usecase.StartQueueUseCase
@@ -20,11 +23,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.random.Random
 
 @RunWith(AndroidJUnit4::class)
 class PlaylistMilestone6Test {
@@ -193,6 +198,24 @@ class PlaylistMilestone6Test {
     }
 
     @Test
+    fun startingPausedPlaylistQueue_persistsPausedIntentAtTheFirstTrack() = runBlocking {
+        val playlist = playlistRepo.createPlaylist(colId, "Paused Refresh").getOrThrow()
+        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m2", "m1"))
+
+        val queue = startQueueUseCase(
+            QueueStartRequest.Playlist(
+                playlistId = playlist.id,
+                startingMediaId = "m2",
+                playWhenReady = false
+            )
+        ).getOrThrow()
+
+        assertEquals(0, queue.currentIndex)
+        assertEquals("m2", queue.currentMediaId)
+        assertFalse(queue.playWhenReadyIntent)
+    }
+
+    @Test
     fun folderDescendantsExpansion_resolvesNestedMediaIds() = runBlocking {
         val resolution = mediaRepo.resolveSelectionMediaIds(
             selectedFileIds = emptySet(),
@@ -218,6 +241,67 @@ class PlaylistMilestone6Test {
 
         val items = fakeRepo.getPlaylistItems(p1.id).map { it.mediaId }
         assertEquals(listOf("m3", "m1", "m2"), items)
+    }
+
+    @Test
+    fun randomizedSorting_atomicallyRemovesDislikedAndPersistsMetadataOrder() = runBlocking {
+        val playlist = playlistRepo.createPlaylist(colId, "Randomized").getOrThrow()
+        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m1", "m2", "m3"))
+        db.mediaFileDao().updateLikeScore("m1", 2)
+        db.mediaFileDao().updateLikeScore("m2", -1)
+        db.mediaFileDao().updateLikeScore("m3", 1)
+        db.mediaFileDao().updateAvailability("m3", false)
+
+        val result = playlistRepo.applyRandomizedSorting(
+            playlist.id,
+            PlaylistRandomizedSortMethod.MOST_LIKED
+        ).getOrThrow()
+
+        assertEquals(1, result.removedDislikedCount)
+        assertEquals(listOf("m1", "m3"), result.orderedMediaIds)
+        assertEquals(listOf("m1"), result.availableOrderedMediaIds)
+        assertEquals(listOf("m1", "m3"), playlistRepo.getPlaylistItems(playlist.id).map { it.mediaId })
+    }
+
+    @Test
+    fun fakeRandomizedSorting_matchesDestructiveRepositorySemantics() = runBlocking {
+        val playlist = Playlist("fake-playlist", colId, "Fake Randomized")
+        val media = listOf(
+            MediaFile(id = "liked", sourceId = "s", folderId = "f", documentUri = "uri://liked", relativePath = "liked.mp3", filename = "liked.mp3", displayTitle = "Liked", mimeType = "audio/mpeg", size = 1, modifiedTimeMs = 1, likeScore = 2),
+            MediaFile(id = "disliked", sourceId = "s", folderId = "f", documentUri = "uri://disliked", relativePath = "disliked.mp3", filename = "disliked.mp3", displayTitle = "Disliked", mimeType = "audio/mpeg", size = 1, modifiedTimeMs = 1, likeScore = -1),
+            MediaFile(id = "neutral", sourceId = "s", folderId = "f", documentUri = "uri://neutral", relativePath = "neutral.mp3", filename = "neutral.mp3", displayTitle = "Neutral", mimeType = "audio/mpeg", size = 1, modifiedTimeMs = 1)
+        )
+        val fakeRepo = FakePlaylistRepository(
+            initialPlaylists = listOf(playlist),
+            initialItems = media.mapIndexed { index, file -> PlaylistItem(playlist.id, file.id, (index + 1) * 1024L) },
+            initialMediaFiles = media,
+            randomFactory = { Random(4) }
+        )
+
+        val result = fakeRepo.applyRandomizedSorting(
+            playlist.id,
+            PlaylistRandomizedSortMethod.MOST_LIKED
+        ).getOrThrow()
+
+        assertEquals(1, result.removedDislikedCount)
+        assertEquals(listOf("liked", "neutral"), result.orderedMediaIds)
+        assertEquals(listOf("liked", "neutral"), fakeRepo.getPlaylistItems(playlist.id).map { it.mediaId })
+    }
+
+    @Test
+    fun randomizedSortingFailure_rollsBackDislikedRemovalAndOrder() = runBlocking {
+        val playlist = playlistRepo.createPlaylist(colId, "Rollback Randomized").getOrThrow()
+        playlistRepo.addItemsToPlaylist(playlist.id, listOf("m1", "m2", "m3"))
+        db.mediaFileDao().updateLikeScore("m2", -1)
+        val failingRepo = RoomPlaylistRepository(db, randomFactory = { error("random source failed") })
+
+        val result = failingRepo.applyRandomizedSorting(
+            playlist.id,
+            PlaylistRandomizedSortMethod.LEAST_PLAYED
+        )
+
+        assertTrue(result.isFailure)
+        assertEquals(listOf("m1", "m2", "m3"), playlistRepo.getPlaylistItems(playlist.id).map { it.mediaId })
     }
 
     @Test

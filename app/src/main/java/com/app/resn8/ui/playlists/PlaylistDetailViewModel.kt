@@ -7,6 +7,8 @@ import com.app.resn8.domain.model.MetadataScanStatus
 import com.app.resn8.domain.model.MoveDirection
 import com.app.resn8.domain.model.Playlist
 import com.app.resn8.domain.model.PlaylistItem
+import com.app.resn8.domain.model.PlaylistRandomizationResult
+import com.app.resn8.domain.model.PlaylistRandomizedSortMethod
 import com.app.resn8.domain.repository.MediaRepository
 import com.app.resn8.domain.repository.PlaylistRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,13 @@ data class PlaylistItemUiModel(
     val mediaFile: MediaFile
 )
 
+data class RandomizedSortingUiState(
+    val isApplying: Boolean = false,
+    val feedbackMessage: String? = null,
+    val feedbackId: Long = 0L,
+    val scrollRequestId: Long = 0L
+)
+
 class PlaylistDetailViewModel(
     val playlistId: String,
     private val playlistRepository: PlaylistRepository,
@@ -31,6 +40,9 @@ class PlaylistDetailViewModel(
     val playlist: StateFlow<Playlist?> = _playlist
 
     val searchQuery = MutableStateFlow("")
+
+    private val _randomizedSortingState = MutableStateFlow(RandomizedSortingUiState())
+    val randomizedSortingState: StateFlow<RandomizedSortingUiState> = _randomizedSortingState
 
     val itemsFlow = playlistRepository.getPlaylistItemsFlow(playlistId)
 
@@ -121,6 +133,45 @@ class PlaylistDetailViewModel(
             playlistRepository.movePlaylistItemToPosition(playlistId, mediaId, targetIndex)
     }
 
+    fun applyRandomizedSorting(
+        method: PlaylistRandomizedSortMethod,
+        onComplete: (Result<PlaylistRandomizationResult>) -> Unit
+    ) {
+        if (_randomizedSortingState.value.isApplying) return
+        _randomizedSortingState.value = _randomizedSortingState.value.copy(isApplying = true)
+        viewModelScope.launch {
+            val result = playlistRepository.applyRandomizedSorting(playlistId, method)
+            result.onSuccess { randomized ->
+                val methodName = method.displayName()
+                val removal = when (randomized.removedDislikedCount) {
+                    0 -> "No disliked tracks removed."
+                    1 -> "1 disliked track removed."
+                    else -> "${randomized.removedDislikedCount} disliked tracks removed."
+                }
+                val nextId = _randomizedSortingState.value.feedbackId + 1
+                _randomizedSortingState.value = RandomizedSortingUiState(
+                    feedbackMessage = "$methodName applied. $removal",
+                    feedbackId = nextId,
+                    scrollRequestId = _randomizedSortingState.value.scrollRequestId + 1
+                )
+            }.onFailure { error ->
+                _randomizedSortingState.value = _randomizedSortingState.value.copy(
+                    isApplying = false,
+                    feedbackMessage = error.message ?: "Randomized sorting could not be applied.",
+                    feedbackId = _randomizedSortingState.value.feedbackId + 1
+                )
+            }
+            onComplete(result)
+        }
+    }
+
+    fun reportPlaybackRefreshFailure() {
+        _randomizedSortingState.value = _randomizedSortingState.value.copy(
+            feedbackMessage = "Playlist reordered, but active playback could not be refreshed. Use Play All to load the new order.",
+            feedbackId = _randomizedSortingState.value.feedbackId + 1
+        )
+    }
+
     suspend fun renamePlaylist(newName: String): Result<Unit> {
         val result = playlistRepository.renamePlaylist(playlistId, newName)
         if (result.isSuccess) {
@@ -135,4 +186,11 @@ class PlaylistDetailViewModel(
             onDeleted()
         }
     }
+}
+
+fun PlaylistRandomizedSortMethod.displayName(): String = when (this) {
+    PlaylistRandomizedSortMethod.LEAST_PLAYED -> "Least Played"
+    PlaylistRandomizedSortMethod.MOST_PLAYED -> "Most Played"
+    PlaylistRandomizedSortMethod.MOST_LIKED -> "Most Liked"
+    PlaylistRandomizedSortMethod.RECENTLY_ADDED -> "Recently Added"
 }

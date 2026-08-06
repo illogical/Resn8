@@ -10,6 +10,7 @@ sealed interface QueueStartRequest {
 
     data class Playlist(
         val playlistId: String,
-        override val startingMediaId: String
+        override val startingMediaId: String,
+        val playWhenReady: Boolean = true
     ) : QueueStartRequest
 }
