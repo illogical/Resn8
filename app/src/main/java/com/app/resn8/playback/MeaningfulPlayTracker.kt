@@ -1,6 +1,7 @@
 package com.app.resn8.playback
 
 import androidx.media3.common.C
+import androidx.media3.common.Player
 import com.app.resn8.domain.model.PlaybackHistoryResult
 import java.util.UUID
 
@@ -16,6 +17,10 @@ class MeaningfulPlayTracker(
         result: PlaybackHistoryResult
     ) -> Unit
 ) {
+    companion object {
+        const val ONE_MINUTE_MS = 60_000L
+    }
+
     var currentOccurrenceId: String? = null
         private set
     var currentMediaId: String? = null
@@ -30,6 +35,8 @@ class MeaningfulPlayTracker(
     private var lastMonotonicTickMs: Long = 0L
     private var isPlaying: Boolean = false
     private var playbackState: Int = 1 // Player.STATE_IDLE
+    private var lastObservedPositionMs: Long = 0L
+    private var hasPlaybackAdvancedSinceEntryOrSeek: Boolean = false
     var hasCommitted: Boolean = false
         private set
 
@@ -39,7 +46,8 @@ class MeaningfulPlayTracker(
         durationMs: Long,
         accumulatedListenedMs: Long,
         occurrenceStartedAtEpochMs: Long,
-        hasCommitted: Boolean
+        hasCommitted: Boolean,
+        currentPositionMs: Long = 0L
     ) {
         this.currentOccurrenceId = occurrenceId
         this.currentMediaId = mediaId
@@ -48,10 +56,19 @@ class MeaningfulPlayTracker(
         this.occurrenceStartedAtEpochMs = occurrenceStartedAtEpochMs
         this.lastMonotonicTickMs = monotonicClock()
         this.hasCommitted = hasCommitted
+        this.lastObservedPositionMs = currentPositionMs
+        this.hasPlaybackAdvancedSinceEntryOrSeek = false
     }
 
-    fun onMediaItemTransition(mediaId: String?, durationMs: Long) {
-        checkNaturalCompletion()
+    fun onMediaItemTransition(
+        mediaId: String?,
+        durationMs: Long,
+        positionMs: Long = 0L,
+        previousItemCompleted: Boolean = false
+    ) {
+        if (previousItemCompleted) {
+            checkNaturalCompletion()
+        }
 
         if (mediaId == null) {
             resetState()
@@ -65,32 +82,61 @@ class MeaningfulPlayTracker(
         occurrenceStartedAtEpochMs = epochClock()
         lastMonotonicTickMs = monotonicClock()
         hasCommitted = false
+        lastObservedPositionMs = positionMs
+        hasPlaybackAdvancedSinceEntryOrSeek = false
     }
 
-    fun onPlaybackStateChanged(state: Int, durationMs: Long = currentDurationMs) {
-        onTick(durationMs)
+    fun onPlaybackStateChanged(
+        state: Int,
+        durationMs: Long = currentDurationMs,
+        positionMs: Long = lastObservedPositionMs
+    ) {
+        onTick(durationMs, positionMs)
         playbackState = state
-        if (state == 4) { // Player.STATE_ENDED == 4
+        if (state == Player.STATE_ENDED) {
             checkNaturalCompletion()
         }
     }
 
-    fun onIsPlayingChanged(playing: Boolean, durationMs: Long = currentDurationMs) {
-        onTick(durationMs)
+    fun onIsPlayingChanged(
+        playing: Boolean,
+        durationMs: Long = currentDurationMs,
+        positionMs: Long = lastObservedPositionMs
+    ) {
+        onTick(durationMs, positionMs)
         isPlaying = playing
         lastMonotonicTickMs = monotonicClock()
     }
 
-    fun onTick(durationMs: Long = currentDurationMs) {
+    fun onTick(
+        durationMs: Long = currentDurationMs,
+        positionMs: Long = lastObservedPositionMs
+    ) {
         val nowMonotonic = monotonicClock()
-        if (isPlaying && playbackState == 3) { // Player.STATE_READY == 3
+        if (isPlaying && playbackState == Player.STATE_READY) {
             val delta = (nowMonotonic - lastMonotonicTickMs).coerceAtLeast(0L)
             accumulatedListenedMs += delta
         }
+        observePosition(positionMs)
         lastMonotonicTickMs = nowMonotonic
         currentDurationMs = durationMs
 
         checkThresholdQualification()
+    }
+
+    fun onSeek(oldPositionMs: Long, newPositionMs: Long) {
+        onTick(currentDurationMs, oldPositionMs)
+        hasPlaybackAdvancedSinceEntryOrSeek = false
+        lastObservedPositionMs = newPositionMs
+        lastMonotonicTickMs = monotonicClock()
+    }
+
+    fun observePosition(positionMs: Long) {
+        if (positionMs == C.TIME_UNSET || positionMs < 0L) return
+        if (positionMs > lastObservedPositionMs) {
+            hasPlaybackAdvancedSinceEntryOrSeek = true
+        }
+        lastObservedPositionMs = positionMs
     }
 
     private fun checkThresholdQualification() {
@@ -98,13 +144,10 @@ class MeaningfulPlayTracker(
         val mediaId = currentMediaId ?: return
         if (hasCommitted) return
 
-        val thresholdMs = if (currentDurationMs > 0L && currentDurationMs != C.TIME_UNSET) {
-            minOf(currentDurationMs / 2, 240_000L)
-        } else {
-            240_000L
-        }
+        val hasKnownDuration = currentDurationMs > 0L && currentDurationMs != C.TIME_UNSET
+        if (hasKnownDuration && currentDurationMs < ONE_MINUTE_MS) return
 
-        if (accumulatedListenedMs >= thresholdMs) {
+        if (accumulatedListenedMs >= ONE_MINUTE_MS) {
             hasCommitted = true
             onQualifyMeaningfulPlay(
                 occurrenceId,
@@ -120,7 +163,7 @@ class MeaningfulPlayTracker(
     private fun checkNaturalCompletion() {
         val occurrenceId = currentOccurrenceId ?: return
         val mediaId = currentMediaId ?: return
-        if (hasCommitted || accumulatedListenedMs <= 0L) return
+        if (hasCommitted || !hasPlaybackAdvancedSinceEntryOrSeek) return
 
         hasCommitted = true
         onQualifyMeaningfulPlay(
@@ -134,12 +177,13 @@ class MeaningfulPlayTracker(
     }
 
     fun resetState() {
-        checkNaturalCompletion()
         currentOccurrenceId = null
         currentMediaId = null
         accumulatedListenedMs = 0L
         hasCommitted = false
         isPlaying = false
         playbackState = 1 // Player.STATE_IDLE
+        lastObservedPositionMs = 0L
+        hasPlaybackAdvancedSinceEntryOrSeek = false
     }
 }

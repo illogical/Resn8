@@ -161,11 +161,11 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 
 ### US4.2 — Trustworthy Play Count Accounting
 - **As a** user,
-- **I want** a play count to increment only when I actually listen to a track (e.g. `min(50% duration, 4 minutes)` or completion),
-- **So that** seeking past a track doesn't manufacture false play counts.
+- **I want** a play count to increment after one minute of cumulative active listening or genuine completion,
+- **So that** partial listening is recognized consistently without manual navigation manufacturing false play counts.
 - **Verification**:
-  1. Seek past 50% duration -> confirm play count does NOT increment instantly.
-  2. Seek backward, pause/resume, and cross the same threshold more than once -> confirm only actual accumulated listening counts and the traversal increments at most once.
+  1. On a track at least one minute long, listen for 59,999 ms and then 60,000 ms -> confirm only the latter qualifies. Repeat with an unknown-duration fixture.
+  2. Seek forward/backward and pause/resume -> confirm skipped and paused time adds nothing, previously accumulated active time remains, and the traversal increments at most once.
   3. Pause, force buffering or an audio-focus interruption, then resume -> confirm excluded time does not advance qualification.
   4. Background the app or lock the screen while audio plays -> confirm active listening continues to accumulate.
   5. Recreate the Activity/controller during playback -> confirm the current traversal continues rather than resetting or double-counting.
@@ -175,12 +175,13 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 - **I want** each real traversal to be counted independently while retries within one traversal remain idempotent,
 - **So that** duplicate tracks, repeats, and automatic transitions produce trustworthy history.
 - **Verification**:
-  1. Let a short track automatically advance to the next item and let the final queue item reach completion; confirm each qualifying completion is recorded once.
-  2. Seek directly to the end without positive active listening -> confirm natural completion does not count.
-  3. Exercise an unknown-duration fixture; confirm four active minutes or positive-listening natural completion qualifies.
+  1. Let a short track automatically advance, repeat an item through its end, and let the final queue item reach completion; confirm each qualifying completion is recorded once.
+  2. Start midway or seek near the end and allow playback to advance through completion -> confirm it counts. Seek directly to the exact endpoint without subsequent playback -> confirm it does not.
+  3. Exercise short, one-minute, longer, and unknown-duration fixtures; confirm short known tracks only time-qualify by completion while the others qualify after 60 active seconds or completion.
   4. Put the same media into two queue entries; confirm each entry has distinct queue-item identity and each traversal receives a distinct history occurrence.
   5. Return to or repeat a queue item; confirm a genuine new traversal may count again while repeated threshold/completion signals for one traversal do not.
-  6. Verify history/play-count results with a deterministic most/least-played fixture or Database Inspector when no direct play-count field is visible.
+  6. Use manual next/previous, a direct jump, queue replacement, stop, and a playback failure after partial listening -> confirm none is recorded as completion.
+  7. Verify history/play-count results with a deterministic most/least-played fixture or Database Inspector when no direct play-count field is visible.
 
 ---
 

@@ -68,7 +68,7 @@ Required model areas:
 Required behavioral contracts:
 
 - Signed score adjustment by `+1` and `-1`
-- Meaningful-play threshold calculation: `min(50% of known duration, 4 minutes)` with an unknown-duration policy
+- Meaningful-play qualification: 60 seconds of cumulative active listening for known one-minute-or-longer and unknown-duration tracks, with genuine completion qualifying any duration
 - Availability state for removable/revoked sources and media
 - Explicit queue order as the authoritative restored order
 - Injectable `Clock` and seeded random source abstractions
@@ -204,4 +204,3 @@ Milestone 0 foundation improvements are complete only when:
 ## Handoff Expectations
 
 The implementing assistant should preserve unrelated working-tree changes, update `milestone_0_foundation.md` or `TASKS.md` only when needed to keep completed work and verification status accurate, and provide a final list of changed files plus test/build evidence. Any necessary departure from these boundaries must be raised before implementation rather than silently expanding Milestone 0.
-

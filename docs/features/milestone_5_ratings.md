@@ -52,10 +52,11 @@ Before implementation, review the working tree and preserve unrelated staged/uns
 
 ### T029 — Meaningful-Play Qualification and Commit
 
-- For a known positive duration, use `min(durationMs / 2, 240_000L)`.
-- For an unknown/unset duration, qualify after 240,000 ms of accumulated active listening or natural completion.
-- Treat both an automatic item transition caused by natural completion and final-queue `STATE_ENDED` as completion signals.
-- Natural completion may qualify a short or partially heard item only when accumulated active listening is greater than zero; seeking directly to the end cannot count.
+- For a known duration of at least one minute, qualify after 60,000 ms of cumulative active listening. For a known duration shorter than one minute, do not time-qualify before completion.
+- For an unknown/unset duration, qualify after 60,000 ms of cumulative active listening or genuine completion.
+- Treat automatic and repeat item transitions caused by reaching the end, plus final-queue `STATE_ENDED`, as completion signals. Manual next/previous, direct jumps, queue replacement, stop, and failure are not completion signals.
+- Genuine completion qualifies any track after playback has advanced since occurrence entry or the most recent seek. Starting midway or seeking near the end and then playing through the end counts; seeking directly to the exact endpoint without subsequent playback does not.
+- "One minute" is cumulative active playback, not an uninterrupted streak. Pause, buffering, focus interruption, seeking, and process restoration preserve already accumulated active time while excluded downtime adds nothing.
 - On qualification, atomically persist the history result, increment `playCount` once, and set `lastPlayedAt`. Preserve distinct `THRESHOLD_COUNTED` and `NATURAL_COMPLETION_COUNTED` results.
 - Use the playback occurrence ID as `sessionOccurrenceId`. Room's unique constraint and transaction are the final defense against transition/threshold races or retry after UI/service concurrency.
 - Persisted `startedAt`, qualification/end, `countedAt`, and `lastPlayedAt` values are epoch milliseconds; `accumulatedListenedDurationMs` comes from monotonic elapsed time.
@@ -81,7 +82,7 @@ Before implementation, review the working tree and preserve unrelated staged/uns
 ### Automated tests
 
 - **Ratings:** normative `0 -> 1 -> 2 -> 1 -> 0 -> -1 -> -2`, invalid deltas, missing media, rapid/concurrent updates, authoritative UI propagation, and file-backed close/reopen.
-- **Tracker thresholds:** just below/at known thresholds, short files, unknown duration at four minutes, positive-listening natural completion, and zero-listening completion rejection.
+- **Tracker thresholds:** just below/at 60 seconds for known durations of at least one minute and unknown durations, short-file completion-only behavior, genuine completion after starting/seeking midway, and direct-to-end zero-play rejection.
 - **Time accounting:** pause/resume, buffering, focus interruption, forward/backward seeks, wall-clock jumps, and monotonic elapsed accumulation.
 - **Transitions and identity:** automatic completion before the next item is initialized, final `STATE_ENDED`, previous/next/direct jump, repeat/replay, duplicate media entries, new occurrence per traversal, and retry idempotency within one occurrence.
 - **Lifecycle:** background/screen-lock playback, Activity/controller recreation, connection after playback begins, service interruption before qualification, and threshold/transition commit races.
@@ -98,8 +99,8 @@ $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 ### Manual API 34+ verification
 
 - Repeatedly Like and Dislike the current track across zero; verify immediate Now Playing/mini-player state, library refresh, uninterrupted playback, unchanged queue order, and relaunch persistence.
-- Seek beyond the threshold and back without listening; verify no count. Accumulate listening across pause/resume and background playback; verify one count at the threshold.
-- Exercise automatic next-item completion, the final queue item, a short file, an unknown-duration fixture, duplicate media entries, direct jumps, repeat/replay, and UI recreation. Use a deterministic sort/filter fixture or Database Inspector when history/play count is not directly visible.
+- Seek without listening; verify no threshold count. Accumulate one minute of active listening across pause/resume and background playback; verify one count for a one-minute-or-longer or unknown-duration track.
+- Exercise automatic and repeat completion, the final queue item, a short file, an unknown-duration fixture, duplicate media entries, direct jumps, and UI recreation. Verify manual transitions do not count, playback from a midway/near-end seek through completion does count, and a direct seek to the exact endpoint without playback does not. Use a deterministic sort/filter fixture or Database Inspector when history/play count is not directly visible.
 
 ## Exit Criteria
 
@@ -108,6 +109,6 @@ Milestone 5 is complete only when:
 1. Like/Dislike mutations are atomic, durable, authoritative across UI surfaces, and correct under rapid/concurrent actions.
 2. The service-owned tracker uses monotonic active-listening time and cannot be advanced by seeks, pauses, buffering, interruption, or wall-clock changes.
 3. Stable queue entries and playback traversals use distinct identities; each occurrence counts at most once and genuine replay may count again.
-4. Known/unknown thresholds and automatic/final natural completion behave as specified during foreground and background playback and UI/controller recreation.
+4. The fixed one-minute threshold, short-track completion-only behavior, and automatic/repeat/final completion rules behave as specified during foreground and background playback and UI/controller recreation.
 5. History, `playCount`, and `lastPlayedAt` commit atomically with no destructive migration or active-queue mutation.
 6. Unit, lint, assemble, and required API 34+ manual/device checks pass and their results are recorded before T027-T030 or the README milestone are checked off.

@@ -87,18 +87,16 @@ For `FLAT` collections, valid embedded common metadata may remain in nullable sh
 
 ### 2.6 Meaningful Play Semantics
 
-`playCount` increments at most once for each playback traversal occurrence after accumulated active listening reaches:
-
-`min(50% of known duration, 4 minutes)`
+`playCount` increments at most once for each playback traversal occurrence. A track with a known duration of at least one minute, or an unknown duration, qualifies after 60 seconds of cumulative active listening. A known track shorter than one minute does not time-qualify and instead qualifies when playback genuinely reaches its end. Genuine end-of-track completion also qualifies longer and unknown-duration tracks.
 
 - `queueItemId` identifies a stable entry in a saved queue. `currentOccurrenceId`/history `sessionOccurrenceId` identifies one traversal of that entry and is the exactly-once key; it is never substituted with `queueItemId`.
 - Duplicate media in one queue has distinct queue-item IDs. Initial entry, next/previous, a direct jump, repeat, or replay/re-entry creates a fresh traversal occurrence ID. Pause/resume, seeking, buffering, and UI/controller recreation preserve the current occurrence.
 - The authoritative playback service observes active listening. Time advances only while audio is actually playing and is measured with a monotonic elapsed-time source; persisted history and last-played timestamps use epoch milliseconds. Paused, buffering, stopped/error, and audio-focus-interrupted time does not count.
-- Seeking beyond the threshold does not count skipped time; only accumulated listened time qualifies.
+- Seeking does not add skipped time to the one-minute threshold. "One minute" means cumulative active playback, not an uninterrupted streak: pause, buffering, audio-focus interruption, seeking, and process restoration preserve already accumulated active time while excluded downtime adds nothing.
 - Pause/resume and seeking within the same occurrence do not create another play.
 - Replaying through a new traversal occurrence can create another play.
-- When duration is unknown, four minutes or natural completion qualifies. Both an automatic transition after an item completes and final-queue `STATE_ENDED` are natural-completion signals. Natural completion qualifies a shorter or partially heard file only when accumulated active listening is greater than zero, so seeking directly to the end cannot count.
-- Finalize/qualify the prior occurrence before initializing the next one on a transition. Interrupted or failed playback cannot manufacture a count, and repeated commit attempts for one occurrence are idempotent.
+- Both automatic/repeat transitions after an item reaches its end and final-queue `STATE_ENDED` are completion signals. Starting midway or seeking near the end and then allowing playback to advance through the end qualifies; seeking directly to the exact endpoint without subsequent playback does not.
+- Finalize/qualify the prior occurrence before initializing the next one on a transition. Manual next/previous, direct jumps, queue replacement, stop, interrupted/failed playback, and repeated commit attempts cannot manufacture a count; retries for one occurrence are idempotent.
 - On qualification, `playCount`, `lastPlayedAt`, and the history record are committed atomically. Position and process-death restoration state are checkpointed separately and more frequently in Milestone 7.
 
 ### 2.7 Filters, Sorts, and Playlist Randomized Sorting
@@ -212,7 +210,7 @@ The MVP is complete when all of the following are demonstrated on an API 34+ dev
 - Artist, album, folder, and all-track browsing return correct filtered results for a representative library.
 - Audio plays through Media3 in foreground/background, responds to notification and hardware controls, handles audio focus/headphone removal, and has only one active player.
 - Like/Dislike updates are durable and atomic. Scores can cross zero in either direction.
-- A play increments exactly once per playback traversal occurrence at the meaningful-listen threshold, cannot be earned by seeking, pause/buffer/interruption time, or wall-clock changes, and remains correct during background playback and UI/controller recreation. Automatic and final-item natural completion use the same occurrence-correct atomic commit.
+- A play increments exactly once per playback traversal occurrence after 60 seconds of cumulative active listening for one-minute-or-longer/unknown-duration tracks or after genuine end-of-track completion. Seeking and excluded downtime do not add threshold time; manual transitions and a zero-play seek to the endpoint do not count. Automatic, repeat, and final-item completion use the same occurrence-correct atomic commit during background playback and UI/controller recreation.
 - Manual playlists enforce unique membership, preserve user order, support single/bulk/folder addition, remain collection-scoped, and survive restart.
 - Randomized Sorting atomically removes disliked playlist memberships and durably rewrites the remaining order for all four metadata methods; matching active playback resets safely while unrelated playback is unchanged.
 - Folder and album Select All resolve the complete available-only database set rather than only loaded pages; folder Select All excludes subfolders and their descendants.

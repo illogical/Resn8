@@ -47,7 +47,7 @@ class MeaningfulPlayTrackerTest {
         fakeMonotonicTimeMs += 30_000L
         tracker.onTick(120_000L)
 
-        // Now total active time is 30,000ms (50% of 120,000ms is 60,000ms)
+        // Now total active time is 30,000ms of the fixed 60,000ms threshold.
         assertTrue(qualifiedEvents.isEmpty())
 
         // Advance another 30,000ms -> total 60,000ms -> qualifies at threshold
@@ -62,17 +62,16 @@ class MeaningfulPlayTrackerTest {
     }
 
     @Test
-    fun `threshold is capped at 4 minutes for long tracks`() {
-        // 10 minute track (600,000ms). 50% is 5 minutes, but threshold cap is 4 minutes (240,000ms)
+    fun `long tracks qualify at one minute`() {
         tracker.onMediaItemTransition("long_track", durationMs = 600_000L)
         tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 600_000L)
         tracker.onIsPlayingChanged(playing = true, durationMs = 600_000L)
 
-        fakeMonotonicTimeMs += 239_000L
+        fakeMonotonicTimeMs += 59_999L
         tracker.onTick(600_000L)
         assertTrue(qualifiedEvents.isEmpty())
 
-        fakeMonotonicTimeMs += 2_000L
+        fakeMonotonicTimeMs += 1L
         tracker.onTick(600_000L)
 
         assertEquals(1, qualifiedEvents.size)
@@ -80,31 +79,151 @@ class MeaningfulPlayTrackerTest {
     }
 
     @Test
-    fun `unknown duration qualifies at 4 minutes or natural completion`() {
+    fun `exactly one minute track uses the one minute threshold`() {
+        tracker.onMediaItemTransition("one_minute_track", durationMs = 60_000L)
+        tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 60_000L)
+        tracker.onIsPlayingChanged(playing = true, durationMs = 60_000L)
+
+        fakeMonotonicTimeMs += 60_000L
+        tracker.onTick(durationMs = 60_000L, positionMs = 59_999L)
+
+        assertEquals(1, qualifiedEvents.size)
+        assertEquals(PlaybackHistoryResult.THRESHOLD_COUNTED, qualifiedEvents.first().result)
+    }
+
+    @Test
+    fun `unknown duration qualifies at one minute`() {
         tracker.onMediaItemTransition("stream_track", durationMs = 0L)
         tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 0L)
         tracker.onIsPlayingChanged(playing = true, durationMs = 0L)
 
-        fakeMonotonicTimeMs += 15_000L
+        fakeMonotonicTimeMs += 59_999L
         tracker.onTick(0L)
         assertTrue(qualifiedEvents.isEmpty())
 
-        // Natural completion before 4 minutes
-        tracker.onPlaybackStateChanged(Player.STATE_ENDED, durationMs = 0L)
+        fakeMonotonicTimeMs += 1L
+        tracker.onTick(0L)
 
         assertEquals(1, qualifiedEvents.size)
         val event = qualifiedEvents.first()
-        assertEquals(PlaybackHistoryResult.NATURAL_COMPLETION_COUNTED, event.result)
-        assertEquals(15_000L, event.accumulatedMs)
+        assertEquals(PlaybackHistoryResult.THRESHOLD_COUNTED, event.result)
+        assertEquals(60_000L, event.accumulatedMs)
     }
 
     @Test
-    fun `zero listening duration on natural completion does not qualify`() {
+    fun `short track qualifies only when playback reaches the end`() {
         tracker.onMediaItemTransition("short_track", durationMs = 10_000L)
-        // Never played, seeked directly to end
-        tracker.onPlaybackStateChanged(Player.STATE_ENDED, durationMs = 10_000L)
+        tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 10_000L)
+        tracker.onIsPlayingChanged(playing = true, durationMs = 10_000L)
+
+        fakeMonotonicTimeMs += 10_000L
+        tracker.onPlaybackStateChanged(
+            Player.STATE_ENDED,
+            durationMs = 10_000L,
+            positionMs = 10_000L
+        )
+
+        assertEquals(1, qualifiedEvents.size)
+        assertEquals(PlaybackHistoryResult.NATURAL_COMPLETION_COUNTED, qualifiedEvents.first().result)
+    }
+
+    @Test
+    fun `short track cannot time qualify even after one minute of cumulative listening`() {
+        tracker.onMediaItemTransition("short_track", durationMs = 10_000L)
+        tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 10_000L)
+        tracker.onIsPlayingChanged(playing = true, durationMs = 10_000L)
+
+        fakeMonotonicTimeMs += 60_000L
+        tracker.onTick(durationMs = 10_000L, positionMs = 9_000L)
 
         assertTrue(qualifiedEvents.isEmpty())
+    }
+
+    @Test
+    fun `seek directly to exact endpoint without playback does not qualify`() {
+        tracker.onMediaItemTransition("track", durationMs = 120_000L)
+        tracker.onSeek(oldPositionMs = 0L, newPositionMs = 120_000L)
+        tracker.onPlaybackStateChanged(
+            Player.STATE_ENDED,
+            durationMs = 120_000L,
+            positionMs = 120_000L
+        )
+
+        assertTrue(qualifiedEvents.isEmpty())
+    }
+
+    @Test
+    fun `seeking near the end and playing through completion qualifies`() {
+        tracker.onMediaItemTransition("track", durationMs = 120_000L)
+        tracker.onSeek(oldPositionMs = 0L, newPositionMs = 119_000L)
+        tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 120_000L, positionMs = 119_000L)
+        tracker.onIsPlayingChanged(playing = true, durationMs = 120_000L, positionMs = 119_000L)
+
+        fakeMonotonicTimeMs += 1_000L
+        tracker.onPlaybackStateChanged(
+            Player.STATE_ENDED,
+            durationMs = 120_000L,
+            positionMs = 120_000L
+        )
+
+        assertEquals(1, qualifiedEvents.size)
+        assertEquals(PlaybackHistoryResult.NATURAL_COMPLETION_COUNTED, qualifiedEvents.first().result)
+    }
+
+    @Test
+    fun `manual transition after partial playback does not qualify previous item`() {
+        tracker.onMediaItemTransition("track_1", durationMs = 120_000L)
+        tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 120_000L)
+        tracker.onIsPlayingChanged(playing = true, durationMs = 120_000L)
+        fakeMonotonicTimeMs += 10_000L
+        tracker.onTick(durationMs = 120_000L, positionMs = 10_000L)
+
+        tracker.onMediaItemTransition(
+            mediaId = "track_2",
+            durationMs = 120_000L,
+            previousItemCompleted = false
+        )
+
+        assertTrue(qualifiedEvents.isEmpty())
+    }
+
+    @Test
+    fun `pause and seek preserve accumulated active listening without adding downtime`() {
+        tracker.onMediaItemTransition("track", durationMs = 120_000L)
+        tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 120_000L)
+        tracker.onIsPlayingChanged(playing = true, durationMs = 120_000L)
+        fakeMonotonicTimeMs += 30_000L
+        tracker.onTick(durationMs = 120_000L, positionMs = 30_000L)
+
+        tracker.onIsPlayingChanged(playing = false, durationMs = 120_000L, positionMs = 30_000L)
+        fakeMonotonicTimeMs += 20_000L
+        tracker.onTick(durationMs = 120_000L, positionMs = 30_000L)
+        tracker.onSeek(oldPositionMs = 30_000L, newPositionMs = 60_000L)
+
+        tracker.onIsPlayingChanged(playing = true, durationMs = 120_000L, positionMs = 60_000L)
+        fakeMonotonicTimeMs += 30_000L
+        tracker.onTick(durationMs = 120_000L, positionMs = 90_000L)
+
+        assertEquals(1, qualifiedEvents.size)
+        assertEquals(60_000L, qualifiedEvents.first().accumulatedMs)
+    }
+
+    @Test
+    fun `automatic or repeat transition qualifies a genuinely completed item once`() {
+        tracker.onMediaItemTransition("track_1", durationMs = 120_000L)
+        tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 120_000L)
+        tracker.onIsPlayingChanged(playing = true, durationMs = 120_000L)
+        fakeMonotonicTimeMs += 10_000L
+        tracker.onTick(durationMs = 120_000L, positionMs = 120_000L)
+
+        tracker.onMediaItemTransition(
+            mediaId = "track_2",
+            durationMs = 120_000L,
+            previousItemCompleted = true
+        )
+
+        assertEquals(1, qualifiedEvents.size)
+        assertEquals(PlaybackHistoryResult.NATURAL_COMPLETION_COUNTED, qualifiedEvents.first().result)
     }
 
     @Test
@@ -128,7 +247,7 @@ class MeaningfulPlayTrackerTest {
 
     @Test
     fun `hydrate restores in-progress occurrence state without double-counting downtime`() {
-        // Hydrate with 40,000ms accumulated out of 100,000ms threshold (50,000ms threshold)
+        // Hydrate with 40,000ms accumulated toward the fixed 60,000ms threshold.
         tracker.hydrate(
             occurrenceId = "occ_hydrated",
             mediaId = "track_hydrated",
@@ -148,16 +267,16 @@ class MeaningfulPlayTrackerTest {
         assertEquals(40_000L, tracker.accumulatedListenedMs)
         assertTrue(qualifiedEvents.isEmpty())
 
-        // Start playing and advance 10,000ms active listening -> total 50,000ms -> qualifies!
+        // Start playing and advance 20,000ms active listening -> total 60,000ms -> qualifies.
         tracker.onPlaybackStateChanged(Player.STATE_READY, durationMs = 100_000L)
         tracker.onIsPlayingChanged(playing = true, durationMs = 100_000L)
-        fakeMonotonicTimeMs += 10_000L
+        fakeMonotonicTimeMs += 20_000L
         tracker.onTick(100_000L)
 
         assertEquals(1, qualifiedEvents.size)
         val event = qualifiedEvents.first()
         assertEquals("occ_hydrated", event.sessionOccurrenceId)
         assertEquals("track_hydrated", event.mediaId)
-        assertEquals(50_000L, event.accumulatedMs)
+        assertEquals(60_000L, event.accumulatedMs)
     }
 }

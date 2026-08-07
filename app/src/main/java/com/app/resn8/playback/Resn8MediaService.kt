@@ -105,17 +105,23 @@ class Resn8MediaService : MediaSessionService() {
         val playerListener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val mediaId = mediaItem?.requestMetadata?.extras?.getString(RESN8_MEDIA_FILE_ID) ?: mediaItem?.mediaId
-                playTracker.onMediaItemTransition(mediaId, exoPlayer.duration)
+                playTracker.onMediaItemTransition(
+                    mediaId = mediaId,
+                    durationMs = exoPlayer.duration,
+                    positionMs = exoPlayer.currentPosition,
+                    previousItemCompleted = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+                        reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
+                )
                 checkpointCoordinator?.triggerCheckpoint(exoPlayer, playTracker, activeQueueId)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                playTracker.onPlaybackStateChanged(playbackState, exoPlayer.duration)
+                playTracker.onPlaybackStateChanged(playbackState, exoPlayer.duration, exoPlayer.currentPosition)
                 checkpointCoordinator?.triggerCheckpoint(exoPlayer, playTracker, activeQueueId)
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                playTracker.onIsPlayingChanged(isPlaying, exoPlayer.duration)
+                playTracker.onIsPlayingChanged(isPlaying, exoPlayer.duration, exoPlayer.currentPosition)
                 if (isPlaying) {
                     startTicker(playTracker, exoPlayer)
                     checkpointCoordinator?.startPeriodicCheckpoints(exoPlayer, playTracker, activeQueueId)
@@ -123,6 +129,21 @@ class Resn8MediaService : MediaSessionService() {
                     stopTicker()
                     checkpointCoordinator?.stopPeriodicCheckpoints()
                     checkpointCoordinator?.triggerCheckpoint(exoPlayer, playTracker, activeQueueId)
+                }
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                when (reason) {
+                    Player.DISCONTINUITY_REASON_SEEK -> playTracker.onSeek(
+                        oldPositionMs = oldPosition.positionMs,
+                        newPositionMs = newPosition.positionMs
+                    )
+                    Player.DISCONTINUITY_REASON_AUTO_TRANSITION ->
+                        playTracker.observePosition(oldPosition.positionMs)
                 }
             }
 
@@ -245,7 +266,8 @@ class Resn8MediaService : MediaSessionService() {
                     durationMs = load.startMediaFile?.durationMs ?: 0L,
                     accumulatedListenedMs = existingHistory?.accumulatedListenedDurationMs ?: 0L,
                     occurrenceStartedAtEpochMs = existingHistory?.startedAt ?: System.currentTimeMillis(),
-                    hasCommitted = existingHistory?.countedAt != null
+                    hasCommitted = existingHistory?.countedAt != null,
+                    currentPositionMs = load.startPositionMs
                 )
             }
 
@@ -258,7 +280,7 @@ class Resn8MediaService : MediaSessionService() {
         stopTicker()
         tickerJob = serviceScope.launch {
             while (isActive) {
-                tracker.onTick(exoPlayer.duration)
+                tracker.onTick(exoPlayer.duration, exoPlayer.currentPosition)
                 delay(500L)
             }
         }

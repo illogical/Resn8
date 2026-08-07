@@ -33,7 +33,7 @@ The first usable release supports multiple named collections, each beneath one s
 ### Listen and remember
 
 - Play in the foreground or background with notification, lock-screen, headset, and Bluetooth controls.
-- Track meaningful plays based on active listening—not seek position alone.
+- Track meaningful plays after one minute of cumulative active listening or genuine end-of-track completion.
 - Rate tracks with an incrementing/decrementing score instead of a single binary favorite.
 - Restore the active queue and listening position in a safe, paused state on normal relaunch.
 
@@ -48,7 +48,7 @@ The first usable release supports multiple named collections, each beneath one s
 
 1. **Local first.** Source audio and personal listening data remain on the device.
 2. **Your files are the source.** Resn8 reads through Android's Storage Access Framework and does not modify source audio during normal indexing or playback.
-3. **Listening data should be trustworthy.** Ratings are atomic, plays have a clear qualification rule, and seeking cannot manufacture play counts.
+3. **Listening data should be trustworthy.** Ratings are atomic, plays have a clear qualification rule, and seeking alone cannot manufacture play counts while playback that genuinely reaches the end is recognized.
 4. **Randomization should be explainable.** Playlist modes have explicit metadata-group ordering rules with fresh randomization inside exact-value ties.
 5. **Accessibility is foundational.** Core actions remain visible and usable without relying on hidden gestures, color alone, or one screen orientation.
 
