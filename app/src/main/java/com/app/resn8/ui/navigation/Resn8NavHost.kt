@@ -51,6 +51,8 @@ import com.app.resn8.ui.screens.PlaylistsScreen
 import com.app.resn8.ui.screens.QueueScreen
 import com.app.resn8.ui.screens.onboarding.OnboardingViewModel
 import com.app.resn8.ui.screens.settings.AboutSettingsScreen
+import com.app.resn8.ui.screens.settings.BackupRestoreScreen
+import com.app.resn8.ui.screens.settings.BackupRestoreViewModel
 import com.app.resn8.ui.screens.settings.CollectionDetailScreen
 import com.app.resn8.ui.screens.settings.CollectionDeletionResult
 import com.app.resn8.ui.screens.settings.CollectionsScreen
@@ -470,7 +472,19 @@ fun Resn8NavHost(
             composable<SettingsRoute> {
                 SettingsScreen(
                     onCollectionsClick = { navController.navigate(SettingsCollectionsRoute) },
+                    onBackupRestoreClick = { navController.navigate(SettingsBackupRestoreRoute) },
                     onAboutClick = { navController.navigate(SettingsAboutRoute) }
+                )
+            }
+
+            composable<SettingsBackupRestoreRoute> {
+                val context = LocalContext.current
+                val backupViewModel: BackupRestoreViewModel = viewModel(
+                    factory = BackupRestoreViewModel.Factory(context.applicationContext, container)
+                )
+                BackupRestoreScreen(
+                    viewModel = backupViewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
 

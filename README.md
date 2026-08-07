@@ -29,6 +29,7 @@ The first usable release supports multiple named collections, each beneath one s
 - Switch between Music and folder-first Audio Files collections without mixing their playlists or indexed media.
 - Re-index safely while preserving ratings, play counts, history, and playlist membership.
 - Keep missing or temporarily unavailable files represented instead of silently discarding their data.
+- Export selected collections to integrity-checked JSON and selectively restore their metadata before reconnecting source folders.
 
 ### Listen and remember
 
@@ -110,7 +111,7 @@ Implementation is organized into dependency-ordered milestones:
 10. [ ] **Milestone 9**: multiple single-folder collections and folder-first audio
 11. [ ] **Milestone 10**: accessibility, adaptive-layout, acceptance, and release polish
 
-Post-MVP goals include multiple source roots within a collection, contextual-folder profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, safe disliked-file maintenance, and metadata/history backup and restore. Settings is the home for collection management and later user-configurable capabilities.
+Post-MVP goals include multiple source roots within a collection, contextual-folder profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, and safe disliked-file maintenance. Settings is the home for collection management, metadata backup and restore, and later user-configurable capabilities.
 
 For the complete product decisions and acceptance criteria, see:
 

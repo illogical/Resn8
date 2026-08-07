@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -65,6 +66,7 @@ import com.app.resn8.domain.model.CollectionSummary
 @Composable
 fun SettingsScreen(
     onCollectionsClick: () -> Unit,
+    onBackupRestoreClick: () -> Unit,
     onAboutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -75,6 +77,7 @@ fun SettingsScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
             SettingsMenuRow(Icons.Default.Storage, "Collections", "Manage folders and indexing", onCollectionsClick)
+            SettingsMenuRow(Icons.Default.Save, "Backup & Restore", "Export or restore listening metadata", onBackupRestoreClick)
             SettingsMenuRow(Icons.Default.Info, "About", "About Resn8 and local-first privacy", onAboutClick)
         }
     }

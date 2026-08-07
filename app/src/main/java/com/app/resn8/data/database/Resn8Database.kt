@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.app.resn8.data.database.dao.CollectionDao
+import com.app.resn8.data.database.dao.BackupDao
 import com.app.resn8.data.database.dao.FolderDao
 import com.app.resn8.data.database.dao.MediaFileDao
 import com.app.resn8.data.database.dao.PlaybackHistoryDao
@@ -53,6 +54,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 )
 @TypeConverters(Converters::class)
 abstract class Resn8Database : RoomDatabase() {
+    abstract fun backupDao(): BackupDao
     abstract fun collectionDao(): CollectionDao
     abstract fun folderDao(): FolderDao
     abstract fun scanDao(): ScanDao

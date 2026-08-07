@@ -43,6 +43,9 @@ object SettingsRoute
 object SettingsCollectionsRoute
 
 @Serializable
+object SettingsBackupRestoreRoute
+
+@Serializable
 data class CollectionDetailRoute(val collectionId: String? = null)
 
 @Serializable

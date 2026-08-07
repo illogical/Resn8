@@ -425,3 +425,25 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 - Confirm a disliked current track skips immediately, an all-disliked/no-playable result stops and clears this playlist's queue, and playback from another playlist or Library/Folder source remains untouched.
 - Confirm the list refreshes and scrolls to the top, Play All and track taps use the persisted new order, and relaunch restoration observes the replacement explicit queue.
 - Saving a generated queue as a playlist creates unique manual membership in visible order rather than a dynamic rule.
+
+---
+
+## Backup & Restore
+
+### BR1 — Export Selected Collection Metadata
+- Open Settings → Backup & Restore and confirm every current collection is selected by default.
+- Use the all/none icon in both states and confirm its TalkBack description announces the action that will occur.
+- Select a subset, save the suggested dated JSON file through the system document picker, and confirm the completion summary reports the exported collections, tracks, playlists, and history records.
+- Confirm the JSON contains no source audio, artwork binaries, or portable SAF permission grant and that canceling the picker changes no app data.
+
+### BR2 — Validate and Select an Import
+- Choose malformed JSON, a non-Resn8 JSON file, a checksum-modified backup, and a newer unsupported format; confirm each is rejected before collection selection with a specific, recoverable explanation.
+- Choose a valid backup and confirm no collection is selected initially. Exercise the all/none icon and individual checkboxes, including large-font and TalkBack navigation.
+- Confirm each row summarizes profile, tracks, playlists, and history. For an ID or normalized-name conflict, confirm the local collection defaults to safe **Skip** behavior and **Replace existing collection** is explicit.
+- Review the final summary, cancel once, then confirm import. Verify source audio remains unchanged and a failure rolls back every database change.
+
+### BR3 — Restore and Reconnect Source Folders
+- Import a full backup into a clean app database and verify collection names/profiles, indexed metadata, ratings, play counts, last-played values, history, playlists/order, saved queues, queue-item identities, and applicable session state are restored.
+- Confirm restored files remain unavailable until current folder access is verified. Use each **Select folder** action, grant the original library folder, and allow re-indexing to finish.
+- Verify conservatively matched files become playable without losing restored metadata. Keep some source files absent or ambiguous and confirm they remain unavailable in playlists/history/queues and are reported rather than deleted.
+- Repeat with only a subset of collections and confirm unrelated local collections and global session state remain unchanged.

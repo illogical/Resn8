@@ -2,6 +2,8 @@ package com.app.resn8.di
 
 import android.content.Context
 import com.app.resn8.data.database.Resn8Database
+import com.app.resn8.data.backup.BackupRepository
+import com.app.resn8.data.backup.RoomBackupRepository
 import com.app.resn8.data.repository.FakeCollectionRepository
 import com.app.resn8.data.repository.FakeMediaRepository
 import com.app.resn8.data.repository.FakePlaylistRepository
@@ -19,6 +21,7 @@ import com.app.resn8.domain.repository.UiSessionRepository
 
 interface AppContainer {
     val database: Resn8Database?
+    val backupRepository: BackupRepository?
     val mediaRepository: MediaRepository
     val collectionRepository: CollectionRepository
     val playlistRepository: PlaylistRepository
@@ -31,6 +34,9 @@ interface AppContainer {
 class DefaultAppContainer(private val context: Context) : AppContainer {
     override val database: Resn8Database by lazy {
         Resn8Database.buildDatabase(context)
+    }
+    override val backupRepository: BackupRepository by lazy {
+        RoomBackupRepository(context, database)
     }
 
     override val mediaRepository: MediaRepository by lazy {
@@ -67,6 +73,7 @@ class TestAppContainer(
     override val playlistRepository: PlaylistRepository = FakePlaylistRepository(),
     override val queueRepository: QueueRepository = FakeQueueRepository(),
     override val database: Resn8Database? = null,
+    override val backupRepository: BackupRepository? = null,
     override val playbackConnection: com.app.resn8.playback.PlaybackConnection? = null
 ) : AppContainer {
     override val uiSessionRepository: UiSessionRepository by lazy {
