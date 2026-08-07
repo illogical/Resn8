@@ -18,6 +18,8 @@ import com.app.resn8.domain.model.PlaylistRandomizationResult
 import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.domain.model.RepeatMode
 import com.app.resn8.domain.usecase.StartQueueUseCase
+import com.app.resn8.domain.model.resolvePlaybackOrigin
+import com.app.resn8.storage.artwork.ArtworkCache
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.CoroutineScope
@@ -59,6 +61,9 @@ class PlaybackConnection(
     private var controller: MediaController? = null
     private var pollingJob: Job? = null
     private var activeQueueJob: Job? = null
+    private var artworkJob: Job? = null
+    private var artworkMediaId: String? = null
+    private val artworkCache = ArtworkCache(context)
 
     private val attemptedFailedItems = mutableSetOf<String>()
     private var activeQueue: SavedQueue? = null
@@ -184,9 +189,12 @@ class PlaybackConnection(
                     queueItems = emptyList(),
                     queueTitle = null,
                     sourcePlaylistId = null,
+                    queueOrigin = null,
                     isFlatCollection = false
                 )
             }
+            artworkJob?.cancel()
+            artworkMediaId = null
             return
         }
 
@@ -210,6 +218,7 @@ class PlaybackConnection(
 
             val filter = queue.filterSnapshot
             val sourcePlaylistId = filter?.playlistId
+            val queueOrigin = filter?.resolvePlaybackOrigin()
             val queueTitle = when {
                 filter?.playlistName != null -> "Playlist: ${filter.playlistName}"
                 filter?.album != null -> "Album: ${filter.album}"
@@ -224,6 +233,7 @@ class PlaybackConnection(
                     queueItems = itemStates,
                     queueTitle = queueTitle,
                     sourcePlaylistId = sourcePlaylistId,
+                    queueOrigin = queueOrigin,
                     isFlatCollection = isFlat
                 )
             }
@@ -257,7 +267,15 @@ class PlaybackConnection(
 
         scope.launch {
             val mediaFile = if (currentMediaFileId != null) container.mediaRepository.getMediaFileById(currentMediaFileId) else null
+            if (controller?.currentMediaItem?.mediaId != currentQueueItemId) return@launch
             val likeScore = mediaFile?.likeScore ?: 0
+            val displayedArtworkUri = if (
+                _uiState.value.currentMediaId == currentMediaFileId && artworkMediaId == currentMediaFileId
+            ) {
+                _uiState.value.artworkUri ?: artworkUri
+            } else {
+                artworkUri
+            }
 
             _uiState.update {
                 it.copy(
@@ -267,7 +285,7 @@ class PlaybackConnection(
                     title = title,
                     artist = artist,
                     album = album,
-                    artworkUri = artworkUri,
+                    artworkUri = displayedArtworkUri,
                     likeScore = likeScore,
                     positionMs = pos,
                     durationMs = if (isUnknownDuration) 0L else dur,
@@ -280,6 +298,16 @@ class PlaybackConnection(
                     canSkipNext = ctrl.hasNextMediaItem(),
                     queueItems = updatedQueueItems
                 )
+            }
+            if (mediaFile != null && artworkMediaId != mediaFile.id) {
+                artworkJob?.cancel()
+                artworkMediaId = mediaFile.id
+                artworkJob = scope.launch {
+                    val resolvedArtwork = artworkCache.resolveEmbedded(mediaFile) ?: artworkUri
+                    if (_uiState.value.currentMediaId == mediaFile.id && artworkMediaId == mediaFile.id) {
+                        _uiState.update { it.copy(artworkUri = resolvedArtwork) }
+                    }
+                }
             }
         }
     }
@@ -358,6 +386,19 @@ class PlaybackConnection(
         if (ctrl.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) {
             ctrl.seekTo(positionMs)
         }
+    }
+
+    fun seekBy(deltaMs: Long) {
+        val ctrl = controller ?: return
+        if (!ctrl.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) return
+        val unboundedTarget = (ctrl.currentPosition.coerceAtLeast(0L) + deltaMs).coerceAtLeast(0L)
+        val duration = ctrl.duration
+        val target = if (duration != C.TIME_UNSET && duration > 0L) {
+            unboundedTarget.coerceAtMost(duration)
+        } else {
+            unboundedTarget
+        }
+        ctrl.seekTo(target)
     }
 
     fun skipToPrevious() {
@@ -559,6 +600,7 @@ class PlaybackConnection(
     fun release() {
         stopPollingPosition()
         activeQueueJob?.cancel()
+        artworkJob?.cancel()
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controller = null

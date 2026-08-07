@@ -2,6 +2,32 @@ package com.app.resn8.domain.model
 
 import kotlinx.serialization.Serializable
 
+@Serializable
+sealed interface PlaybackOrigin {
+    @Serializable
+    data class Playlist(val playlistId: String, val playlistName: String) : PlaybackOrigin
+
+    @Serializable
+    data class Album(
+        val albumKeySerialized: String,
+        val albumArtistKeySerialized: String?,
+        val albumName: String
+    ) : PlaybackOrigin
+
+    @Serializable
+    data class Artist(val artistKeySerialized: String, val artistName: String) : PlaybackOrigin
+
+    @Serializable
+    data class Folder(
+        val sourceId: String?,
+        val folderId: String,
+        val folderName: String
+    ) : PlaybackOrigin
+
+    @Serializable
+    data object AllTracks : PlaybackOrigin
+}
+
 enum class SavedQueueKind {
     EXPLICIT,
     GENERATED
@@ -20,14 +46,31 @@ enum class SmartQueueMode {
 @Serializable
 data class QueueFilterSnapshot(
     val collectionId: String? = null,
+    val sourceId: String? = null,
     val folderId: String? = null,
+    val folderName: String? = null,
     val artist: String? = null,
     val album: String? = null,
+    val albumArtist: String? = null,
     val searchQuery: String? = null,
     val excludeDisliked: Boolean = true,
     val playlistId: String? = null,
-    val playlistName: String? = null
+    val playlistName: String? = null,
+    val origin: PlaybackOrigin? = null
 )
+
+fun QueueFilterSnapshot.resolvePlaybackOrigin(): PlaybackOrigin? = origin ?: when {
+    playlistId != null && playlistName != null -> PlaybackOrigin.Playlist(playlistId, playlistName)
+    album != null -> PlaybackOrigin.Album(
+        albumKeySerialized = MetadataGroupKey.Known(album).serialize(),
+        albumArtistKeySerialized = albumArtist?.let { MetadataGroupKey.Known(it).serialize() },
+        albumName = album
+    )
+    artist != null -> PlaybackOrigin.Artist(MetadataGroupKey.Known(artist).serialize(), artist)
+    folderId != null -> PlaybackOrigin.Folder(sourceId, folderId, folderName ?: "Folder")
+    collectionId != null -> PlaybackOrigin.AllTracks
+    else -> null
+}
 
 data class SavedQueueItem(
     val queueItemId: String,

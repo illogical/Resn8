@@ -48,7 +48,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UiSessionStateEntity::class,
         CollectionPlaybackStateEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -125,12 +125,25 @@ abstract class Resn8Database : RoomDatabase() {
             }
         }
 
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("UPDATE media_files SET likeScore = -1 WHERE likeScore < -1")
+            }
+        }
+
         fun buildDatabase(context: Context): Resn8Database {
             return Room.databaseBuilder(
                 context.applicationContext,
                 Resn8Database::class.java,
                 DB_NAME
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            ).addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7
+            )
                 .build()
         }
 

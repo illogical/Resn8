@@ -187,4 +187,23 @@ class MigrationTest {
         assertEquals(null, cursor.getString(2))
         cursor.close()
     }
+
+    @Test
+    fun migrate6To7ClampsHistoricalDislikesAtMinusOne() {
+        db.execSQL("CREATE TABLE media_files (id TEXT NOT NULL PRIMARY KEY, likeScore INTEGER NOT NULL)")
+        db.execSQL("INSERT INTO media_files VALUES ('deeply-disliked', -7)")
+        db.execSQL("INSERT INTO media_files VALUES ('disliked', -1)")
+        db.execSQL("INSERT INTO media_files VALUES ('liked', 4)")
+
+        Resn8Database.MIGRATION_6_7.migrate(db)
+
+        val cursor = db.query("SELECT id, likeScore FROM media_files ORDER BY id")
+        val scores = buildMap {
+            while (cursor.moveToNext()) put(cursor.getString(0), cursor.getInt(1))
+        }
+        cursor.close()
+        assertEquals(-1, scores["deeply-disliked"])
+        assertEquals(-1, scores["disliked"])
+        assertEquals(4, scores["liked"])
+    }
 }

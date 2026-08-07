@@ -5,7 +5,8 @@ sealed interface QueueStartRequest {
 
     data class Library(
         val query: LibraryQuery,
-        override val startingMediaId: String
+        override val startingMediaId: String,
+        val origin: PlaybackOrigin
     ) : QueueStartRequest
 
     data class Playlist(

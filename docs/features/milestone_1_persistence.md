@@ -297,7 +297,7 @@ Use in-memory databases for fast transaction tests and at least one file-backed/
 
 #### 3. Rating and meaningful-play tests
 
-- Signed scores cross zero through the normative sequence `0 -> 1 -> 2 -> 1 -> 0 -> -1 -> -2`.
+- Ratings cross zero through the UX Improvements v4 normative sequence `0 -> 1 -> 2 -> 1 -> 0 -> -1 -> -1`; older values below `-1` are normalized non-destructively.
 - Concurrent rating updates do not lose increments.
 - Invalid rating deltas are rejected.
 - Play counts never become negative through any exposed operation.

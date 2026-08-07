@@ -396,6 +396,18 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
   7. In Folders, Album Detail, and All Tracks, select items and confirm the list does not jump, the bottom action tray stacks above the mini-player, the last row remains reachable, counts stay concise, and checkbox rows have no redundant Add overflow.
   8. Confirm Library offers Artists, Albums, and All Tracks only, and long row titles use compact accessible typography while Audio Files titles remain single-instance and at most two lines.
 
+### US8.3 — Now Playing Context, Rating, Seeking, and Artwork
+- **As a** listener moving between browsing and playback,
+- **I want** the player to retain its source context and balanced controls,
+- **So that** I can return to what I was browsing and adjust playback quickly.
+- **Verification**:
+  1. Start playback separately from a playlist, album, artist track list, folder, and All Tracks. Confirm the collection selector is upper-right and the upper-left action uses the matching icon and label.
+  2. Open each origin action and confirm it returns to the exact source. In particular, Artist → Album → Track returns to that album, while a direct artist-track start returns to the artist. Queue jumps, mini-player reopening, and relaunch restoration retain the original context.
+  3. Confirm Add to Playlist appears at the right above the artwork and the Dislike/score/Like cluster remains centered without shifting at scores `-1`, `0`, and positive values.
+  4. Repeatedly Dislike a neutral track and confirm it stops at `-1` with no number shown. Like it through `0` and above, confirm only positive `+N` values appear, then Dislike a liked track and confirm each tap subtracts exactly one.
+  5. Double-tap the left and right halves around the artwork and confirm position changes by ten seconds, clamps at the beginning/end, and shows a brief outward motion on the tapped side. Confirm the seek slider remains operable with touch and accessibility navigation.
+  6. Play tracks with an external folder cover, embedded artwork, and no usable artwork. Confirm artwork loads asynchronously without interrupting playback, cached art returns promptly, rapid track changes never show the prior track's late result, and the stable placeholder remains for missing/corrupt art.
+
 ---
 
 ## Randomized Sorting

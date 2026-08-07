@@ -400,8 +400,17 @@ interface MediaFileDao {
     @Update
     suspend fun updateMediaFile(file: MediaFileEntity)
 
-    @Query("UPDATE media_files SET likeScore = likeScore + :delta WHERE id = :mediaId")
-    suspend fun updateLikeScore(mediaId: String, delta: Int)
+    @Query(
+        """
+        UPDATE media_files
+        SET likeScore = CASE
+            WHEN :delta < 0 THEN MAX(-1, likeScore + :delta)
+            ELSE likeScore + :delta
+        END
+        WHERE id = :mediaId
+        """
+    )
+    suspend fun updateLikeScore(mediaId: String, delta: Int): Int
 
     @Query("UPDATE media_files SET playCount = playCount + 1, lastPlayedAt = :now WHERE id = :mediaId")
     suspend fun incrementPlayCount(mediaId: String, now: Long)

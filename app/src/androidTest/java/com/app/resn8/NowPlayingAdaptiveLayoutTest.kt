@@ -24,7 +24,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.app.resn8.ui.NowPlayingPlaylistAction
+import com.app.resn8.ui.NowPlayingContextAction
+import com.app.resn8.domain.model.PlaybackOrigin
 import com.app.resn8.ui.screens.NowPlayingScreen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -146,23 +147,22 @@ class NowPlayingAdaptiveLayoutTest {
         composeRule.setContent {
             MaterialTheme {
                 Row(modifier = Modifier.width(180.dp).testTag("app-bar-actions")) {
-                    NowPlayingPlaylistAction(
+                    NowPlayingContextAction(
                         isNowPlaying = isNowPlaying.value,
-                        queueTitle = longLabel,
-                        sourcePlaylistId = "playlist-42",
-                        onOpenPlaylist = { openedPlaylistId = it }
+                        origin = PlaybackOrigin.Playlist("playlist-42", "A Very Long Relaxation Playlist Name"),
+                        onOpenOrigin = { openedPlaylistId = (it as PlaybackOrigin.Playlist).playlistId }
                     )
                 }
             }
         }
 
         composeRule.onNodeWithText(longLabel).assertIsDisplayed()
-        composeRule.onNodeWithTag("now-playing-playlist-link").performClick()
+        composeRule.onNodeWithTag("now-playing-context-link").performClick()
         composeRule.runOnIdle { assertEquals("playlist-42", openedPlaylistId) }
 
         composeRule.runOnIdle { isNowPlaying.value = false }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("now-playing-playlist-link").assertDoesNotExist()
+        composeRule.onNodeWithTag("now-playing-context-link").assertDoesNotExist()
     }
 
     private fun assertControlsInsidePlayer() {

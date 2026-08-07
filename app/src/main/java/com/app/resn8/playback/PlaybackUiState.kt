@@ -1,5 +1,7 @@
 package com.app.resn8.playback
 
+import com.app.resn8.domain.model.PlaybackOrigin
+
 enum class PlaybackConnectionStatus {
     CONNECTING,
     CONNECTED,
@@ -41,6 +43,7 @@ data class PlaybackUiState(
     val queueItems: List<PlaybackQueueItemState> = emptyList(),
     val queueTitle: String? = null,
     val sourcePlaylistId: String? = null,
+    val queueOrigin: PlaybackOrigin? = null,
     val isFlatCollection: Boolean = false,
     val notice: PlaybackNotice? = null
 )

@@ -25,9 +25,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.model.LibraryQuery
+import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.MetadataGroupKey
 import com.app.resn8.domain.model.PlaylistMembershipState
 import com.app.resn8.domain.model.QueueStartRequest
+import com.app.resn8.domain.model.PlaybackOrigin
 import com.app.resn8.domain.model.toLegacySortOrder
 import com.app.resn8.playback.PlaybackUiState
 import com.app.resn8.ui.components.PlaylistSelectorSheet
@@ -133,7 +135,11 @@ fun Resn8NavHost(
                 )
             }
 
-            composable<LibraryRoute> {
+            composable<LibraryRoute> { backStackEntry ->
+                val route: LibraryRoute = backStackEntry.toRoute()
+                val requestedSurface = LibrarySurface.entries.firstOrNull {
+                    it.name.equals(route.tab, ignoreCase = true)
+                }
                 val routeState = activeCollectionState.value
                 val selection = (routeState as? ActiveCollectionState.Ready)?.selection
                 if (selection == null) {
@@ -148,7 +154,8 @@ fun Resn8NavHost(
                                     collectionId = selection.collectionId,
                                     sourceId = selection.sourceId,
                                     mediaRepository = container.mediaRepository,
-                                    uiSessionRepository = container.uiSessionRepository
+                                    uiSessionRepository = container.uiSessionRepository,
+                                    initialSurface = requestedSurface
                                 ) as T
                             }
                         }
@@ -180,7 +187,8 @@ fun Resn8NavHost(
                             playbackConnection?.startQueue(
                                 QueueStartRequest.Library(
                                     query = query,
-                                    startingMediaId = mediaFile.id
+                                    startingMediaId = mediaFile.id,
+                                    origin = PlaybackOrigin.AllTracks
                                 )
                             )
                         },
@@ -219,7 +227,11 @@ fun Resn8NavHost(
                         playbackConnection?.startQueue(
                             QueueStartRequest.Library(
                                 query = query,
-                                startingMediaId = mediaFile.id
+                                startingMediaId = mediaFile.id,
+                                origin = PlaybackOrigin.Artist(
+                                    artistKeySerialized = route.artistKeySerialized,
+                                    artistName = mediaFile.artist ?: "Unknown Artist"
+                                )
                             )
                         )
                     },
@@ -256,7 +268,12 @@ fun Resn8NavHost(
                         playbackConnection?.startQueue(
                             QueueStartRequest.Library(
                                 query = query,
-                                startingMediaId = mediaFile.id
+                                startingMediaId = mediaFile.id,
+                                origin = PlaybackOrigin.Album(
+                                    albumKeySerialized = route.albumKeySerialized,
+                                    albumArtistKeySerialized = route.albumArtistKeySerialized,
+                                    albumName = mediaFile.album ?: "Unknown Album"
+                                )
                             )
                         )
                     },
@@ -290,6 +307,7 @@ fun Resn8NavHost(
                         }
                     )
                     val currentFolderId by foldersViewModel.currentFolderId.collectAsState()
+                    val currentBreadcrumbs by foldersViewModel.breadcrumbs.collectAsState(initial = emptyList())
 
                     FoldersScreen(
                         viewModel = foldersViewModel,
@@ -302,7 +320,12 @@ fun Resn8NavHost(
                             playbackConnection?.startQueue(
                                 QueueStartRequest.Library(
                                     query = query,
-                                    startingMediaId = mediaFile.id
+                                    startingMediaId = mediaFile.id,
+                                    origin = PlaybackOrigin.Folder(
+                                        sourceId = selection.sourceId,
+                                        folderId = requireNotNull(currentFolderId),
+                                        folderName = currentBreadcrumbs.lastOrNull()?.displayName ?: selection.collection.name
+                                    )
                                 )
                             )
                         },
@@ -429,6 +452,7 @@ fun Resn8NavHost(
                     noticeMessage = playbackUiState.notice?.message,
                     onPlayPauseToggle = { playbackConnection?.togglePlayPause() },
                     onSeek = { pos -> playbackConnection?.seekTo(pos) },
+                    onSeekBy = { delta -> playbackConnection?.seekBy(delta) },
                     onSkipPrevious = { playbackConnection?.skipToPrevious() },
                     onSkipNext = { playbackConnection?.skipToNext() },
                     onLikeClicked = { playbackConnection?.likeTrack() },

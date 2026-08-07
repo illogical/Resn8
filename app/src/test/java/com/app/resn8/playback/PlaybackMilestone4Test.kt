@@ -5,6 +5,7 @@ import com.app.resn8.data.repository.FakePlaylistRepository
 import com.app.resn8.data.repository.FakeQueueRepository
 import com.app.resn8.domain.model.LibraryQuery
 import com.app.resn8.domain.model.MediaFile
+import com.app.resn8.domain.model.PlaybackOrigin
 import com.app.resn8.domain.model.QueueStartRequest
 import com.app.resn8.domain.model.SavedQueueKind
 import com.app.resn8.domain.model.SortOrder
@@ -71,7 +72,8 @@ class PlaybackMilestone4Test {
 
         val request = QueueStartRequest.Library(
             query = query,
-            startingMediaId = "track_3"
+            startingMediaId = "track_3",
+            origin = PlaybackOrigin.AllTracks
         )
 
         val result = startQueueUseCase(request)
@@ -84,6 +86,7 @@ class PlaybackMilestone4Test {
         assertEquals(5, queue?.orderedMediaIds?.size)
         assertEquals("track_3", queue?.currentMediaId)
         assertEquals(2, queue?.currentIndex)
+        assertEquals(PlaybackOrigin.AllTracks, queue?.filterSnapshot?.origin)
 
         val sessionState = uiSessionRepository.getUiSessionStateFlow().value
         assertEquals(queue?.id, sessionState.activeQueueId)
@@ -99,7 +102,7 @@ class PlaybackMilestone4Test {
         mediaRepository.addMediaFiles(tracks)
 
         val query = LibraryQuery(collectionId = "DEFAULT_COLLECTION")
-        val request = QueueStartRequest.Library(query = query, startingMediaId = "t3")
+        val request = QueueStartRequest.Library(query = query, startingMediaId = "t3", origin = PlaybackOrigin.AllTracks)
 
         val result = startQueueUseCase(request)
         assertTrue(result.isSuccess)
@@ -117,7 +120,7 @@ class PlaybackMilestone4Test {
         mediaRepository.addMediaFiles(tracks)
 
         val query = LibraryQuery(collectionId = "DEFAULT_COLLECTION")
-        val request = QueueStartRequest.Library(query = query, startingMediaId = "t1")
+        val request = QueueStartRequest.Library(query = query, startingMediaId = "t1", origin = PlaybackOrigin.AllTracks)
 
         val result = startQueueUseCase(request)
         assertTrue(result.isFailure)
@@ -150,7 +153,7 @@ class PlaybackMilestone4Test {
         val query = LibraryQuery(collectionId = "DEFAULT_COLLECTION")
         val availableIds = mediaRepository.snapshotVisibleMediaIds(query)
         val targetMediaId = availableIds[12500]
-        val request = QueueStartRequest.Library(query = query, startingMediaId = targetMediaId)
+        val request = QueueStartRequest.Library(query = query, startingMediaId = targetMediaId, origin = PlaybackOrigin.AllTracks)
 
         val start = System.currentTimeMillis()
         val result = startQueueUseCase(request)

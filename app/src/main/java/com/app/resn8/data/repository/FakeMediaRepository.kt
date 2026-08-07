@@ -297,7 +297,7 @@ class FakeMediaRepository(
         }
         val file = _mediaFiles.value.find { it.id == mediaId }
             ?: return Result.failure(IllegalArgumentException("Media file not found: $mediaId"))
-        val newScore = file.likeScore + delta
+        val newScore = if (delta < 0) (file.likeScore + delta).coerceAtLeast(-1) else file.likeScore + delta
         _mediaFiles.value = _mediaFiles.value.map { item ->
             if (item.id == mediaId) {
                 item.copy(likeScore = newScore)

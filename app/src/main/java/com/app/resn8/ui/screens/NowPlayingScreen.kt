@@ -1,5 +1,8 @@
 package com.app.resn8.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,6 +26,8 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.Card
@@ -36,14 +41,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -85,6 +94,7 @@ fun NowPlayingScreen(
     noticeMessage: String? = null,
     onPlayPauseToggle: () -> Unit = {},
     onSeek: (Long) -> Unit = {},
+    onSeekBy: (Long) -> Unit = {},
     onSkipPrevious: () -> Unit = {},
     onSkipNext: () -> Unit = {},
     onLikeClicked: () -> Unit = {},
@@ -118,11 +128,11 @@ fun NowPlayingScreen(
                 canSkipNext = canSkipNext,
                 onPlayPauseToggle = onPlayPauseToggle,
                 onSeek = onSeek,
+                onSeekBy = onSeekBy,
                 onSkipPrevious = onSkipPrevious,
                 onSkipNext = onSkipNext,
                 onLikeClicked = onLikeClicked,
-                onDislikeClicked = onDislikeClicked,
-                onAddToPlaylistClicked = onAddToPlaylistClicked
+                onDislikeClicked = onDislikeClicked
             )
         } else {
             PortraitPlayerContent(
@@ -142,11 +152,25 @@ fun NowPlayingScreen(
                 canSkipNext = canSkipNext,
                 onPlayPauseToggle = onPlayPauseToggle,
                 onSeek = onSeek,
+                onSeekBy = onSeekBy,
                 onSkipPrevious = onSkipPrevious,
                 onSkipNext = onSkipNext,
                 onLikeClicked = onLikeClicked,
-                onDislikeClicked = onDislikeClicked,
-                onAddToPlaylistClicked = onAddToPlaylistClicked
+                onDislikeClicked = onDislikeClicked
+            )
+        }
+
+        IconButton(
+            onClick = onAddToPlaylistClicked,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 8.dp)
+                .size(48.dp)
+                .testTag("now-playing-add-to-playlist")
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                contentDescription = "Add to Playlist"
             )
         }
 
@@ -180,21 +204,23 @@ private fun PortraitPlayerContent(
     canSkipNext: Boolean,
     onPlayPauseToggle: () -> Unit,
     onSeek: (Long) -> Unit,
+    onSeekBy: (Long) -> Unit,
     onSkipPrevious: () -> Unit,
     onSkipNext: () -> Unit,
     onLikeClicked: () -> Unit,
-    onDislikeClicked: () -> Unit,
-    onAddToPlaylistClicked: () -> Unit
+    onDislikeClicked: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 56.dp, bottom = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ArtworkRegion(
             title = title,
             artworkUri = artworkUri,
+            canSeek = canSeek,
+            onSeekBy = onSeekBy,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -228,8 +254,7 @@ private fun PortraitPlayerContent(
         RatingControls(
             likeScore = likeScore,
             onLikeClicked = onLikeClicked,
-            onDislikeClicked = onDislikeClicked,
-            onAddToPlaylistClicked = onAddToPlaylistClicked
+            onDislikeClicked = onDislikeClicked
         )
     }
 }
@@ -252,16 +277,16 @@ private fun LandscapePlayerContent(
     canSkipNext: Boolean,
     onPlayPauseToggle: () -> Unit,
     onSeek: (Long) -> Unit,
+    onSeekBy: (Long) -> Unit,
     onSkipPrevious: () -> Unit,
     onSkipNext: () -> Unit,
     onLikeClicked: () -> Unit,
-    onDislikeClicked: () -> Unit,
-    onAddToPlaylistClicked: () -> Unit
+    onDislikeClicked: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 56.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Column(
@@ -273,6 +298,8 @@ private fun LandscapePlayerContent(
             ArtworkRegion(
                 title = title,
                 artworkUri = artworkUri,
+                canSeek = canSeek,
+                onSeekBy = onSeekBy,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -313,8 +340,7 @@ private fun LandscapePlayerContent(
             RatingControls(
                 likeScore = likeScore,
                 onLikeClicked = onLikeClicked,
-                onDislikeClicked = onDislikeClicked,
-                onAddToPlaylistClicked = onAddToPlaylistClicked
+                onDislikeClicked = onDislikeClicked
             )
         }
     }
@@ -324,10 +350,33 @@ private fun LandscapePlayerContent(
 private fun ArtworkRegion(
     title: String,
     artworkUri: String?,
+    canSeek: Boolean,
+    onSeekBy: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var animationDirection by remember { mutableIntStateOf(0) }
+    var animationPulse by remember { mutableIntStateOf(0) }
+    val animationProgress = remember { Animatable(1f) }
+
+    LaunchedEffect(animationPulse) {
+        if (animationPulse == 0) return@LaunchedEffect
+        animationProgress.snapTo(0f)
+        animationProgress.animateTo(1f, animationSpec = tween(320))
+        animationDirection = 0
+    }
+
     BoxWithConstraints(
-        modifier = modifier,
+        modifier = modifier.pointerInput(canSeek) {
+            if (canSeek) {
+                detectTapGestures(
+                    onDoubleTap = { offset ->
+                        animationDirection = if (offset.x < size.width / 2f) -1 else 1
+                        animationPulse += 1
+                        onSeekBy(animationDirection * 10_000L)
+                    }
+                )
+            }
+        },
         contentAlignment = Alignment.Center
     ) {
         val artworkSize = minOf(maxWidth, maxHeight, MaximumArtworkSize)
@@ -336,6 +385,21 @@ private fun ArtworkRegion(
                 title = title,
                 artworkUri = artworkUri,
                 size = artworkSize
+            )
+        }
+        if (animationDirection != 0) {
+            Icon(
+                imageVector = if (animationDirection < 0) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier
+                    .align(if (animationDirection < 0) Alignment.CenterStart else Alignment.CenterEnd)
+                    .size(48.dp)
+                    .graphicsLayer {
+                        translationX = animationDirection * animationProgress.value * 36.dp.toPx()
+                        alpha = 1f - animationProgress.value
+                    }
+                    .testTag(if (animationDirection < 0) "seek-back-animation" else "seek-forward-animation"),
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -530,8 +594,7 @@ private fun TransportControls(
 private fun RatingControls(
     likeScore: Int,
     onLikeClicked: () -> Unit,
-    onDislikeClicked: () -> Unit,
-    onAddToPlaylistClicked: () -> Unit
+    onDislikeClicked: () -> Unit
 ) {
     val isLiked = likeScore > 0
     val isDisliked = likeScore < 0
@@ -559,7 +622,7 @@ private fun RatingControls(
         }
 
         Text(
-            text = if (likeScore > 0) "+$likeScore" else "$likeScore",
+            text = if (likeScore > 0) "+$likeScore" else "",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.width(40.dp),
             textAlign = TextAlign.Center
@@ -583,15 +646,6 @@ private fun RatingControls(
             )
         }
 
-        IconButton(
-            onClick = onAddToPlaylistClicked,
-            modifier = Modifier.size(48.dp)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                contentDescription = "Add to Playlist"
-            )
-        }
     }
 }
 

@@ -82,9 +82,9 @@ The primary player should be simple and centered, with:
 The Like and Dislike actions should modify an integer score:
 
 - Like adds `1`.
-- Dislike subtracts `1`.
+- Dislike subtracts `1` until the score reaches the resolved minimum of `-1`.
 - `0` means unrated or neutral.
-- A negative value means disliked.
+- `-1` means disliked; repeated Dislike actions do not lower it further.
 - A positive value means liked.
 - Repeated likes can raise a file's priority in future randomization algorithms.
 

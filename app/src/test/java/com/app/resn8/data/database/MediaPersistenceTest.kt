@@ -78,9 +78,9 @@ class MediaPersistenceTest {
         mediaRepo.updateLikeScore(testMediaId, -1)
         assertEquals(-1, mediaRepo.getMediaFileById(testMediaId)?.likeScore)
 
-        // -1 -> -2
+        // -1 remains the minimum
         mediaRepo.updateLikeScore(testMediaId, -1)
-        assertEquals(-2, mediaRepo.getMediaFileById(testMediaId)?.likeScore)
+        assertEquals(-1, mediaRepo.getMediaFileById(testMediaId)?.likeScore)
     }
 
     @Test

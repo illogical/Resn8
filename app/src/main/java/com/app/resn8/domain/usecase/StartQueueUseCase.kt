@@ -31,10 +31,13 @@ class StartQueueUseCase(
                 val albumName = (request.query.album as? com.app.resn8.domain.model.MetadataGroupKey.Known)?.value
                 filterSnapshot = com.app.resn8.domain.model.QueueFilterSnapshot(
                     collectionId = request.query.collectionId,
+                    sourceId = request.query.sourceId,
                     folderId = request.query.folderId,
                     artist = artistName,
                     album = albumName,
-                    searchQuery = request.query.searchText
+                    albumArtist = (request.query.albumArtist as? com.app.resn8.domain.model.MetadataGroupKey.Known)?.value,
+                    searchQuery = request.query.searchText,
+                    origin = request.origin
                 )
                 Pair(mediaIds, request.query.collectionId)
             }
@@ -50,7 +53,8 @@ class StartQueueUseCase(
                 filterSnapshot = com.app.resn8.domain.model.QueueFilterSnapshot(
                     collectionId = colId,
                     playlistId = playlist.id,
-                    playlistName = playlist.name
+                    playlistName = playlist.name,
+                    origin = com.app.resn8.domain.model.PlaybackOrigin.Playlist(playlist.id, playlist.name)
                 )
                 Pair(mediaIds.filter { availableIds.contains(it) }, colId)
             }

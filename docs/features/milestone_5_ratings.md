@@ -33,10 +33,10 @@ Before implementation, review the working tree and preserve unrelated staged/uns
 
 ### T027 — Atomic Signed Ratings
 
-- Like atomically adds `1`; Dislike atomically subtracts `1`. Scores are unbounded signed integers and may cross zero in either direction.
+- The original milestone shipped Like and Dislike as unbounded signed adjustments. UX Improvements v4 supersedes the lower-bound portion: Like atomically adds `1`, while Dislike subtracts `1` only until the score reaches `-1`.
 - Keep repository validation that rejects any delta other than `+1` or `-1`, and define missing-media behavior explicitly rather than silently presenting a false successful update.
 - Make the authoritative post-mutation score available by returning it from the atomic adjustment or exposing a media-by-ID `Flow`. Apply the same contract to Room and fake repositories.
-- `PlaybackConnection` exposes Like/Dislike commands. Now Playing shows the numeric score and actions; the mini-player shows the current liked/disliked indicator; paged library/filter/sort state refreshes from Room invalidation or repository observation.
+- `PlaybackConnection` exposes Like/Dislike commands. Now Playing shows `+N` only for positive scores and hides the count at `0`/`-1`; the mini-player shows the current liked/disliked indicator; paged library/filter/sort state refreshes from Room invalidation or repository observation.
 - Rapid or concurrent taps cannot lose increments or leave current-player state at a stale score.
 - Rating never skips the item, interrupts playback, removes playlist membership, or rewrites/reorders the active saved queue. Do not add unsupported library-row rating buttons or notification score presentation as part of M5.
 
@@ -81,7 +81,7 @@ Before implementation, review the working tree and preserve unrelated staged/uns
 
 ### Automated tests
 
-- **Ratings:** normative `0 -> 1 -> 2 -> 1 -> 0 -> -1 -> -2`, invalid deltas, missing media, rapid/concurrent updates, authoritative UI propagation, and file-backed close/reopen.
+- **Ratings:** UX Improvements v4 normative sequence `0 -> 1 -> 2 -> 1 -> 0 -> -1 -> -1`, invalid deltas, missing media, rapid/concurrent updates, authoritative UI propagation, migration normalization, and file-backed close/reopen.
 - **Tracker thresholds:** just below/at 60 seconds for known durations of at least one minute and unknown durations, short-file completion-only behavior, genuine completion after starting/seeking midway, and direct-to-end zero-play rejection.
 - **Time accounting:** pause/resume, buffering, focus interruption, forward/backward seeks, wall-clock jumps, and monotonic elapsed accumulation.
 - **Transitions and identity:** automatic completion before the next item is initialized, final `STATE_ENDED`, previous/next/direct jump, repeat/replay, duplicate media entries, new occurrence per traversal, and retry idempotency within one occurrence.

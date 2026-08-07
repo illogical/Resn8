@@ -42,7 +42,8 @@ class LibraryViewModel(
     collectionId: String,
     private val sourceId: String?,
     private val mediaRepository: MediaRepository,
-    private val uiSessionRepository: UiSessionRepository
+    private val uiSessionRepository: UiSessionRepository,
+    private val initialSurface: LibrarySurface? = null
 ) : ViewModel() {
 
     private val _surface = MutableStateFlow(LibrarySurface.ARTISTS)
@@ -78,7 +79,7 @@ class LibraryViewModel(
     init {
         viewModelScope.launch {
             val session = uiSessionRepository.getUiSessionStateFlow().first()
-            _surface.value = session.activeSurface
+            _surface.value = initialSurface ?: session.activeSurface
             _searchText.value = session.activeSearchQuery ?: ""
             _sortPreferences.value = session.librarySortPreferences
 

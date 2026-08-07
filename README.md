@@ -14,7 +14,7 @@ Large personal libraries have a discovery problem: familiar tracks keep resurfac
 - **Bring your own library.** Select an organized music folder with Android's system picker—no broad storage permission required.
 - **Keep everything local.** Audio, metadata, ratings, playlists, and listening history stay on your device.
 - **Rediscover what you own.** Randomize a playlist by least played, most played, most liked, or recently added while retaining variety among tracks with equal metadata.
-- **Shape playback directly.** Like and Dislike actions adjust a durable signed score; applying Randomized Sorting permanently removes disliked tracks from that playlist.
+- **Shape playback directly.** Like raises a durable score without a product cap, while Dislike lowers it to a minimum of `-1`; applying Randomized Sorting permanently removes disliked tracks from that playlist.
 - **Resume without rebuilding context.** Restore the exact queue, track, position, filters, and screen after the app or process restarts.
 
 ## Planned MVP
@@ -34,7 +34,7 @@ The first usable release supports multiple named collections, each beneath one s
 
 - Play in the foreground or background with notification, lock-screen, headset, and Bluetooth controls.
 - Track meaningful plays after one minute of cumulative active listening or genuine end-of-track completion.
-- Rate tracks with an incrementing/decrementing score instead of a single binary favorite.
+- Rate tracks with an incrementing positive score and a single disliked state at `-1` instead of a binary favorite.
 - Restore the active queue and listening position in a safe, paused state on normal relaunch.
 
 ### Organize and rediscover

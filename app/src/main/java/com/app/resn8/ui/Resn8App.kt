@@ -2,10 +2,12 @@ package com.app.resn8.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Folder
@@ -13,6 +15,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -36,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -51,6 +57,8 @@ import com.app.resn8.ui.navigation.NowPlayingRoute
 import com.app.resn8.ui.navigation.OnboardingRoute
 import com.app.resn8.ui.navigation.PlaylistsRoute
 import com.app.resn8.ui.navigation.PlaylistDetailRoute
+import com.app.resn8.ui.navigation.AlbumDetailRoute
+import com.app.resn8.ui.navigation.ArtistDetailRoute
 import com.app.resn8.ui.navigation.Resn8NavHost
 import com.app.resn8.ui.navigation.SettingsRoute
 import com.app.resn8.ui.startup.AppStartupCoordinator
@@ -59,6 +67,7 @@ import com.app.resn8.domain.model.CollectionProfile
 import com.app.resn8.domain.model.LibrarySurface
 import com.app.resn8.domain.model.LibraryFilterSnapshot
 import com.app.resn8.domain.model.SortOrder
+import com.app.resn8.domain.model.PlaybackOrigin
 import com.app.resn8.domain.model.restorableQueueIdForCollection
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
@@ -68,21 +77,44 @@ internal fun nowPlayingPlaylistRoute(playlistId: String) = PlaylistDetailRoute(
     revealCurrentTrack = true
 )
 
+internal fun nowPlayingOriginRoute(origin: PlaybackOrigin, collectionId: String): Any = when (origin) {
+    is PlaybackOrigin.Playlist -> nowPlayingPlaylistRoute(origin.playlistId)
+    is PlaybackOrigin.Album -> AlbumDetailRoute(
+        collectionId = collectionId,
+        albumKeySerialized = origin.albumKeySerialized,
+        albumArtistKeySerialized = origin.albumArtistKeySerialized
+    )
+    is PlaybackOrigin.Artist -> ArtistDetailRoute(collectionId, origin.artistKeySerialized)
+    is PlaybackOrigin.Folder -> FoldersRoute(origin.folderId)
+    PlaybackOrigin.AllTracks -> LibraryRoute(tab = "all_tracks")
+}
+
 @Composable
-internal fun NowPlayingPlaylistAction(
+internal fun NowPlayingContextAction(
     isNowPlaying: Boolean,
-    queueTitle: String?,
-    sourcePlaylistId: String?,
-    onOpenPlaylist: (String) -> Unit
+    origin: PlaybackOrigin?,
+    onOpenOrigin: (PlaybackOrigin) -> Unit
 ) {
-    if (!isNowPlaying || sourcePlaylistId == null) return
+    if (!isNowPlaying || origin == null) return
+
+    val (label, icon) = when (origin) {
+        is PlaybackOrigin.Playlist -> "Playlist: ${origin.playlistName}" to Icons.AutoMirrored.Filled.QueueMusic
+        is PlaybackOrigin.Album -> "Album: ${origin.albumName}" to Icons.Default.Album
+        is PlaybackOrigin.Artist -> "Artist: ${origin.artistName}" to Icons.Default.Person
+        is PlaybackOrigin.Folder -> "Folder: ${origin.folderName}" to Icons.Default.Folder
+        PlaybackOrigin.AllTracks -> "Library: All Tracks" to Icons.Default.LibraryMusic
+    }
 
     TextButton(
-        onClick = { onOpenPlaylist(sourcePlaylistId) },
-        modifier = Modifier.testTag("now-playing-playlist-link")
+        onClick = { onOpenOrigin(origin) },
+        modifier = Modifier
+            .testTag("now-playing-context-link")
+            .semantics { contentDescription = label }
     ) {
+        Icon(icon, contentDescription = null)
+        Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = queueTitle ?: "Playlist",
+            text = label,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.widthIn(max = 168.dp)
@@ -212,12 +244,31 @@ private fun Resn8AppContent(
         topBar = {
             TopAppBar(
                 title = {
+                    NowPlayingContextAction(
+                        isNowPlaying = isNowPlaying,
+                        origin = playbackUiState.queueOrigin,
+                        onOpenOrigin = { origin ->
+                            activeCollection?.id?.let { collectionId ->
+                                navController.navigate(nowPlayingOriginRoute(origin, collectionId))
+                            }
+                        }
+                    )
+                },
+                actions = {
                     Box {
                         TextButton(
                             onClick = { collectionMenuExpanded = true },
-                            enabled = hasCollections
+                            enabled = hasCollections,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Collection: ${activeCollection?.name ?: "Resn8"}. Choose collection"
+                            }
                         ) {
-                            Text(activeCollection?.name ?: "Resn8")
+                            Text(
+                                text = activeCollection?.name ?: "Resn8",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 148.dp)
+                            )
                             Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose collection")
                         }
                         DropdownMenu(
@@ -295,16 +346,6 @@ private fun Resn8AppContent(
                             }
                         }
                     }
-                },
-                actions = {
-                    NowPlayingPlaylistAction(
-                        isNowPlaying = isNowPlaying,
-                        queueTitle = playbackUiState.queueTitle,
-                        sourcePlaylistId = playbackUiState.sourcePlaylistId,
-                        onOpenPlaylist = { playlistId ->
-                            navController.navigate(nowPlayingPlaylistRoute(playlistId))
-                        }
-                    )
                 }
             )
         },

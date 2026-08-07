@@ -46,6 +46,17 @@ class DomainModelTest {
     }
 
     @Test
+    fun fakeMediaRepository_dislikeStopsAtMinusOne() = runBlocking {
+        val repository = FakeMediaRepository(
+            initialMediaFiles = listOf(createTestMediaFile(id = "track_1", likeScore = 0))
+        )
+
+        assertEquals(-1, repository.updateLikeScore("track_1", -1).getOrThrow())
+        assertEquals(-1, repository.updateLikeScore("track_1", -1).getOrThrow())
+        assertEquals(0, repository.updateLikeScore("track_1", 1).getOrThrow())
+    }
+
+    @Test
     fun fakeClockAndRandom_behaveDeterministically() {
         val clock = FakeClock(1000L)
         clock.advanceBy(500L)

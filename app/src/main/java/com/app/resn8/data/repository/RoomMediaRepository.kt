@@ -259,11 +259,11 @@ class RoomMediaRepository(
         }
         return try {
             val newScore = db.withTransaction {
-                val existing = mediaFileDao.getMediaFileById(mediaId)
-                    ?: throw IllegalArgumentException("Media file not found: $mediaId")
-                val updatedScore = existing.likeScore + delta
-                mediaFileDao.updateLikeScore(mediaId, delta)
-                updatedScore
+                if (mediaFileDao.updateLikeScore(mediaId, delta) != 1) {
+                    throw IllegalArgumentException("Media file not found: $mediaId")
+                }
+                mediaFileDao.getMediaFileById(mediaId)?.likeScore
+                    ?: throw IllegalStateException("Updated media file disappeared: $mediaId")
             }
             Result.success(newScore)
         } catch (e: Exception) {
