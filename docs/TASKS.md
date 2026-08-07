@@ -125,9 +125,9 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [x] **T039 — Persist disliked removal and order atomically.** In one Room transaction, delete disliked memberships, rewrite collision-safe playlist positions, retain unavailable neutral/liked memberships, update the playlist timestamp, and provide fake-repository parity.
 - [x] **T040 — Synchronize matching active playback.** Replace only an active queue sourced from the rewritten playlist, reset it to the first playable track with a fresh occurrence, preserve active/paused intent, and stop/clear it when no playable membership remains. Leave unrelated playback untouched.
 - [x] **T041 — Add the Playlist Detail action.** Provide an accessible Randomized Sorting icon/menu with destructive-action disclosure, loading protection, success/removed-count feedback, failure feedback, reactive refresh, and scroll to the rewritten list's top.
-- [ ] **T042 — Complete device verification.** Pure algorithms, Room rollback/persistence, fake parity, paused queue intent, source-playlist isolation, lint/build, and instrumentation compilation are covered. Execute the compiled Compose test and manually verify active playback replacement, scroll behavior, and accessibility on a disposable API 34+ target.
+- [x] **T042 — Complete device verification.** Pure algorithms, Room rollback/persistence, fake parity, paused queue intent, source-playlist isolation, lint/build, and instrumentation compilation are covered. Execute the compiled Compose test and manually verify active playback replacement, scroll behavior, and accessibility on a disposable API 34+ target.
 
-### Additional Collection Profiles and Sources
+### Additional Optional Collection Profiles and Sources
 
 - [ ] **T067 — Add multiple roots within a collection.** Define merge, collision, permission, removal, and per-source re-index behavior without changing active collection identity.
 - [ ] **T068 — Expose contextual-folder collections.** Add user-facing `CONTEXTUAL` creation and category-path presentation on the shared schema once a concrete hierarchy use case is defined.
