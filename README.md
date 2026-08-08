@@ -97,19 +97,7 @@ To exercise storage access, media playback, and removable-storage behavior, run 
 
 ## Project status and roadmap
 
-Implementation is organized into dependency-ordered milestones:
-
-1. [x] **Milestone 0**: application foundation and domain contracts
-2. [x] **Milestone 1**: durable library persistence
-3. [x] **Milestone 2**: folder selection and indexing
-4. [x] **Milestone 3**: library and folder browsing
-5. [x] **Milestone 4**: reliable background playback
-6. [x] **Milestone 5**: ratings and meaningful-play tracking
-7. [x] **Milestone 6**: manual playlists
-8. [x] **Milestone 7**: full queue, playback-position, and browsing-context restoration
-9. [x] **Milestone 8**: startup restoration and index-completion feedback corrections
-10. [ ] **Milestone 9**: multiple single-folder collections and folder-first audio
-11. [ ] **Milestone 10**: accessibility, adaptive-layout, acceptance, and release polish
+Post-MVP roadmap: [ ] **Milestone 11** — responsive home-screen playback widget.
 
 Post-MVP goals include multiple source roots within a collection, contextual-folder profiles, richer use of indexed album artwork across library surfaces, saved dynamic smart playlists, scheduled indexing, playback-speed memory, global command search, and safe disliked-file maintenance. Settings is the home for collection management, metadata backup and restore, and later user-configurable capabilities.
 
@@ -120,9 +108,3 @@ For the complete product decisions and acceptance criteria, see:
 - [UX stories and manual verification](docs/UX.md)
 - [Feature implementation plans](docs/features/)
 - [Original brainstorm](docs/BRAINSTORM.md)
-
-## Contributing
-
-Resn8 is advancing through dependency-ordered milestones, so the specification, task backlog, UX verification matrix, and relevant feature plan are the best starting points for proposed changes. Before implementing a feature, check its completed baseline and milestone prerequisites and preserve the MVP boundaries documented in the specification.
-
-Bug reports, design feedback, test-library edge cases, and focused pull requests are welcome.

@@ -3,6 +3,7 @@ package com.app.resn8.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -15,10 +16,14 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.app.resn8.domain.model.RepeatMode
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
 import com.app.resn8.MainActivity
 import com.app.resn8.Resn8Application
 import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.usecase.SavedQueueLoader
+import com.app.resn8.widget.PlaybackWidgetUpdater
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
@@ -97,6 +102,7 @@ class Resn8MediaService : MediaSessionService() {
                         if (exoPlayer.mediaItemCount == 0 && !newActiveQueueId.isNullOrEmpty()) {
                             restorePlaybackContext(newActiveQueueId, container, playWhenReady = false)
                         }
+                        PlaybackWidgetUpdater.updateAll(this@Resn8MediaService)
                     }
                 }
             }
@@ -113,11 +119,13 @@ class Resn8MediaService : MediaSessionService() {
                         reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
                 )
                 checkpointCoordinator?.triggerCheckpoint(exoPlayer, playTracker, activeQueueId)
+                PlaybackWidgetUpdater.request(this@Resn8MediaService)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 playTracker.onPlaybackStateChanged(playbackState, exoPlayer.duration, exoPlayer.currentPosition)
                 checkpointCoordinator?.triggerCheckpoint(exoPlayer, playTracker, activeQueueId)
+                PlaybackWidgetUpdater.request(this@Resn8MediaService)
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -130,6 +138,7 @@ class Resn8MediaService : MediaSessionService() {
                     checkpointCoordinator?.stopPeriodicCheckpoints()
                     checkpointCoordinator?.triggerCheckpoint(exoPlayer, playTracker, activeQueueId)
                 }
+                PlaybackWidgetUpdater.request(this@Resn8MediaService)
             }
 
             override fun onPositionDiscontinuity(
@@ -167,6 +176,64 @@ class Resn8MediaService : MediaSessionService() {
         )
 
         val callback = object : MediaSession.Callback {
+            @OptIn(UnstableApi::class)
+            override fun onConnect(
+                mediaSession: MediaSession,
+                controller: MediaSession.ControllerInfo
+            ): MediaSession.ConnectionResult {
+                if (!isTrustedResn8Controller(packageName, controller)) {
+                    return super.onConnect(mediaSession, controller)
+                }
+                val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS
+                    .buildUpon()
+                    .add(LIKE_CURRENT_COMMAND)
+                    .add(DISLIKE_CURRENT_COMMAND)
+                    .build()
+                return MediaSession.ConnectionResult.AcceptedResultBuilder(mediaSession)
+                    .setAvailableSessionCommands(sessionCommands)
+                    .build()
+            }
+
+            @OptIn(UnstableApi::class)
+            override fun onCustomCommand(
+                mediaSession: MediaSession,
+                controller: MediaSession.ControllerInfo,
+                customCommand: SessionCommand,
+                args: Bundle
+            ): ListenableFuture<SessionResult> {
+                val delta = when (customCommand) {
+                    LIKE_CURRENT_COMMAND -> +1
+                    DISLIKE_CURRENT_COMMAND -> -1
+                    else -> return super.onCustomCommand(mediaSession, controller, customCommand, args)
+                }
+                if (!isTrustedResn8Controller(packageName, controller) || container == null) {
+                    return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
+                }
+
+                val currentMediaId = exoPlayer.currentMediaItem
+                    ?.requestMetadata
+                    ?.extras
+                    ?.getString(RESN8_MEDIA_FILE_ID)
+                if (currentMediaId.isNullOrBlank()) {
+                    return Futures.immediateFuture(SessionResult(SessionError.ERROR_BAD_VALUE))
+                }
+
+                val future = SettableFuture.create<SessionResult>()
+                serviceScope.launch {
+                    container.mediaRepository.updateLikeScore(currentMediaId, delta)
+                        .onSuccess { score ->
+                            val resultExtras = ratingResultExtras(currentMediaId, score)
+                            mediaSession.broadcastCustomCommand(RATING_CHANGED_EVENT, resultExtras)
+                            PlaybackWidgetUpdater.updateAll(this@Resn8MediaService)
+                            future.set(SessionResult(SessionResult.RESULT_SUCCESS, resultExtras))
+                        }
+                        .onFailure {
+                            future.set(SessionResult(SessionError.ERROR_UNKNOWN))
+                        }
+                }
+                return future
+            }
+
             override fun onAddMediaItems(
                 mediaSession: MediaSession,
                 controller: MediaSession.ControllerInfo,

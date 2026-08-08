@@ -92,6 +92,7 @@ dependencies {
 
     // Coil Image Loading
     implementation(libs.coil.compose)
+    implementation(libs.androidx.glance.appwidget)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)

@@ -447,3 +447,25 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 - Confirm restored files remain unavailable until current folder access is verified. Use each **Select folder** action, grant the original library folder, and allow re-indexing to finish.
 - Verify conservatively matched files become playable without losing restored metadata. Keep some source files absent or ambiguous and confirm they remain unavailable in playlists/history/queues and are reported rather than deleted.
 - Repeat with only a subset of collections and confirm unrelated local collections and global session state remain unchanged.
+
+---
+
+## Home-Screen Playback Widget
+
+### W1 — Place and Resize the Responsive Player
+- On a disposable Android 14, 15, or 16 target, open the launcher widget picker and confirm one **Resn8 Player** entry has a readable preview and description.
+- Place it at approximately 4x2 cells. Confirm the compact layout shows current title, profile-appropriate secondary text, explicit rating state, and Dislike, Previous, Play/Pause, Next, and Like controls without clipping.
+- Resize it to approximately 4x4 cells. Confirm current artwork or the stable placeholder appears and **Up next** shows no more than three playable occurrences.
+- Repeat with long titles, large font, light/dark wallpaper themes, and both Music and Audio Files collections. Confirm Audio Files never shows synthetic artist/album labels.
+
+### W2 — Control Playback and Rating Safely
+- Start a queue containing duplicate media occurrences. Use every compact transport control and confirm the existing `Resn8MediaService` session responds without creating a second player.
+- Tap Like and Dislike rapidly from the widget, including while the foreground app is already connected. Confirm the action applies to the track current at execution time, Dislike clamps at `-1`, and the widget and app show the same authoritative score.
+- Pause playback, tap one of the upcoming rows, and confirm the exact displayed queue occurrence starts at zero. Unavailable items must not appear and the list must not wrap at queue end.
+- Background, lock, restart the launcher, and recreate the app process. Confirm the widget restores the selected collection's active queue through `UiSessionState.activeQueueId` and never autoplays merely because it refreshed.
+
+### W3 — Navigate and Recover
+- Tap active track content from both sizes and confirm a cold or already-running app opens Now Playing exactly once.
+- Clear active playback while the selected collection has playlists; tap the friendly empty state and confirm Playlists opens. Delete all playlists and repeat, confirming Folders opens. With no collection configured, confirm Onboarding opens.
+- Temporarily make the playback service unavailable and confirm the widget shows a bounded retry state without replacing or deleting the saved queue. Restore availability, tap retry, and confirm normal state returns.
+- With TalkBack, verify logical focus order, explicit enabled/disabled action labels, artwork semantics, upcoming-row titles, 48dp targets, and rating meaning that does not rely on color.

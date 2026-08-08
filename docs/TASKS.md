@@ -116,6 +116,18 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 
 **Exit:** Every MVP acceptance criterion passes and the app can be used daily without losing its library, queue, ratings, playlists, browsing context, or playback position.
 
+## Milestone 11 — Add a Responsive Home-Screen Playback Widget (P2)
+
+- [x] **T069 — Establish the responsive widget surface.** Add stable `androidx.glance:glance-appwidget:1.1.1`, register one home-screen-only receiver/provider, supply picker name, description, static/generated previews, responsive compact and expanded size buckets, a stable loading layout, and Material-style dynamic colors. Do not add per-widget configuration.
+- [x] **T070 — Build authoritative widget state and updates.** Derive current playback from MediaController and the active queue exclusively from `UiSessionState.activeQueueId`; preserve duplicate occurrence identity, select up to three playable entries after the current occurrence without wrapping, use profile-appropriate metadata, load bounded expanded artwork with a stable fallback, and update widgets on meaningful playback, queue, and rating events rather than position polling.
+- [x] **T071 — Route widget commands safely.** Send standard transport and occurrence-jump actions through a short-lived MediaController connected to `Resn8MediaService`. Add same-package-only `LIKE_CURRENT` and `DISLIKE_CURRENT` session commands that resolve the current media item at execution time, perform the existing atomic score update, and publish the authoritative result to the app and widget.
+- [x] **T072 — Complete compact, expanded, and empty-state UX.** Keep all controls visible with 48dp targets, accessible labels, disabled-command states, truncation, and non-color rating cues. Open Now Playing from active content. With no current item, show a friendly state and open Playlists when the active collection has playlists; otherwise open Folders, or Onboarding when no collection exists.
+- [ ] **T073 — Verify and close the widget milestone.** Cover state mapping, actions, cold/warm navigation, responsive rendering, update throttling, accessibility, process recreation, paused restoration without autoplay, and Android 14-16 launcher behavior. Run host build gates and disposable-device checks, update `docs/UX.md`, then update the milestone and README status only after exit criteria pass.
+
+See `docs/features/milestone_11_home_screen_playback_widget.md` for the implementation contract and verification matrix.
+
+**Exit:** One responsive home-screen widget provides reliable compact and expanded playback control without violating single-player ownership, losing queue occurrence identity, rating a stale track, or polling continuously; automated gates pass and Android 14-16 launcher verification is recorded.
+
 ## Post-MVP Backlog (P2)
 
 ### Randomized Sorting
@@ -138,3 +150,7 @@ This backlog is ordered by dependency and user value. Complete tasks top-to-bott
 - [ ] **T056 — Add safe disliked-file maintenance.** Preview and confirm move/delete operations through providers that grant write access; keep database/history reconciliation explicit.
 - [x] **T057 — Add collection backup export and import in Settings.** Add visible **Export Backup** and **Import Backup** actions using SAF document creation/opening. Export a versioned, integrity-checked portable backup containing collection names/profiles, media identity and remapping facts, ratings, play statistics, history, playlists and ordering, saved queues, and applicable settings/session state without copying source audio or treating persisted tree-URI grants as portable. Import must validate and preview the backup, require explicit confirmation, apply changes transactionally without silent destructive overwrite, handle collection/name conflicts, require folder reselection where permission is unavailable, remap media conservatively, retain and report unresolved records, and prove same-version round trips, older-version upgrades, corrupt/unsupported input rejection, partial-source recovery, and failure rollback.
 - [ ] **T058 — Surface indexed album artwork throughout the library.** Extend the existing player artwork seam so an indexed artwork reference appears consistently on album, artist, track, queue, and playlist surfaces with caching, bounded decode work, accessibility semantics, and a stable placeholder. Do not rescan or modify source audio merely to decorate a list.
+
+### System Integrations
+
+- [ ] **T074 — Explore Like/Dislike on Android system media controls.** Investigate Media3 media-button preferences on Android 14-16, notification and lock-screen host variability, available button slots, preservation of standard transport controls, and OEM behavior. Keep this research and any later implementation separate from the Milestone 11 home-screen widget.

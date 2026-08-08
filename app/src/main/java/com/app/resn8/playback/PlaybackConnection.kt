@@ -10,6 +10,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import androidx.media3.session.SessionToken
 import com.app.resn8.di.AppContainer
 import com.app.resn8.domain.model.QueueStartRequest
@@ -22,6 +24,7 @@ import com.app.resn8.domain.model.resolvePlaybackOrigin
 import com.app.resn8.storage.artwork.ArtworkCache
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import com.google.common.util.concurrent.Futures
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,6 +70,23 @@ class PlaybackConnection(
 
     private val attemptedFailedItems = mutableSetOf<String>()
     private var activeQueue: SavedQueue? = null
+
+    private val controllerListener = object : MediaController.Listener {
+        override fun onCustomCommand(
+            controller: MediaController,
+            command: SessionCommand,
+            args: Bundle
+        ): ListenableFuture<SessionResult> {
+            if (command == RATING_CHANGED_EVENT) {
+                val mediaId = args.getString(RATING_RESULT_MEDIA_ID)
+                val score = args.getInt(RATING_RESULT_SCORE)
+                if (mediaId != null && _uiState.value.currentMediaId == mediaId) {
+                    _uiState.update { it.copy(likeScore = score) }
+                }
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+    }
 
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -121,7 +141,9 @@ class PlaybackConnection(
                     context,
                     ComponentName(context, Resn8MediaService::class.java)
                 )
-                val future = MediaController.Builder(context, sessionToken).buildAsync()
+                val future = MediaController.Builder(context, sessionToken)
+                    .setListener(controllerListener)
+                    .buildAsync()
                 controllerFuture = future
                 val ctrl = future.awaitFuture()
                 controller = ctrl
@@ -426,28 +448,29 @@ class PlaybackConnection(
         }
     }
 
-    fun likeTrack(mediaId: String? = _uiState.value.currentMediaId) {
-        if (mediaId == null) return
-        scope.launch {
-            val result = container.mediaRepository.updateLikeScore(mediaId, +1)
-            result.onSuccess { newScore ->
-                if (_uiState.value.currentMediaId == mediaId) {
-                    _uiState.update { it.copy(likeScore = newScore) }
-                }
-            }
-        }
+    fun likeTrack() {
+        rateCurrentTrack(LIKE_CURRENT_COMMAND)
     }
 
-    fun dislikeTrack(mediaId: String? = _uiState.value.currentMediaId) {
-        if (mediaId == null) return
+    fun dislikeTrack() {
+        rateCurrentTrack(DISLIKE_CURRENT_COMMAND)
+    }
+
+    private fun rateCurrentTrack(command: SessionCommand) {
+        val ctrl = controller ?: return
+        if (!ctrl.isSessionCommandAvailable(command)) return
         scope.launch {
-            val result = container.mediaRepository.updateLikeScore(mediaId, -1)
-            result.onSuccess { newScore ->
-                if (_uiState.value.currentMediaId == mediaId) {
-                    _uiState.update { it.copy(likeScore = newScore) }
+            runCatching { ctrl.sendCustomCommand(command, Bundle.EMPTY).awaitFuture() }
+                .getOrNull()
+                ?.takeIf { it.resultCode == SessionResult.RESULT_SUCCESS }
+                ?.extras
+                ?.let { result ->
+                    val mediaId = result.getString(RATING_RESULT_MEDIA_ID)
+                    if (mediaId != null && _uiState.value.currentMediaId == mediaId) {
+                        _uiState.update { it.copy(likeScore = result.getInt(RATING_RESULT_SCORE)) }
+                    }
                 }
             }
-        }
     }
 
     @OptIn(UnstableApi::class)

@@ -69,6 +69,7 @@ import com.app.resn8.domain.model.LibraryFilterSnapshot
 import com.app.resn8.domain.model.SortOrder
 import com.app.resn8.domain.model.PlaybackOrigin
 import com.app.resn8.domain.model.restorableQueueIdForCollection
+import com.app.resn8.widget.WidgetDestination
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -150,6 +151,8 @@ internal fun buildTopLevelDestinations(
 fun Resn8App(
     container: AppContainer,
     navController: NavHostController = rememberNavController(),
+    widgetDestination: WidgetDestination? = null,
+    onWidgetDestinationConsumed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val startupCoordinator: AppStartupCoordinator = viewModel(
@@ -173,6 +176,8 @@ fun Resn8App(
                 container = container,
                 navController = navController,
                 startDestination = startDestination,
+                widgetDestination = widgetDestination,
+                onWidgetDestinationConsumed = onWidgetDestinationConsumed,
                 modifier = modifier
             )
         }
@@ -185,6 +190,8 @@ private fun Resn8AppContent(
     container: AppContainer,
     navController: NavHostController,
     startDestination: Any,
+    widgetDestination: WidgetDestination? = null,
+    onWidgetDestinationConsumed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -208,6 +215,20 @@ private fun Resn8AppContent(
     val playbackConnection = container.playbackConnection
     val playbackUiState by (playbackConnection?.uiState ?: remember { kotlinx.coroutines.flow.MutableStateFlow(com.app.resn8.playback.PlaybackUiState()) }).collectAsState()
     val isNowPlaying = currentDestination?.route?.contains("NowPlayingRoute") == true
+
+    LaunchedEffect(widgetDestination) {
+        val destination = widgetDestination ?: return@LaunchedEffect
+        val route: Any = when (destination) {
+            WidgetDestination.NOW_PLAYING -> NowPlayingRoute
+            WidgetDestination.PLAYLISTS -> PlaylistsRoute
+            WidgetDestination.FOLDERS -> FoldersRoute()
+            WidgetDestination.ONBOARDING -> OnboardingRoute
+        }
+        navController.navigate(route) {
+            launchSingleTop = true
+        }
+        onWidgetDestinationConsumed()
+    }
 
     var openSelectorHandler by remember { mutableStateOf<((List<String>, String, String?) -> Unit)?>(null) }
 

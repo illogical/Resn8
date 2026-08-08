@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Resn8</string>
+    <string name="playback_widget_name">Resn8 Player</string>
+    <string name="playback_widget_description">Control playback, rate the current track, and see what is up next.</string>
+    <string name="playback_widget_preview_track">Example track</string>
+    <string name="playback_widget_preview_detail">Artist · Neutral</string>
+    <string name="playback_widget_dislike">Dislike</string>
+    <string name="playback_widget_previous">Previous</string>
+    <string name="playback_widget_play">Play</string>
+    <string name="playback_widget_next">Next</string>
+    <string name="playback_widget_like">Like</string>
 </resources>
