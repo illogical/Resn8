@@ -15,13 +15,10 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
-import androidx.glance.action.ActionParameters
-import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.appwidget.action.actionSendBroadcast
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -48,7 +45,7 @@ import com.app.resn8.R
 
 class PlaybackWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Responsive(
-        setOf(COMPACT_SIZE, EXPANDED_SIZE)
+        setOf(COMPACT_SIZE, STANDARD_COMPACT_SIZE, EXPANDED_SIZE)
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -60,6 +57,7 @@ class PlaybackWidget : GlanceAppWidget() {
 
     companion object {
         val COMPACT_SIZE = DpSize(250.dp, 110.dp)
+        val STANDARD_COMPACT_SIZE = DpSize(300.dp, 130.dp)
         val EXPANDED_SIZE = DpSize(250.dp, 250.dp)
     }
 }
@@ -90,10 +88,16 @@ private val Accent: GlanceColorProvider
     @Composable get() = LocalWidgetColors.current.accent
 private val Disabled: GlanceColorProvider
     @Composable get() = LocalWidgetColors.current.disabled
+private val Surface: GlanceColorProvider
+    @Composable get() = LocalWidgetColors.current.surface
 
 @Composable
 private fun PlaybackWidgetContent(snapshot: PlaybackWidgetSnapshot) {
-    val isExpanded = LocalSize.current.height >= 180.dp
+    val widgetSize = LocalSize.current
+    val isExpanded = widgetSize.height >= 180.dp
+    val useLargeCompactControls = !isExpanded &&
+        widgetSize.width >= PlaybackWidget.STANDARD_COMPACT_SIZE.width &&
+        widgetSize.height >= PlaybackWidget.STANDARD_COMPACT_SIZE.height
     val colors = dynamicWidgetColors(LocalWidgetContext.current)
     CompositionLocalProvider(LocalWidgetColors provides colors) {
         Box(
@@ -101,10 +105,17 @@ private fun PlaybackWidgetContent(snapshot: PlaybackWidgetSnapshot) {
                 .fillMaxSize()
                 .cornerRadius(24.dp)
                 .background(colors.surface)
-                .padding(12.dp)
+                .padding(
+                    horizontal = if (useLargeCompactControls) 8.dp else 12.dp,
+                    vertical = if (useLargeCompactControls) 8.dp else 12.dp
+                )
         ) {
             when (snapshot.status) {
-                PlaybackWidgetStatus.READY -> ReadyContent(snapshot, isExpanded)
+                PlaybackWidgetStatus.READY -> ReadyContent(
+                    snapshot = snapshot,
+                    expanded = isExpanded,
+                    controlSize = if (useLargeCompactControls) 56.dp else 48.dp
+                )
                 PlaybackWidgetStatus.EMPTY -> EmptyContent(snapshot)
                 PlaybackWidgetStatus.ERROR -> ErrorContent(snapshot)
             }
@@ -129,9 +140,13 @@ private fun dynamicWidgetColors(context: Context): WidgetColors {
 }
 
 @Composable
-private fun ReadyContent(snapshot: PlaybackWidgetSnapshot, expanded: Boolean) {
-    Column(modifier = GlanceModifier.fillMaxSize()) {
-        if (expanded) {
+private fun ReadyContent(
+    snapshot: PlaybackWidgetSnapshot,
+    expanded: Boolean,
+    controlSize: androidx.compose.ui.unit.Dp
+) {
+    if (expanded) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
             Row(
                 modifier = GlanceModifier
                     .fillMaxWidth()
@@ -154,21 +169,9 @@ private fun ReadyContent(snapshot: PlaybackWidgetSnapshot, expanded: Boolean) {
                     )
                 }
                 Spacer(GlanceModifier.width(10.dp))
-                TrackText(snapshot, GlanceModifier.fillMaxWidth())
+                TrackText(snapshot, GlanceModifier.fillMaxWidth(), centered = false)
             }
-        } else {
-            Box(
-                modifier = GlanceModifier
-                    .fillMaxWidth()
-                    .clickable(actionStartActivity(widgetNavigationIntent(LocalWidgetContext.current, WidgetDestination.NOW_PLAYING)))
-            ) {
-                TrackText(snapshot, GlanceModifier.fillMaxWidth())
-            }
-        }
-
-        TransportControls(snapshot)
-
-        if (expanded) {
+            TransportControls(snapshot, controlSize)
             Spacer(GlanceModifier.height(2.dp))
             Text(
                 text = "Up next",
@@ -185,45 +188,105 @@ private fun ReadyContent(snapshot: PlaybackWidgetSnapshot, expanded: Boolean) {
                 snapshot.upcoming.forEach { row -> UpcomingRow(row) }
             }
         }
+    } else {
+        Column(
+            modifier = GlanceModifier.fillMaxSize(),
+            horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
+            verticalAlignment = Alignment.Vertical.CenterVertically
+        ) {
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .clickable(
+                        actionStartActivity(
+                            widgetNavigationIntent(LocalWidgetContext.current, WidgetDestination.NOW_PLAYING)
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                TrackText(snapshot, GlanceModifier.fillMaxWidth(), centered = true)
+            }
+            TransportControls(snapshot, controlSize)
+        }
     }
 }
 
 @Composable
-private fun TrackText(snapshot: PlaybackWidgetSnapshot, modifier: GlanceModifier) {
-    Column(modifier = modifier) {
+private fun TrackText(snapshot: PlaybackWidgetSnapshot, modifier: GlanceModifier, centered: Boolean) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = if (centered) {
+            Alignment.Horizontal.CenterHorizontally
+        } else {
+            Alignment.Horizontal.Start
+        }
+    ) {
         Text(
             text = snapshot.title,
-            style = TextStyle(color = PrimaryText, fontWeight = FontWeight.Bold, fontSize = 17.sp),
+            style = TextStyle(
+                color = PrimaryText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                textAlign = if (centered) TextAlign.Center else TextAlign.Start
+            ),
             maxLines = 1
         )
-        val detail = listOf(snapshot.secondaryText, ratingLabel(snapshot.likeScore))
-            .filter { it.isNotBlank() }
-            .joinToString(" · ")
         Text(
-            text = detail,
-            style = TextStyle(color = SecondaryText, fontSize = 13.sp),
+            text = snapshot.secondaryText,
+            style = TextStyle(
+                color = SecondaryText,
+                fontSize = 13.sp,
+                textAlign = if (centered) TextAlign.Center else TextAlign.Start
+            ),
             maxLines = 1
         )
     }
 }
 
 @Composable
-private fun TransportControls(snapshot: PlaybackWidgetSnapshot) {
+private fun TransportControls(snapshot: PlaybackWidgetSnapshot, controlSize: androidx.compose.ui.unit.Dp) {
     Row(
-        modifier = GlanceModifier.fillMaxWidth().height(48.dp),
+        modifier = GlanceModifier.fillMaxWidth().height(controlSize),
         horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
         verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
-        ControlIcon(R.drawable.ic_widget_dislike, "Dislike current track", snapshot.canRate, PlaybackWidgetCommand.DISLIKE)
-        ControlIcon(R.drawable.ic_widget_previous, "Previous track", snapshot.canSkipPrevious, PlaybackWidgetCommand.PREVIOUS)
+        RatingControlIcon(
+            drawable = R.drawable.ic_widget_dislike,
+            description = ratingContentDescription("Dislike current track", snapshot.likeScore),
+            enabled = snapshot.canRate,
+            command = PlaybackWidgetCommand.DISLIKE,
+            overlay = "",
+            controlSize = controlSize
+        )
+        ControlIcon(
+            R.drawable.ic_widget_previous,
+            "Previous track",
+            snapshot.canSkipPrevious,
+            PlaybackWidgetCommand.PREVIOUS,
+            controlSize
+        )
         ControlIcon(
             if (snapshot.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
             if (snapshot.isPlaying) "Pause" else "Play",
             snapshot.canPlayPause,
-            PlaybackWidgetCommand.TOGGLE_PLAY_PAUSE
+            PlaybackWidgetCommand.TOGGLE_PLAY_PAUSE,
+            controlSize
         )
-        ControlIcon(R.drawable.ic_widget_next, "Next track", snapshot.canSkipNext, PlaybackWidgetCommand.NEXT)
-        ControlIcon(R.drawable.ic_widget_like, "Like current track", snapshot.canRate, PlaybackWidgetCommand.LIKE)
+        ControlIcon(
+            R.drawable.ic_widget_next,
+            "Next track",
+            snapshot.canSkipNext,
+            PlaybackWidgetCommand.NEXT,
+            controlSize
+        )
+        RatingControlIcon(
+            drawable = R.drawable.ic_widget_like,
+            description = ratingContentDescription("Like current track", snapshot.likeScore),
+            enabled = snapshot.canRate,
+            command = PlaybackWidgetCommand.LIKE,
+            overlay = likeOverlayLabel(snapshot.likeScore),
+            controlSize = controlSize
+        )
     }
 }
 
@@ -232,22 +295,64 @@ private fun ControlIcon(
     drawable: Int,
     description: String,
     enabled: Boolean,
-    command: PlaybackWidgetCommand
+    command: PlaybackWidgetCommand,
+    controlSize: androidx.compose.ui.unit.Dp
 ) {
-    var modifier = GlanceModifier.size(48.dp).padding(12.dp)
+    var modifier = GlanceModifier.size(controlSize)
     if (enabled) {
         modifier = modifier.clickable(
-            actionRunCallback<PlaybackWidgetCommandAction>(
-                actionParametersOf(CommandKey to command.name)
+            actionSendBroadcast(
+                PlaybackWidgetActionContract.commandIntent(LocalWidgetContext.current, command)
             )
         )
     }
-    Image(
-        provider = ImageProvider(drawable),
-        contentDescription = if (enabled) description else "$description unavailable",
-        modifier = modifier,
-        colorFilter = ColorFilter.tint(if (enabled) Accent else Disabled)
-    )
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Image(
+            provider = ImageProvider(drawable),
+            contentDescription = if (enabled) description else "$description unavailable",
+            modifier = GlanceModifier.size(if (controlSize >= 56.dp) 32.dp else 28.dp),
+            colorFilter = ColorFilter.tint(if (enabled) Accent else Disabled)
+        )
+    }
+}
+
+@Composable
+private fun RatingControlIcon(
+    drawable: Int,
+    description: String,
+    enabled: Boolean,
+    command: PlaybackWidgetCommand,
+    overlay: String,
+    controlSize: androidx.compose.ui.unit.Dp
+) {
+    var modifier = GlanceModifier.size(controlSize)
+    if (enabled) {
+        modifier = modifier.clickable(
+            actionSendBroadcast(
+                PlaybackWidgetActionContract.commandIntent(LocalWidgetContext.current, command)
+            )
+        )
+    }
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Image(
+            provider = ImageProvider(drawable),
+            contentDescription = if (enabled) description else "$description unavailable",
+            modifier = GlanceModifier.size(if (controlSize >= 56.dp) 32.dp else 28.dp),
+            colorFilter = ColorFilter.tint(if (enabled) Accent else Disabled)
+        )
+        if (overlay.isNotEmpty()) {
+            Text(
+                text = overlay,
+                style = TextStyle(
+                    color = Surface,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (overlay.length >= 3) 9.sp else 10.sp,
+                    textAlign = TextAlign.Center
+                ),
+                maxLines = 1
+            )
+        }
+    }
 }
 
 @Composable
@@ -258,8 +363,8 @@ private fun UpcomingRow(row: PlaybackWidgetQueueRow) {
             .fillMaxWidth()
             .height(32.dp)
             .clickable(
-                actionRunCallback<PlaybackWidgetJumpAction>(
-                    actionParametersOf(QueueItemKey to row.queueItemId)
+                actionSendBroadcast(
+                    PlaybackWidgetActionContract.jumpIntent(LocalWidgetContext.current, row.queueItemId)
                 )
             ),
         contentAlignment = Alignment.CenterStart
@@ -310,7 +415,11 @@ private fun ErrorContent(snapshot: PlaybackWidgetSnapshot) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .clickable(actionRunCallback<RefreshPlaybackWidgetAction>()),
+            .clickable(
+                actionSendBroadcast(
+                    PlaybackWidgetActionContract.refreshIntent(LocalWidgetContext.current)
+                )
+            ),
         horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
         verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
@@ -324,31 +433,5 @@ private fun ErrorContent(snapshot: PlaybackWidgetSnapshot) {
             style = TextStyle(color = SecondaryText, fontSize = 12.sp, textAlign = TextAlign.Center),
             maxLines = 2
         )
-    }
-}
-
-private val CommandKey = ActionParameters.Key<String>("playback_command")
-private val QueueItemKey = ActionParameters.Key<String>("queue_item_id")
-
-class PlaybackWidgetCommandAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        val command = parameters[CommandKey]?.let { runCatching { PlaybackWidgetCommand.valueOf(it) }.getOrNull() }
-            ?: return
-        PlaybackWidgetController(context).execute(command)
-        PlaybackWidgetUpdater.updateAll(context)
-    }
-}
-
-class PlaybackWidgetJumpAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        val queueItemId = parameters[QueueItemKey] ?: return
-        PlaybackWidgetController(context).jumpTo(queueItemId)
-        PlaybackWidgetUpdater.updateAll(context)
-    }
-}
-
-class RefreshPlaybackWidgetAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        PlaybackWidgetUpdater.updateAll(context)
     }
 }

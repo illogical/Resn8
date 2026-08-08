@@ -82,6 +82,21 @@ class PlaybackWidgetSnapshotTest {
         assertEquals("Disliked", ratingLabel(-1))
     }
 
+    @Test
+    fun ratingOverlaysConsolidateScoreWithoutLosingFullAccessibilityValue() {
+        assertEquals("", likeOverlayLabel(0))
+        assertEquals("+2", likeOverlayLabel(2))
+        assertEquals("99+", likeOverlayLabel(100))
+        assertEquals(
+            "Like current track, current score +125",
+            ratingContentDescription("Like current track", 125)
+        )
+        assertEquals(
+            "Dislike current track, current score Disliked",
+            ratingContentDescription("Dislike current track", -1)
+        )
+    }
+
     private fun queue(vararg items: SavedQueueItem) = SavedQueue(
         id = "active-queue",
         collectionId = "collection",

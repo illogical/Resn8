@@ -43,6 +43,10 @@
                 android:resource="@xml/playback_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.PlaybackWidgetActionReceiver"
+            android:exported="false" />
+
         <service
             android:name=".playback.Resn8MediaService"
             android:foregroundServiceType="mediaPlayback"

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -24,12 +23,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.ThumbDown
-import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.outlined.ThumbDown
-import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -62,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.app.resn8.ui.components.RatingActionButton
 import java.util.Locale
 
 private val MinimumArtworkSize = 72.dp
@@ -596,56 +592,20 @@ private fun RatingControls(
     onLikeClicked: () -> Unit,
     onDislikeClicked: () -> Unit
 ) {
-    val isLiked = likeScore > 0
-    val isDisliked = likeScore < 0
-
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = onDislikeClicked,
-            colors = if (isDisliked) {
-                IconButtonDefaults.iconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                )
-            } else {
-                IconButtonDefaults.iconButtonColors()
-            },
-            modifier = Modifier.size(48.dp)
-        ) {
-            Icon(
-                imageVector = if (isDisliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown,
-                contentDescription = "Dislike"
-            )
-        }
-
-        Text(
-            text = if (likeScore > 0) "+$likeScore" else "",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.width(40.dp),
-            textAlign = TextAlign.Center
+        RatingActionButton(
+            likeScore = likeScore,
+            isLikeAction = false,
+            onClick = onDislikeClicked
         )
-
-        IconButton(
-            onClick = onLikeClicked,
-            colors = if (isLiked) {
-                IconButtonDefaults.iconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            } else {
-                IconButtonDefaults.iconButtonColors()
-            },
-            modifier = Modifier.size(48.dp)
-        ) {
-            Icon(
-                imageVector = if (isLiked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
-                contentDescription = "Like"
-            )
-        }
-
+        RatingActionButton(
+            likeScore = likeScore,
+            isLikeAction = true,
+            onClick = onLikeClicked
+        )
     }
 }
 

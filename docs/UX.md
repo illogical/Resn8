@@ -455,12 +455,14 @@ Milestone 4 delivered the visible rating and playlist action seams. Milestone 5 
 ### W1 — Place and Resize the Responsive Player
 - On a disposable Android 14, 15, or 16 target, open the launcher widget picker and confirm one **Resn8 Player** entry has a readable preview and description.
 - Place it at approximately 4x2 cells. Confirm the compact layout shows current title, profile-appropriate secondary text, explicit rating state, and Dislike, Previous, Play/Pause, Next, and Like controls without clipping.
+- Confirm the compact metadata/control group is centered horizontally and vertically. At wider/taller compact sizes, verify controls grow from 48dp to 56dp targets without overlap.
 - Resize it to approximately 4x4 cells. Confirm current artwork or the stable placeholder appears and **Up next** shows no more than three playable occurrences.
 - Repeat with long titles, large font, light/dark wallpaper themes, and both Music and Audio Files collections. Confirm Audio Files never shows synthetic artist/album labels.
 
 ### W2 — Control Playback and Rating Safely
 - Start a queue containing duplicate media occurrences. Use every compact transport control and confirm the existing `Resn8MediaService` session responds without creating a second player.
 - Tap Like and Dislike rapidly from the widget, including while the foreground app is already connected. Confirm the action applies to the track current at execution time, Dislike clamps at `-1`, and the widget and app show the same authoritative score.
+- Confirm positive scores appear centered on Like (`+1` through `+99`, then `99+`). Confirm no count appears at neutral `0` or disliked `-1`; with TalkBack, verify the full uncapped score or rating state is still announced in both the widget and Now Playing.
 - Pause playback, tap one of the upcoming rows, and confirm the exact displayed queue occurrence starts at zero. Unavailable items must not appear and the list must not wrap at queue end.
 - Background, lock, restart the launcher, and recreate the app process. Confirm the widget restores the selected collection's active queue through `UiSessionState.activeQueueId` and never autoplays merely because it refreshed.
 

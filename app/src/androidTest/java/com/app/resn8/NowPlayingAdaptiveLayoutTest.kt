@@ -165,6 +165,28 @@ class NowPlayingAdaptiveLayoutTest {
         composeRule.onNodeWithTag("now-playing-context-link").assertDoesNotExist()
     }
 
+    @Test
+    fun ratingScoreIsOverlaidOnItsActionAndRetainsTheFullAccessibleValue() {
+        composeRule.setContent {
+            MaterialTheme {
+                Box(modifier = Modifier.size(width = 360.dp, height = 640.dp)) {
+                    NowPlayingScreen(
+                        title = "Favorite Things",
+                        artist = "Incubus",
+                        album = "S.C.I.E.N.C.E.",
+                        showMusicMetadata = true,
+                        likeScore = 125,
+                        durationMs = 191_000L
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("rating-like-overlay").assertTextEquals("99+")
+        composeRule.onNodeWithContentDescription("Like, current score +125").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Dislike, current score +125").assertIsDisplayed()
+    }
+
     private fun assertControlsInsidePlayer() {
         val root = composeRule.onNodeWithTag("now-playing-root")
             .fetchSemanticsNode().boundsInRoot
@@ -173,8 +195,8 @@ class NowPlayingAdaptiveLayoutTest {
             "Previous Track",
             "Play",
             "Next Track",
-            "Dislike",
-            "Like",
+            "Dislike, current score Neutral",
+            "Like, current score Neutral",
             "Add to Playlist"
         ).forEach { description ->
             composeRule.onNodeWithContentDescription(description).assertIsDisplayed()

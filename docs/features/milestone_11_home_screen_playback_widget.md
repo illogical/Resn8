@@ -47,14 +47,16 @@ Add explicit internal `LIKE_CURRENT` and `DISLIKE_CURRENT` MediaSession commands
 
 After a successful rating, broadcast a same-app rating-changed session event and request a widget refresh. `PlaybackConnection` uses the same commands and consumes the event so a widget-originated rating is reflected when the foreground UI is already connected.
 
-Widget transport actions use a short-lived MediaController, check the corresponding standard `Player` command, execute exactly one operation, and release the controller future in `finally`. Direct upcoming-row selection locates the exact `queueItemId`, seeks to its index at zero, prepares, and starts playback. No widget component constructs or releases ExoPlayer.
+Widget interactions use explicit intents targeting a non-exported same-package receiver. The receiver bounds each request to five seconds, uses a short-lived MediaController, checks the corresponding standard `Player` command, executes exactly one operation, and releases the controller future in `finally`. Direct upcoming-row selection locates the exact `queueItemId`, seeks to its index at zero, prepares, and starts playback. No widget component constructs or releases ExoPlayer.
 
 ## Responsive UX and navigation
 
 ### Compact bucket
 
-- Target approximately 4x2 cells with current title, profile-appropriate secondary text, visible `+N` or `Disliked` rating state, and five 48dp controls.
-- Use disabled states when commands or a current item are unavailable. Icons have explicit action and state descriptions; rating never relies on color alone.
+- Target approximately 4x2 cells with a horizontally and vertically centered content group containing current title, profile-appropriate secondary text, and five controls.
+- Retain 48dp targets at the constrained 250x110dp bucket. Use a 300x130dp compact bucket with 56dp targets and 32dp icons when the host provides the space.
+- Overlay positive scores through `+99` on Like and display `99+` above that. Hide the count at neutral `0` and disliked `-1`; accessibility still exposes the full rating state, which never relies on color alone.
+- Use disabled states when commands or a current item are unavailable. The clickable modifier belongs to the entire touch-target container, not only the icon image.
 - Tapping track content opens Now Playing.
 
 ### Expanded bucket
@@ -78,6 +80,7 @@ Widget transport actions use a short-lived MediaController, check the correspond
 - Test transport and direct occurrence jumps while paused/playing, disconnected, and at queue boundaries.
 - Test cold- and warm-activity navigation for Now Playing and the Playlists -> Folders -> Onboarding empty-state fallback.
 - Render compact and expanded widgets with long text, large font, missing artwork, each rating state, disabled controls, and zero to three upcoming rows. Verify touch targets, descriptions, truncation, and no overlap.
+- Verify every generated command and occurrence-jump intent has unique PendingIntent identity, round-trips through the action contract, and rejects malformed input.
 
 Run from the repository root with Android Studio's bundled JDK:
 
@@ -103,6 +106,17 @@ $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 - `assembleDebugAndroidTest`: passed; the instrumentation APK compiled without installing or running it.
 - `git diff --check`: passed; only the repository's existing Windows line-ending notices were emitted.
 - No connected-device, APK installation, launcher placement, or manual Android 14-16 verification was run. T073 and the README milestone therefore remain unchecked.
+
+## Widget feedback follow-up — 2026-08-08
+
+- Launcher screenshots showed compact content anchored toward the top with substantial unused space and the signed rating duplicated in the metadata line.
+- On-device navigation from artwork worked, but all Glance callback-backed transport and rating actions were inert. The active MediaSession remained healthy and advertised playback actions, isolating the failure to widget action delivery rather than player ownership or timeline state.
+- The follow-up replaces callback actions with an explicit non-exported receiver, centers compact content, adds the larger compact control bucket, and consolidates positive scores into the Like control in both the widget and Now Playing.
+- `testDebugUnitTest`: passed, 136 tests across 39 suites with zero failures, errors, or skips.
+- `lintDebug assembleDebug`: passed; the debug APK compiled successfully. Existing lint warnings remain non-blocking.
+- `assembleDebugAndroidTest`: passed; the new action-contract and rating UI instrumentation tests compile without installing or running an APK.
+- `git diff --check`: passed; only the repository's existing Windows line-ending notices were emitted.
+- The user-provided launcher screenshots establish the pre-fix compact/expanded baseline, but the repaired APK has not been installed or manually exercised. T073 and the README milestone remain unchecked.
 
 ## Assumptions
 

@@ -107,3 +107,12 @@ internal fun ratingLabel(score: Int): String = when {
     score < 0 -> "Disliked"
     else -> "Neutral"
 }
+
+internal fun likeOverlayLabel(score: Int): String = when {
+    score > 99 -> "99+"
+    score > 0 -> "+$score"
+    else -> ""
+}
+
+internal fun ratingContentDescription(action: String, score: Int): String =
+    "$action, current score ${ratingLabel(score)}"
